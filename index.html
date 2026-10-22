@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>crypto-tune</title>
+  </head>
+  <body>
+    <main class="app">
+      <header class="bar">
+        <h1>crypto-tune</h1>
+        <span id="status" class="status" data-state="idle">idle</span>
+      </header>
+
+      <section class="readout">
+        <div class="label" id="feed-label">—</div>
+        <div class="price" id="price">—</div>
+        <div class="meter">
+          <div class="meter-track">
+            <div class="meter-fill" id="tension-fill"></div>
+            <span class="meter-mark" style="left: 20%"></span>
+            <span class="meter-mark" style="left: 50%"></span>
+          </div>
+          <div class="meter-scale"><span>0</span><span>1</span><span>2.5</span><span>5</span></div>
+        </div>
+        <dl class="stats">
+          <dt>tension</dt><dd id="tension">—</dd>
+          <dt>direction</dt><dd id="direction">—</dd>
+          <dt>z (ret)</dt><dd id="z">—</dd>
+          <dt>volZ</dt><dd id="volz">—</dd>
+          <dt>vol/s</dt><dd id="vol">—</dd>
+          <dt>warm-up</dt><dd id="warmup">—</dd>
+        </dl>
+      </section>
+
+      <section class="controls">
+        <fieldset class="segmented" id="source">
+          <legend>Источник</legend>
+          <label><input type="radio" name="source" value="live" /> LIVE</label>
+          <label><input type="radio" name="source" value="simulator" /> SIMULATOR</label>
+        </fieldset>
+
+        <label class="field">
+          <span>Пара (Binance USDⓈ-M)</span>
+          <input id="symbol" list="symbols" autocomplete="off" spellcheck="false" />
+          <datalist id="symbols"></datalist>
+          <small id="symbol-error" class="error" hidden></small>
+        </label>
+
+        <label class="field">
+          <span>Окно N: <output id="window-out"></output> с</span>
+          <input id="window" type="range" />
+        </label>
+
+        <label class="field">
+          <span>Чувствительность: ×<output id="sens-out"></output></span>
+          <input id="sensitivity" type="range" />
+        </label>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
