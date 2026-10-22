@@ -20,22 +20,29 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 ## Layout
 
 - `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: exchange adapters
-  (`binance.ts`), `simulator.ts`, later `replay.ts`, `mexc.ts`. `reconnecting-socket.ts` owns
-  backoff and the silence/connect watchdog.
+  (`binance.ts`, which also loads 30 min of REST `aggTrades` on connect so metrics start warm),
+  `simulator.ts`, later `replay.ts`, `mexc.ts`. `reconnecting-socket.ts` owns backoff and the
+  silence/connect watchdog. History is emitted before live events, trades always in `ts` order.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`.
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
   first user gesture), `mixer.ts` (layers → reverb → compressor → limiter → master),
-  `base-layer.ts` (drone + arpeggio), `tension-layer.ts` (sub, percussion, riser), `events-layer.ts`
+  `base-layer.ts` (drone with chord drift + arpeggio), `ambience-layer.ts` (Eno bell loops + pulse,
+  base channel), `tension-layer.ts` (sub, percussion, riser, shock swell), `events-layer.ts`
   (liquidation gongs, trade plucks). Pure, spec-covered: `scale.ts`, `arp-pattern.ts`,
-  `tension-map.ts` (tension/direction → every sound parameter), `events-map.ts` (cascade collapse,
-  size → velocity, voice placement). Event flow: `AudioEngine.onTrade/onLiquidation` buffer events
-  above threshold, `flushEvents(feed.now())` plays at most one voice per kind per tick.
+  `tension-map.ts` (tension/direction → every sound parameter; `stepShock` detector),
+  `events-map.ts` (cascade collapse, size → velocity, voice placement). Event flow:
+  `AudioEngine.onTrade/onLiquidation` buffer events above threshold, `flushEvents(feed.now())`
+  plays at most one voice per kind per tick.
   Keep anything testable out of Tone-importing files: Tone needs a browser AudioContext.
   Layers use their own node's context (`this.loop.context.transport`), not `Tone.getTransport()`,
   so they also render in `Tone.Offline`.
   Never automate `transport.bpm` with `rampTo` per tick: it crashes Tone 15's clock after about a
   minute. Write whole-BPM steps with `setValueAtTime` only when the value changes.
+  Transport vs context time: `Loop.start`/`scheduleOnce` take transport time, so place loops once
+  with `start(0)` (or tick strings like `` `${n}i` ``) and let transport start/stop drive them;
+  never pass `Tone.now()`. `transport.nextSubdivision` returns context time: convert with
+  `getTicksAtTime` before scheduling on the transport.
 - `src/ui/` — DOM view; `index.html` holds the static markup.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
@@ -87,7 +94,8 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
 - Metrics run on `feed.now()`, never `Date.now()`, so replay speed-ups and throttled timers do not
   distort statistics.
 - Every audio parameter change goes through `rampTo`/scheduled ramps — no clicks, no volume jumps.
-  Tempo/register switches are quantized to bar boundaries.
+  Quantized switches land on the grid: double time on the next beat, contour on the next note,
+  chord changes on bar lines.
 - Feed adapters normalize to `Trade`/`Liquidation`: `side` is the aggressor; a forced SELL is a
   `long` liquidation.
 - Exchange endpoints come from current official docs, never guessed. Binance USDⓈ-M uses the

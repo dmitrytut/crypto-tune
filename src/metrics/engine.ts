@@ -25,7 +25,7 @@ export interface MetricsConfig {
 }
 
 export const DEFAULT_METRICS_CONFIG: MetricsConfig = {
-  windowSec: 10,
+  windowSec: 5,
   statsWindowMin: 30,
   warmupMin: 5,
   emaHorizonMin: 60,

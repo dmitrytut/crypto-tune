@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arpDegree, MAX_REGISTER_SHIFT, stickyShift } from '../arp-pattern';
+import { arpDegree, entryStep, MAX_REGISTER_SHIFT, stickyShift } from '../arp-pattern';
 
 describe('arpDegree', () => {
   it('cycles the pattern and transposes it by the register shift', () => {
@@ -15,6 +15,27 @@ describe('arpDegree', () => {
     expect(up.every((d, i) => i === 0 || d === (up[i - 1] as number) + 1)).toBe(true);
     expect(down).toEqual([...up].reverse());
     expect(arpDegree(0, 1, 'down')).toBe((down[0] as number) + 1);
+  });
+});
+
+describe('entryStep', () => {
+  it('continues a run from the note just played instead of restarting the phrase', () => {
+    // Calm phrase was on degree 5 when the market started moving.
+    expect(arpDegree(entryStep('up', 5), 0, 'up')).toBe(6);
+    expect(arpDegree(entryStep('down', 5), 0, 'down')).toBe(4);
+  });
+
+  it('steps to the neighbouring degree from anywhere inside a run', () => {
+    for (let from = 0; from < 7; from++) {
+      expect(arpDegree(entryStep('up', from), 0, 'up')).toBe(from + 1);
+      expect(arpDegree(entryStep('down', from + 1), 0, 'down')).toBe(from);
+    }
+  });
+
+  it('settles back into the calm phrase within a third of the last note', () => {
+    for (let from = 0; from <= 7; from++) {
+      expect(Math.abs(arpDegree(entryStep('calm', from), 0) - from)).toBeLessThanOrEqual(2);
+    }
   });
 });
 
