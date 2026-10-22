@@ -100,6 +100,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const tonic = el<HTMLSelectElement>('tonic');
   const baseVol = el<HTMLInputElement>('base-volume');
   const baseVolOut = el<HTMLOutputElement>('base-vol-out');
+  const tensionVol = el<HTMLInputElement>('tension-volume');
+  const tensionVolOut = el<HTMLOutputElement>('tension-vol-out');
 
   audioToggle.addEventListener('click', () => handlers.onToggleAudio());
 
@@ -178,10 +180,19 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   bindRange(
     baseVol,
     baseVolOut,
-    LIMITS.baseVolumeDb,
+    LIMITS.layerVolumeDb,
     settings.baseVolumeDb,
     String,
     (v) => update({ baseVolumeDb: v }),
+    'input',
+  );
+  bindRange(
+    tensionVol,
+    tensionVolOut,
+    LIMITS.layerVolumeDb,
+    settings.tensionVolumeDb,
+    String,
+    (v) => update({ tensionVolumeDb: v }),
     'input',
   );
 

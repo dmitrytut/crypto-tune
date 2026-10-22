@@ -26,8 +26,13 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`.
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
   first user gesture), `mixer.ts` (layers → reverb → compressor → limiter → master),
-  `base-layer.ts` (drone + arpeggio). Pure music math with specs: `scale.ts`, `arp-pattern.ts`.
+  `base-layer.ts` (drone + arpeggio), `tension-layer.ts` (sub, percussion, riser). Pure, spec-covered:
+  `scale.ts`, `arp-pattern.ts`, `tension-map.ts` (tension/direction → every sound parameter).
   Keep anything testable out of Tone-importing files: Tone needs a browser AudioContext.
+  Layers use their own node's context (`this.loop.context.transport`), not `Tone.getTransport()`,
+  so they also render in `Tone.Offline`.
+  Never automate `transport.bpm` with `rampTo` per tick: it crashes Tone 15's clock after about a
+  minute. Write whole-BPM steps with `setValueAtTime` only when the value changes.
 - `src/ui/` — DOM view; `index.html` holds the static markup.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
