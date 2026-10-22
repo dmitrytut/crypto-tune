@@ -1,14 +1,13 @@
 import * as Tone from 'tone';
 import { arpDegree, type Contour, entryStep, stickyShift } from './arp-pattern';
-import { degreeToMidi, midiToHz, pitchClassMidi } from './scale';
-import type { TensionMix } from './tension-map';
+import { degreeToMidi, midiToHz, pitchClassMidi, TONIC_GLIDE_SEC } from './scale';
+import { MIX_RAMP_SEC, type TensionMix } from './tension-map';
 
 /** Drone sits in octave 2 (A2 = 110 Hz), arpeggio starts an octave higher. */
 const DRONE_OCTAVE = 2;
 const ARP_OCTAVE = 3;
 /** Perfect fifth above the drone root. */
 const FIFTH = 7;
-const TONIC_GLIDE_SEC = 3;
 const DRONE_FADE_SEC = 4;
 const DRONE_LEVEL_DB = -9;
 /**
@@ -17,14 +16,12 @@ const DRONE_LEVEL_DB = -9;
  * every root here (Fmaj7/9, Dm11, C6/9, G6sus over A).
  */
 const PROGRESSION = [0, -4, -7, 0, 3, -2] as const;
-/** Bars per chord: ~64 s at 60 BPM, so the full cycle takes ~6.4 min. */
+/** Bars per chord: ~64 s at CALM_BPM, so the full cycle takes ~6.4 min. */
 const CHORD_BARS = 16;
 /** Crossfade between drone voices on a chord change; long enough to never sound like a switch. */
 const CHORD_FADE_SEC = 6;
 /** Chance a weak-beat note rests in a calm market; tension fills the line back in. */
 const MAX_REST_PROB = 0.25;
-/** Glide for every tension-driven parameter; mixes arrive every 250 ms. */
-const MIX_RAMP_SEC = 0.5;
 const VIBRATO_HZ = 5;
 
 interface DroneVoice {
@@ -36,7 +33,7 @@ interface DroneVoice {
  * Always-on layer: a soft drone on root + fifth breathing through a slowly
  * swept lowpass and drifting through a slow chord cycle (two voices
  * crossfading, never gliding), and a pentatonic arpeggio. Calm: quarters at
- * 60 BPM behind a closed filter with occasional rests, register following the
+ * CALM_BPM behind a closed filter with occasional rests, register following the
  * price vs its hour EMA. Under tension the filter opens, the line fills in,
  * the contour runs with the move from the next note, time doubles on the next
  * beat, the arpeggio wavers and the drone root drifts flat against the fifth.
@@ -75,6 +72,10 @@ export class BaseLayer {
   private contour: Contour = 'calm';
   private nextContour: Contour = 'calm';
   private doubleTime = false;
+  /** What the loop plays now; trails `doubleTime` until the queued switch lands. */
+  private eighths = false;
+  /** Transport event of the pending quarter↔eighth switch, if one is queued. */
+  private pendingSwitch: number | undefined;
   private restProb = MAX_REST_PROB;
 
   constructor(output: Tone.InputNode, tonicPc: number) {
@@ -108,8 +109,13 @@ export class BaseLayer {
       }
       const step = this.step++;
       this.lastDegree = arpDegree(step, 0, this.contour);
-      // Odd steps are weak beats; resting there thins a calm line without losing the pulse.
-      if (step % 2 === 1 && Math.random() < this.restProb) return;
+      // Weak beats from the transport, not the pattern step (a contour entry can set it
+      // to either parity): odd quarters, or off-beat eighths in double time. Resting there
+      // thins a calm line without losing the pulse.
+      const transport = this.loop.context.transport;
+      const stepTicks = this.eighths ? transport.PPQ / 2 : transport.PPQ;
+      const weak = Math.round(transport.getTicksAtTime(time) / stepTicks) % 2 === 1;
+      if (weak && Math.random() < this.restProb) return;
       const degree = this.lastDegree + this.shift + this.bias;
       const midi = degreeToMidi(pitchClassMidi(this.tonicPc, ARP_OCTAVE), degree);
       // Slight velocity variation so the loop never sounds mechanical.
@@ -142,6 +148,10 @@ export class BaseLayer {
       v.fifth.stop(time);
     }
     this.droneSweep.stop(time);
+    // A queued switch would otherwise fire at its tick after the next start, which
+    // replays the timeline from 0; apply it now so the next start begins in step.
+    this.clearPendingSwitch();
+    this.setEighths(this.doubleTime);
   }
 
   setTonic(pc: number): void {
@@ -167,17 +177,30 @@ export class BaseLayer {
     this.restProb = MAX_REST_PROB * (1 - mix.intensity);
     if (mix.doubleTime !== this.doubleTime) {
       this.doubleTime = mix.doubleTime;
-      const interval = mix.doubleTime ? '8n' : '4n';
+      const eighths = mix.doubleTime;
       // Switch on the next beat so the pulse never stumbles. nextSubdivision
       // returns context time but scheduleOnce reads transport time, so convert
       // through ticks. The loop's own context, not the global one, so the layer
       // also works in offline renders.
       const transport = this.loop.context.transport;
       const beat = Math.round(transport.getTicksAtTime(transport.nextSubdivision('4n')));
-      transport.scheduleOnce(() => {
-        this.loop.interval = interval;
+      this.clearPendingSwitch();
+      this.pendingSwitch = transport.scheduleOnce(() => {
+        this.pendingSwitch = undefined;
+        this.setEighths(eighths);
       }, `${beat}i`);
     }
+  }
+
+  private setEighths(on: boolean): void {
+    this.eighths = on;
+    this.loop.interval = on ? '8n' : '4n';
+  }
+
+  private clearPendingSwitch(): void {
+    if (this.pendingSwitch === undefined) return;
+    this.loop.context.transport.clear(this.pendingSwitch);
+    this.pendingSwitch = undefined;
   }
 
   private droneRootMidi(): number {

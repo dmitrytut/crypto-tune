@@ -33,8 +33,8 @@ export type FeedStatus =
 export type Unsubscribe = () => void;
 
 /**
- * Exchange-agnostic market data source. Adapters (Binance, MEXC), replay and
- * simulator all implement this so metrics and audio never know the origin.
+ * Exchange-agnostic market data source. The Binance adapter and the simulator
+ * implement this so metrics and audio never know the origin.
  * A source may first emit recent history (events with `ts` in the past) so
  * metrics start warm; trades always arrive in `ts` order, history before live.
  */

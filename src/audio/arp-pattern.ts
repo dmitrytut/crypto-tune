@@ -9,12 +9,16 @@ const PATTERNS = {
   down: [7, 6, 5, 4, 3, 2, 1, 0],
 } as const;
 
+/** @package */
 export type Contour = keyof typeof PATTERNS;
 
 /** Steps per phrase. */
 const PHRASE_STEPS = 8;
 
-/** Furthest the trend may move the register, in scale degrees. */
+/**
+ * Furthest the trend may move the register, in scale degrees.
+ * @package
+ */
 export const MAX_REGISTER_SHIFT = 3;
 
 /**
@@ -23,7 +27,10 @@ export const MAX_REGISTER_SHIFT = 3;
  */
 const HYSTERESIS = 0.25;
 
-/** Scale degree for arpeggio step `step` of `contour`, with the register moved by `shift` degrees. */
+/**
+ * Scale degree for arpeggio step `step` of `contour`, with the register moved by `shift` degrees.
+ * @package
+ */
 export function arpDegree(step: number, shift: number, contour: Contour = 'calm'): number {
   const pattern = PATTERNS[contour];
   const i = ((step % PHRASE_STEPS) + PHRASE_STEPS) % PHRASE_STEPS;
@@ -34,6 +41,7 @@ export function arpDegree(step: number, shift: number, contour: Contour = 'calm'
  * Step at which `contour` continues after the arpeggio played pattern degree
  * `fromDegree`: the step after the nearest degree, so a contour switch on the
  * next note carries on from where the line was instead of restarting the phrase.
+ * @package
  */
 export function entryStep(contour: Contour, fromDegree: number): number {
   const pattern: readonly number[] = PATTERNS[contour];
@@ -49,6 +57,7 @@ export function entryStep(contour: Contour, fromDegree: number): number {
  * Integer register shift following `target` (price vs EMA in spread units),
  * clamped to ±MAX_REGISTER_SHIFT, changing only once `target` is clearly
  * nearer another integer than the current one.
+ * @package
  */
 export function stickyShift(current: number, target: number): number {
   const clamped = Math.max(-MAX_REGISTER_SHIFT, Math.min(MAX_REGISTER_SHIFT, target));

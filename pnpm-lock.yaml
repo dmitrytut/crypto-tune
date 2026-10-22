@@ -7,6 +7,9 @@ settings:
 importers:
   .:
     dependencies:
+      "@fontsource-variable/onest":
+        specifier: ^5.3.1
+        version: 5.3.1
       tone:
         specifier: ^15.1.22
         version: 15.1.22
@@ -133,6 +136,12 @@ packages:
     engines: { node: ">=14.21.3" }
     cpu: [x64]
     os: [win32]
+
+  "@fontsource-variable/onest@5.3.1":
+    resolution:
+      {
+        integrity: sha512-xaaw6G4HDB2/RczsWLD/2bnib4ykmQlTlBUN3GOEOiyErilZukQWVJG95h9zwAy0i8KY+QzDa+COPfqhI72Acw==,
+      }
 
   "@jridgewell/resolve-uri@3.1.2":
     resolution:
@@ -953,6 +962,8 @@ snapshots:
 
   "@biomejs/cli-win32-x64@2.6.2":
     optional: true
+
+  "@fontsource-variable/onest@5.3.1": {}
 
   "@jridgewell/resolve-uri@3.1.2": {}
 

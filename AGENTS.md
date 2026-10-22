@@ -19,21 +19,24 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 
 ## Layout
 
-- `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: exchange adapters
-  (`binance.ts`, which also loads 30 min of REST `aggTrades` on connect so metrics start warm),
-  `simulator.ts`, later `replay.ts`, `mexc.ts`. `reconnecting-socket.ts` owns backoff and the
-  silence/connect watchdog. History is emitted before live events, trades always in `ts` order.
+- `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: the Binance adapter
+  (`binance.ts`, which also loads 30 min of REST `aggTrades` on connect so metrics start warm) and
+  `simulator.ts`. `reconnecting-socket.ts` owns backoff and the silence/connect watchdog.
+  `trade-cache.ts` is the injected `TradeStore`: recent trades with ids per pair in IndexedDB, so a
+  reload fetches only the gap after the cache. History is emitted before live events, trades always
+  in `ts` order. Any history or storage failure degrades to a plain live start, never blocks the stream.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
-  trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`.
+  trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`, and `events.ts`
+  (`EventBuffer`: trades and liquidations above their thresholds collapse to at most one
+  `EventCue` per kind per tick, stale replays dropped; audio, readout and chart all use the cues).
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
   first user gesture), `mixer.ts` (layers → reverb → compressor → limiter → master),
   `base-layer.ts` (drone with chord drift + arpeggio), `ambience-layer.ts` (Eno bell loops + pulse,
   base channel), `tension-layer.ts` (sub, percussion, riser, shock swell), `events-layer.ts`
   (liquidation gongs, trade plucks). Pure, spec-covered: `scale.ts`, `arp-pattern.ts`,
   `tension-map.ts` (tension/direction → every sound parameter; `stepShock` detector),
-  `events-map.ts` (cascade collapse, size → velocity, voice placement). Event flow:
-  `AudioEngine.onTrade/onLiquidation` buffer events above threshold, `flushEvents(feed.now())`
-  plays at most one voice per kind per tick.
+  `events-map.ts` (size → velocity, voice placement). `AudioEngine.play(cues)` voices the tick's
+  event cues.
   Keep anything testable out of Tone-importing files: Tone needs a browser AudioContext.
   Layers use their own node's context (`this.loop.context.transport`), not `Tone.getTransport()`,
   so they also render in `Tone.Offline`.
@@ -43,7 +46,16 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   with `start(0)` (or tick strings like `` `${n}i` ``) and let transport start/stop drive them;
   never pass `Tone.now()`. `transport.nextSubdivision` returns context time: convert with
   `getTicksAtTime` before scheduling on the transport.
-- `src/ui/` — DOM view; `index.html` holds the static markup.
+- `src/ui/` — DOM view; `index.html` holds the static markup. `app.ts` (readouts, meter, immersive
+  mode, tab title; implements `AppView`), `price-readout.ts` (fixed-decimal price with per-digit
+  flash), `settings-panel.ts` (settings `<dialog>`), `scene/` (`stage.ts` creates the layers and
+  runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
+  trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
+  Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no warm-up), `palette.ts` (market +
+  flow → aura colours/motion; the one source of side and tension colours, CSS included),
+  `scene/spawn.ts` (merging, bubble start state). Visuals are wall-clock animation; anything older
+  than 2 s is not animated (history replays, filtered in the view). Every motion effect respects
+  `prefers-reduced-motion`.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 
@@ -65,7 +77,7 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
 - **Types live with their owner.** Declare a type in the file that produces or accepts it
   (params, results, options, state); consumers import it from there.
 - **A shared contract file only for a real seam**: an interface with two or more implementations
-  plus the data they exchange (`feed/market-feed.ts`: Binance, simulator, replay, MEXC). Name it by
+  plus the data they exchange (`feed/market-feed.ts`: Binance, simulator). Name it by
   purpose, not by kind. No `types.ts`, no `src/types/`, no "types" folder inside a module.
 - **Internal types stay unexported**: wire formats (`AggTradeMsg`), internal state (`Regime`).
   Exchange DTOs never leave their adapter; the rest of the app sees only `Trade`/`Liquidation`.
@@ -87,6 +99,8 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
 
 ## Conventions
 
+- All user-facing text is English: markup, aria labels, tab title, canvas labels, error messages.
+  Docs, PRs and chat may be Russian.
 - Tests live next to the code they cover, in a `__specs__/` folder inside that module's directory,
   named `<module>.spec.ts` (e.g. `src/metrics/rolling.ts` → `src/metrics/__specs__/rolling.spec.ts`).
   Never `*.test.ts`, never a top-level `tests/` dir; vitest only picks up `src/**/__specs__/**/*.spec.ts`.

@@ -2,14 +2,16 @@ import { TICK_MS } from '../metrics/engine';
 import { TENSION_LEVELS } from '../metrics/tension';
 import type { Contour } from './arp-pattern';
 
-/** Tension above `high` at which the peak effects (riser, detune) are at full depth. */
-const PEAK_SPAN = 1.5;
 /** Double time engages at `high` and releases below `high − DOUBLE_TIME_HYSTERESIS`. */
 const DOUBLE_TIME_HYSTERESIS = 0.3;
 /** |direction| beyond which the arpeggio runs in the move's direction. */
 const DIRECTION_THRESHOLD = 0.5;
 
-const CALM_BPM = 60;
+/**
+ * Tempo of a calm market; the mix raises it to TENSE_BPM with tension.
+ * @package
+ */
+export const CALM_BPM = 60;
 const TENSE_BPM = 90;
 const CALM_CUTOFF_HZ = 1000;
 const OPEN_CUTOFF_HZ = 6000;
@@ -30,11 +32,20 @@ const SHOCK_WINDOW_TICKS = 5;
 /** Minimum feed-clock gap between two shocks, ms. */
 const SHOCK_COOLDOWN_MS = 20_000;
 
-/** Everything the layers need for one tick, derived from tension and direction only. */
+/**
+ * Glide for every tension-driven parameter; mixes arrive every 250 ms.
+ * @package
+ */
+export const MIX_RAMP_SEC = 0.5;
+
+/**
+ * Everything the layers need for one tick, derived from tension and direction only.
+ * @package
+ */
 export interface TensionMix {
   /** 0 below TENSION_LEVELS.mid, 1 at TENSION_LEVELS.high. */
   intensity: number;
-  /** 0 up to TENSION_LEVELS.high, 1 at high + PEAK_SPAN. */
+  /** 0 up to TENSION_LEVELS.high, 1 at TENSION_LEVELS.peak. */
   peak: number;
   bpm: number;
   /** Arpeggio in eighths instead of quarters. */
@@ -60,10 +71,11 @@ const smoothstep = (x: number) => x * x * (3 - 2 * x);
 /** Ease-out: audible early in the zone, still flat-topped at 1. */
 const easeOut = (x: number) => 1 - (1 - x) ** 2;
 
+/** @package */
 export function tensionMix(tension: number, direction: number, wasDoubleTime: boolean): TensionMix {
-  const { mid, high } = TENSION_LEVELS;
+  const { mid, high, peak: full } = TENSION_LEVELS;
   const intensity = clamp01((tension - mid) / (high - mid));
-  const peak = clamp01((tension - high) / PEAK_SPAN);
+  const peak = clamp01((tension - high) / (full - high));
   const rising = Math.max(0, direction) * intensity;
   const falling = Math.max(0, -direction) * intensity;
 
@@ -96,6 +108,7 @@ export function tensionMix(tension: number, direction: number, wasDoubleTime: bo
   };
 }
 
+/** @package */
 export interface ShockState {
   /** Tension over the last SHOCK_WINDOW_TICKS − 1 ticks, oldest first. */
   recent: readonly number[];
@@ -104,6 +117,7 @@ export interface ShockState {
   lastFireTs: number;
 }
 
+/** @package */
 export const INITIAL_SHOCK: ShockState = {
   recent: [],
   lastTs: Number.NEGATIVE_INFINITY,
@@ -116,6 +130,7 @@ export const INITIAL_SHOCK: ShockState = {
  * accent into a pattern. `ts` is the feed clock. After a gap in updates (a new
  * pipeline, a throttled tab) the lookback restarts: the old values belong to
  * another market or another moment.
+ * @package
  */
 export function stepShock(
   prev: ShockState,

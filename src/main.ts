@@ -2,7 +2,10 @@ import { AudioEngine, type AudioParams } from './audio/engine';
 import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
 import type { MarketFeed, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
+import { indexedDbTradeStore } from './feed/trade-cache';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
+import { EventBuffer, type EventThresholds } from './metrics/events';
+import { MarketHistory } from './metrics/history';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { mountApp } from './ui/app';
 
@@ -11,6 +14,7 @@ const SYMBOLS_CACHE_KEY = 'crypto-tune.binance-symbols';
 let settings = loadSettings();
 let feed: MarketFeed | null = null;
 let engine: MetricsEngine | null = null;
+let history: MarketHistory | null = null;
 let unsubs: Unsubscribe[] = [];
 
 const tensionParams = (s: Settings) => ({
@@ -23,11 +27,15 @@ const audioParams = (s: Settings): AudioParams => ({
   baseVolumeDb: s.baseVolumeDb,
   tensionVolumeDb: s.tensionVolumeDb,
   eventsVolumeDb: s.eventsVolumeDb,
-  liqThresholdUsd: s.liqThresholdUsd,
-  tradeThresholdUsd: s.tradeThresholdUsd,
+});
+
+const eventThresholds = (s: Settings): EventThresholds => ({
+  liquidationUsd: s.liqThresholdUsd,
+  tradeUsd: s.tradeThresholdUsd,
 });
 
 const audio = new AudioEngine(audioParams(settings));
+const events = new EventBuffer(eventThresholds(settings));
 
 const view = mountApp(settings, {
   onSettings(next) {
@@ -43,6 +51,7 @@ const view = mountApp(settings, {
       engine?.setTensionParams(tensionParams(next));
     }
     audio.setParams(audioParams(next));
+    events.setThresholds(eventThresholds(next));
     saveSettings(next);
   },
   onToggleAudio() {
@@ -62,24 +71,38 @@ const view = mountApp(settings, {
   },
 });
 
-/** (Re)create feed and metrics from current settings; history is discarded. */
+/** Feeds replay this much history on connect: exactly the window the tension statistics need. */
+const HISTORY_MS = DEFAULT_METRICS_CONFIG.statsWindowMin * 60_000;
+
+/** (Re)create feed, metrics and chart history from current settings; history is discarded. */
 function startPipeline(): void {
   for (const u of unsubs) u();
   feed?.disconnect();
 
   const f: MarketFeed =
-    settings.source === 'simulator' ? new SimulatorFeed() : new BinanceFuturesFeed(settings.symbol);
+    settings.source === 'simulator'
+      ? new SimulatorFeed({ historyMs: HISTORY_MS })
+      : new BinanceFuturesFeed(settings.symbol, {
+          historyMs: HISTORY_MS,
+          store: indexedDbTradeStore(`binance:${settings.symbol}`),
+        });
   const e = new MetricsEngine({
     ...DEFAULT_METRICS_CONFIG,
     windowSec: settings.windowSec,
     tension: tensionParams(settings),
   });
+  const h = new MarketHistory();
   unsubs = [
     f.onTrade((t) => {
       e.addTrade(t);
-      audio.onTrade(t);
+      h.addTrade(t);
+      events.addTrade(t);
+      view.trade(t);
     }),
-    f.onLiquidation((l) => audio.onLiquidation(l)),
+    f.onLiquidation((l) => {
+      events.addLiquidation(l);
+      view.liquidation(l);
+    }),
     f.onStatus((s) => {
       view.setStatus(s);
       // A data gap is not a calm market: drop tick-level state so the move
@@ -89,24 +112,37 @@ function startPipeline(): void {
   ];
   feed = f;
   engine = e;
-  view.reset();
-  view.setFeedLabel(f.label);
+  history = h;
+  view.reset(h);
   f.connect();
 }
 
 window.setInterval(() => {
   if (!feed || !engine) return;
   const now = feed.now();
-  const snap = engine.advanceTo(now);
+  const snap = engine.advanceTo(now, (s) => history?.addSnapshot(s));
   if (snap) {
     view.render(snap);
     audio.update(snap);
   }
   // Events flush every tick, with or without new trades (a liquidation can arrive alone).
-  const { liquidation, trade } = audio.flushEvents(now);
-  if (trade) view.showEvent({ kind: 'trade', ...trade });
+  const cues = events.flush(now);
+  audio.play(cues);
+  const { liquidation, trade } = cues;
+  if (trade) {
+    view.showEvent({ kind: 'trade', ...trade });
+    history?.addMarker({ ts: now, kind: 'trade', side: trade.side, usd: trade.usd });
+  }
   // Liquidation last: it is rarer and more important, so it wins the readout.
-  if (liquidation) view.showEvent({ kind: 'liquidation', ...liquidation });
+  if (liquidation) {
+    view.showEvent({ kind: 'liquidation', ...liquidation });
+    history?.addMarker({
+      ts: now,
+      kind: 'liquidation',
+      side: liquidation.side,
+      usd: liquidation.usd,
+    });
+  }
 }, TICK_MS);
 
 async function loadSymbols(): Promise<void> {

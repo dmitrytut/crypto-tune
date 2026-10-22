@@ -33,9 +33,11 @@ describe('MetricsEngine', () => {
     expect(before.ready).toBe(false);
     expect(before.tension).toBe(0);
     expect(before.warmup).toBeLessThan(1);
+    expect(before.warmupLeftSec).toBeCloseTo(0.25, 9);
     const after = runTo(e, READY_TICK + 1);
     expect(after.ready).toBe(true);
     expect(after.warmup).toBe(1);
+    expect(after.warmupLeftSec).toBe(0);
   });
 
   it('drives tension up with direction on a sharp move', () => {

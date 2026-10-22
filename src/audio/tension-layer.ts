@@ -1,17 +1,14 @@
 import * as Tone from 'tone';
-import { midiToHz, pitchClassMidi } from './scale';
-import type { TensionMix } from './tension-map';
+import { midiToHz, pitchClassMidi, TONIC_GLIDE_SEC } from './scale';
+import { MIX_RAMP_SEC, type TensionMix } from './tension-map';
 
 /** Sub-bass on the tonic in octave 1 (A1 = 55 Hz). */
 const SUB_OCTAVE = 1;
-const TONIC_GLIDE_SEC = 3;
-/** Glide for every tension-driven level; mixes arrive every 250 ms. */
-const MIX_RAMP_SEC = 0.5;
 /** Full-intensity linear gains of each element. */
 const SUB_MAX_GAIN = Tone.dbToGain(0);
 const PERC_MAX_GAIN = Tone.dbToGain(-6);
 const RISER_MAX_GAIN = Tone.dbToGain(-4);
-/** Shaker accents over one beat of eighths… repeated: strong, soft, medium, soft. */
+/** Shaker accents over two beats of eighths, repeated: strong, soft, medium, soft. */
 const PERC_ACCENTS = [1, 0.35, 0.6, 0.35] as const;
 /** Shock swell: pink-noise band sweeping with the move; gain > 1 offsets the narrow band. */
 const SHOCK_GAIN = Tone.dbToGain(9);
@@ -52,7 +49,6 @@ export class TensionLayer {
   private readonly subLoop: Tone.Loop;
   private readonly percLoop: Tone.Loop;
   private subHz: number;
-  private percStep = 0;
 
   constructor(output: Tone.InputNode, tonicPc: number) {
     this.subHz = midiToHz(pitchClassMidi(tonicPc, SUB_OCTAVE));
@@ -65,8 +61,11 @@ export class TensionLayer {
     this.subLoop = new Tone.Loop((time) => {
       this.sub.triggerAttackRelease(this.subHz, '4n', time, 0.8);
     }, '2n');
+    const transport = this.perc.context.transport;
     this.percLoop = new Tone.Loop((time) => {
-      const accent = PERC_ACCENTS[this.percStep++ % PERC_ACCENTS.length] as number;
+      // Eighth in the beat from the transport, so accents stay on the beat after a restart.
+      const eighth = Math.round(transport.getTicksAtTime(time) / (transport.PPQ / 2));
+      const accent = PERC_ACCENTS[eighth % PERC_ACCENTS.length] as number;
       this.perc.triggerAttackRelease('32n', time, accent);
     }, '8n');
   }

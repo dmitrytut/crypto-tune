@@ -1,6 +1,7 @@
 import { Emitter } from './emitter';
 import type { FeedStatus, Liquidation, MarketFeed, Trade, Unsubscribe } from './market-feed';
 import { ReconnectingSocket } from './reconnecting-socket';
+import { type CachedTrade, NO_STORE, type TradeStore } from './trade-cache';
 
 /**
  * USDⓈ-M Futures routed endpoint. Legacy `wss://fstream.binance.com/ws/...`
@@ -66,21 +67,33 @@ export function binanceStreamUrl(symbol: string): string {
 
 /** Weight of each new clock-offset observation. */
 const CLOCK_ALPHA = 0.05;
-/** Trade history loaded on connect, so metrics start warm instead of after a 5-minute warm-up. */
-const HISTORY_MS = 30 * 60_000;
+
+export interface BinanceFeedOptions {
+  /** History replayed on connect so metrics start warm: the metrics stats window. */
+  historyMs: number;
+  /** Keeps recent trades across reloads so a restart only fetches what it missed. */
+  store?: TradeStore;
+}
+
 /** `aggTrades` weighs 20; 20 pages = 400 of the 2400/min per-IP budget. */
 const HISTORY_MAX_PAGES = 20;
 const HISTORY_PAGE_SIZE = 1000;
 /** Whole history load gives up after this and falls back to the live warm-up, ms. */
 const HISTORY_TIMEOUT_MS = 15_000;
+/** Longest wait for the trade cache; a stuck store must never hold the live stream back. */
+const CACHE_TIMEOUT_MS = 1_500;
+/** How often the trailing history window of trades is written to the store. */
+const SAVE_EVERY_MS = 30_000;
 
 /**
- * Recent aggregate trades, oldest first, back to `sinceMs` or HISTORY_MAX_PAGES
- * pages, whichever comes first. Pages walk back by id: ids are contiguous.
+ * Recent aggregate trades, oldest first, newer than `afterId`, back to
+ * `sinceMs` or HISTORY_MAX_PAGES pages, whichever comes first. Pages walk back
+ * by id: ids are contiguous, so stopping at `afterId` + 1 extends a cache exactly.
  */
 async function fetchAggTradesSince(
   symbol: string,
   sinceMs: number,
+  afterId: number,
   signal: AbortSignal,
 ): Promise<AggTradeRow[]> {
   const base = `${REST_BASE}/fapi/v1/aggTrades?symbol=${encodeURIComponent(symbol)}&limit=${HISTORY_PAGE_SIZE}`;
@@ -94,8 +107,8 @@ async function fetchAggTradesSince(
     if (!first) break;
     // A page clamped at id 0 overlaps the next newer one.
     const end = pages[0]?.[0]?.a ?? Number.POSITIVE_INFINITY;
-    pages.unshift(page.filter((r) => r.a < end));
-    if (first.T <= sinceMs || first.a === 0) break;
+    pages.unshift(page.filter((r) => r.a < end && r.a > afterId));
+    if (first.T <= sinceMs || first.a === 0 || first.a <= afterId + 1) break;
     fromId = Math.max(0, first.a - HISTORY_PAGE_SIZE);
   }
   return pages.flat();
@@ -117,8 +130,19 @@ export class BinanceFuturesFeed implements MarketFeed {
   /** Newest id emitted from history; live trades up to it are duplicates. */
   private lastHistoryId = -1;
   private readonly abort = new AbortController();
+  /** The newest unbroken run of emitted trades (by id) within the history window, for the store. */
+  private recent: CachedTrade[] = [];
+  private saveTimer: number | undefined;
+  private readonly saveWhenHidden = () => {
+    if (document.visibilityState === 'hidden') void this.persist();
+  };
 
-  constructor(symbol: string) {
+  private readonly historyMs: number;
+  private readonly store: TradeStore;
+
+  constructor(symbol: string, opts: BinanceFeedOptions) {
+    this.historyMs = opts.historyMs;
+    this.store = opts.store ?? NO_STORE;
     this.symbol = symbol.toUpperCase();
     this.label = `Binance ${this.symbol}`;
     this.socket = new ReconnectingSocket(
@@ -130,12 +154,17 @@ export class BinanceFuturesFeed implements MarketFeed {
 
   connect(): void {
     this.socket.start();
+    this.saveTimer = setInterval(() => void this.persist(), SAVE_EVERY_MS);
+    globalThis.document?.addEventListener('visibilitychange', this.saveWhenHidden);
   }
 
   /** Final: a feed is single-use (`main.ts` builds a new one per pipeline), so the abort is not reset. */
   disconnect(): void {
     this.abort.abort();
     this.socket.stop();
+    clearInterval(this.saveTimer);
+    globalThis.document?.removeEventListener('visibilitychange', this.saveWhenHidden);
+    void this.persist();
   }
 
   now(): number {
@@ -164,7 +193,7 @@ export class BinanceFuturesFeed implements MarketFeed {
 
   private onAggTrade(d: AggTradeMsg): void {
     if (this.history === 'done') {
-      if (d.a > this.lastHistoryId) this.trades.emit(parseAggTrade(d));
+      if (d.a > this.lastHistoryId) this.emit({ ...parseAggTrade(d), id: d.a });
       return;
     }
     this.held.push(d);
@@ -176,29 +205,68 @@ export class BinanceFuturesFeed implements MarketFeed {
     }
   }
 
+  /**
+   * Every trade leaves through here. A gap in ids (reconnect, REST lag) starts
+   * the saved run over, so a reload never replays the gap as a flat stretch.
+   */
+  private emit(t: CachedTrade): void {
+    const prev = this.recent.at(-1);
+    if (prev && t.id !== prev.id + 1) this.recent = [];
+    this.recent.push(t);
+    this.trades.emit({ ts: t.ts, price: t.price, qty: t.qty, side: t.side });
+  }
+
   private async loadHistory(liveTs: number): Promise<void> {
     // skipped: a reconnect during this load (a few seconds) is not replayed as a
     // resync between history and held trades, so the move across that gap can
     // count within window N once. Unlikely and self-healing within N; queue
     // statuses with the held trades if it ever shows up.
+    const sinceMs = liveTs - this.historyMs;
+    const cached = (await this.loadCache()).filter((t) => t.ts > sinceMs && t.ts < liveTs);
+    const cachedLastId = cached.at(-1)?.id ?? -1;
     let rows: AggTradeRow[] = [];
+    let fetched = false;
     // A stalled request must not hold live trades back forever: time out into the fallback.
     const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(HISTORY_TIMEOUT_MS)]);
     try {
-      rows = await fetchAggTradesSince(this.symbol, liveTs - HISTORY_MS, signal);
+      rows = await fetchAggTradesSince(this.symbol, sinceMs, cachedLastId, signal);
+      fetched = true;
     } catch (err) {
       if (this.abort.signal.aborted) return;
       console.warn('Trade history unavailable; metrics warm up live', err);
     }
     if (this.abort.signal.aborted) return;
+    // The cache is used only if a fetch reached back to it: a failed fetch, or one
+    // that stopped short, would leave a hole that reads as a flat market and then a jump.
+    const first = rows[0];
+    const contiguous = fetched && (!first || first.a === cachedLastId + 1);
+    if (contiguous) for (const t of cached) this.emit(t);
     // shortcut: if REST lags the stream, trades between its newest and the first
     // held one are lost (sub-second); fetch forward from lastHistoryId if it ever matters.
-    for (const r of rows) this.trades.emit(parseAggTrade(r));
-    this.lastHistoryId = rows.at(-1)?.a ?? -1;
+    for (const r of rows) this.emit({ ...parseAggTrade(r), id: r.a });
+    this.lastHistoryId = rows.at(-1)?.a ?? (contiguous ? cachedLastId : -1);
     this.history = 'done';
     const held = this.held;
     this.held = [];
     for (const d of held) this.onAggTrade(d);
+  }
+
+  private async loadCache(): Promise<CachedTrade[]> {
+    const { promise: gaveUp, resolve } = Promise.withResolvers<CachedTrade[]>();
+    const timer = setTimeout(() => resolve([]), CACHE_TIMEOUT_MS);
+    const cached = await Promise.race([this.store.load(), gaveUp]);
+    clearTimeout(timer);
+    return cached;
+  }
+
+  private async persist(): Promise<void> {
+    const last = this.recent.at(-1);
+    if (!last) return;
+    const cutoff = last.ts - this.historyMs;
+    let drop = 0;
+    while (drop < this.recent.length && (this.recent[drop] as CachedTrade).ts < cutoff) drop++;
+    if (drop > 0) this.recent.splice(0, drop);
+    await this.store.save(this.recent);
   }
 
   private observeClock(eventTime: number): void {
