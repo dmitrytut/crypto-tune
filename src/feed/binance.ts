@@ -124,7 +124,7 @@ export class BinanceFuturesFeed implements MarketFeed {
   /** Newest id emitted from history; live trades up to it are duplicates. */
   private lastHistoryId = -1;
   private readonly abort = new AbortController();
-  /** Everything emitted within the last HISTORY_MS, with ids, for the store. */
+  /** The newest unbroken run of emitted trades (by id) within HISTORY_MS, for the store. */
   private recent: CachedTrade[] = [];
   private saveTimer: number | undefined;
   private readonly saveWhenHidden = () => {
@@ -186,7 +186,7 @@ export class BinanceFuturesFeed implements MarketFeed {
 
   private onAggTrade(d: AggTradeMsg): void {
     if (this.history === 'done') {
-      if (d.a > this.lastHistoryId) this.emitTrade(d);
+      if (d.a > this.lastHistoryId) this.emit({ ...parseAggTrade(d), id: d.a });
       return;
     }
     this.held.push(d);
@@ -198,10 +198,15 @@ export class BinanceFuturesFeed implements MarketFeed {
     }
   }
 
-  private emitTrade(r: AggTradeRow): void {
-    const t = parseAggTrade(r);
-    this.recent.push({ ...t, id: r.a });
-    this.trades.emit(t);
+  /**
+   * Every trade leaves through here. A gap in ids (reconnect, REST lag) starts
+   * the saved run over, so a reload never replays the gap as a flat stretch.
+   */
+  private emit(t: CachedTrade): void {
+    const prev = this.recent.at(-1);
+    if (prev && t.id !== prev.id + 1) this.recent = [];
+    this.recent.push(t);
+    this.trades.emit({ ts: t.ts, price: t.price, qty: t.qty, side: t.side });
   }
 
   private async loadHistory(liveTs: number): Promise<void> {
@@ -228,15 +233,10 @@ export class BinanceFuturesFeed implements MarketFeed {
     // that stopped short, would leave a hole that reads as a flat market and then a jump.
     const first = rows[0];
     const contiguous = fetched && (!first || first.a === cachedLastId + 1);
-    if (contiguous) {
-      for (const t of cached) {
-        this.recent.push(t);
-        this.trades.emit({ ts: t.ts, price: t.price, qty: t.qty, side: t.side });
-      }
-    }
+    if (contiguous) for (const t of cached) this.emit(t);
     // shortcut: if REST lags the stream, trades between its newest and the first
     // held one are lost (sub-second); fetch forward from lastHistoryId if it ever matters.
-    for (const r of rows) this.emitTrade(r);
+    for (const r of rows) this.emit({ ...parseAggTrade(r), id: r.a });
     this.lastHistoryId = rows.at(-1)?.a ?? (contiguous ? cachedLastId : -1);
     this.history = 'done';
     const held = this.held;

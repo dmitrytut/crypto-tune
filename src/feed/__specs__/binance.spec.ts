@@ -212,6 +212,24 @@ describe('BinanceFuturesFeed history', () => {
     feed.disconnect();
   });
 
+  it('saves only the newest unbroken run of ids, so a reload never replays a gap', async () => {
+    stubRest(5000);
+    let saved: readonly CachedTrade[] = [];
+    const { feed, ids, ws } = connect({
+      load: async () => [],
+      save: async (rows) => {
+        saved = rows;
+      },
+    });
+    ws.live(5001);
+    await vi.waitFor(() => expect(ids.at(-1)).toBe(5001));
+    // A reconnect skipped 5002…5009.
+    ws.live(5010);
+    ws.live(5011);
+    feed.disconnect();
+    await vi.waitFor(() => expect(saved.map((r) => r.id)).toEqual([5010, 5011]));
+  });
+
   it('does not let a cache that never answers hold the stream back', async () => {
     stubRest(5000);
     const { feed, ids, ws } = connect({ load: () => new Promise(() => {}), save: async () => {} });
