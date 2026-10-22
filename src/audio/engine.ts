@@ -1,6 +1,9 @@
 import * as Tone from 'tone';
+import type { Liquidation, LiquidationSide, Trade, TradeSide } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
 import { BaseLayer } from './base-layer';
+import { EventsLayer } from './events-layer';
+import { collapse, type EventCue, eventVelocity, type PendingEvent } from './events-map';
 import { Mixer } from './mixer';
 import { TensionLayer } from './tension-layer';
 import { tensionMix } from './tension-map';
@@ -10,15 +13,28 @@ const BASE_BPM = 60;
 const FADE_IN_SEC = 3;
 const FADE_OUT_SEC = 1.5;
 const MASTER_DB = -2;
+/** Events older than this on the feed clock are dropped instead of played late. */
+const EVENT_MAX_AGE_MS = 2_000;
 
 export interface AudioParams {
   /** Tonic pitch class, 0 = C … 11 = B. */
   tonicPc: number;
   baseVolumeDb: number;
   tensionVolumeDb: number;
+  eventsVolumeDb: number;
+  /** Liquidations at or above this quote notional strike a gong. */
+  liqThresholdUsd: number;
+  /** Aggressive trades at or above this quote notional pluck an accent. */
+  tradeThresholdUsd: number;
 }
 
 export type AudioState = 'stopped' | 'starting' | 'running';
+
+/** What one tick's events collapsed to; each kind plays at most one voice. */
+export interface EventCues {
+  liquidation: EventCue<LiquidationSide> | null;
+  trade: EventCue<TradeSide> | null;
+}
 
 interface Graph {
   mixer: Mixer;
@@ -26,6 +42,8 @@ interface Graph {
   baseChannel: Tone.Volume;
   tension: TensionLayer;
   tensionChannel: Tone.Volume;
+  events: EventsLayer;
+  eventsChannel: Tone.Volume;
 }
 
 /**
@@ -40,6 +58,8 @@ export class AudioEngine {
   private doubleTime = false;
   /** Last tempo written to the transport, whole BPM. */
   private bpm = BASE_BPM;
+  private pendingLiqs: PendingEvent<LiquidationSide>[] = [];
+  private pendingTrades: PendingEvent<TradeSide>[] = [];
 
   constructor(private params: AudioParams) {}
 
@@ -95,6 +115,43 @@ export class AudioEngine {
     }
   }
 
+  /** Called for every trade; only those above the threshold are kept. */
+  onTrade(t: Trade): void {
+    const usd = t.price * t.qty;
+    if (usd >= this.params.tradeThresholdUsd)
+      this.pendingTrades.push({ ts: t.ts, side: t.side, usd });
+  }
+
+  onLiquidation(l: Liquidation): void {
+    if (l.usd >= this.params.liqThresholdUsd)
+      this.pendingLiqs.push({ ts: l.ts, side: l.side, usd: l.usd });
+  }
+
+  /**
+   * Once per tick: collapses buffered events into at most one cue per kind and
+   * plays them if audio is running. Returns the cues either way so the UI can
+   * show events while muted. `now` is the feed clock.
+   */
+  flushEvents(now: number): EventCues {
+    const minTs = now - EVENT_MAX_AGE_MS;
+    const cues: EventCues = {
+      liquidation: collapse(this.pendingLiqs, minTs),
+      trade: collapse(this.pendingTrades, minTs),
+    };
+    this.pendingLiqs = [];
+    this.pendingTrades = [];
+    const g = this.graph;
+    if (this.state === 'running' && g) {
+      const t = Tone.now();
+      const { liquidation: liq, trade } = cues;
+      if (liq)
+        g.events.liquidation(liq.side, eventVelocity(liq.usd, this.params.liqThresholdUsd), t);
+      if (trade)
+        g.events.trade(trade.side, eventVelocity(trade.usd, this.params.tradeThresholdUsd), t);
+    }
+    return cues;
+  }
+
   setParams(next: AudioParams): void {
     const prev = this.params;
     this.params = next;
@@ -103,6 +160,7 @@ export class AudioEngine {
     if (next.tonicPc !== prev.tonicPc) {
       g.base.setTonic(next.tonicPc);
       g.tension.setTonic(next.tonicPc);
+      g.events.setTonic(next.tonicPc);
     }
     if (next.baseVolumeDb !== prev.baseVolumeDb) {
       g.mixer.setLevel(g.baseChannel, next.baseVolumeDb);
@@ -110,18 +168,24 @@ export class AudioEngine {
     if (next.tensionVolumeDb !== prev.tensionVolumeDb) {
       g.mixer.setLevel(g.tensionChannel, next.tensionVolumeDb);
     }
+    if (next.eventsVolumeDb !== prev.eventsVolumeDb) {
+      g.mixer.setLevel(g.eventsChannel, next.eventsVolumeDb);
+    }
   }
 
   private build(): Graph {
     const mixer = new Mixer();
     const baseChannel = mixer.createChannel(this.params.baseVolumeDb);
     const tensionChannel = mixer.createChannel(this.params.tensionVolumeDb);
+    const eventsChannel = mixer.createChannel(this.params.eventsVolumeDb);
     this.graph = {
       mixer,
       baseChannel,
       tensionChannel,
+      eventsChannel,
       base: new BaseLayer(baseChannel, this.params.tonicPc),
       tension: new TensionLayer(tensionChannel, this.params.tonicPc),
+      events: new EventsLayer(eventsChannel, this.params.tonicPc),
     };
     return this.graph;
   }
