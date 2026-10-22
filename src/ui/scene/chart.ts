@@ -1,5 +1,5 @@
 import { HISTORY_WINDOW_MS, type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
-import { css, DOWN_COLOR, tensionColor, UP_COLOR } from '../palette';
+import { css, DOWN_COLOR, sideColor, tensionColor, UP_COLOR } from '../palette';
 
 const MAX_DPR = 2;
 /** Share of the height for the price line; the rest is the volume band. */
@@ -109,8 +109,7 @@ export class Chart {
       if (m.ts < from) continue;
       const price = h.priceAt(m.ts);
       if (Number.isNaN(price)) continue;
-      const down = m.side === 'long' || m.side === 'sell';
-      const color = css(down ? DOWN_COLOR : UP_COLOR, 0.95);
+      const color = css(sideColor(m.side), 0.95);
       const r = 2 + Math.min(4, Math.max(0, Math.log10(m.usd / 10_000)) * 1.5);
       ctx.beginPath();
       ctx.arc(x(m.ts), y(price), r, 0, Math.PI * 2);

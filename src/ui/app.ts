@@ -13,7 +13,7 @@ import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { el, usdFmt } from './dom';
 import { FlowMeter } from './flow';
 import { clock, priceDecimals, splitPrice } from './format';
-import { auraTarget } from './palette';
+import { auraTarget, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
 import { Aura } from './scene/aura';
 import { Chart } from './scene/chart';
 import { Fx } from './scene/fx';
@@ -103,6 +103,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     handlers.onSettings(settings);
   };
   mountSettingsPanel(initial, update);
+  // CSS reads the side colours from the palette, so text and canvas never drift apart.
+  document.documentElement.style.setProperty('--up', css(UP_COLOR));
+  document.documentElement.style.setProperty('--down', css(DOWN_COLOR));
 
   const status = el('status');
   const price = el('price');
@@ -273,17 +276,12 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
       if (s.ready) {
         fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
-        fill.dataset.level =
-          s.tension >= TENSION_LEVELS.high
-            ? 'high'
-            : s.tension >= TENSION_LEVELS.mid
-              ? 'mid'
-              : 'low';
+        fill.style.backgroundColor = css(tensionColor(s.tension));
         vol.textContent = `vol ${volFmt.format(s.volPerSec)}/s`;
       } else {
         // Tension needs a few minutes of this market's own statistics before it means anything.
         fill.style.width = `${Math.floor(s.warmup * 100)}%`;
-        fill.dataset.level = 'warmup';
+        fill.style.backgroundColor = '';
         vol.textContent = `calibrating tension · ${clock(s.warmupLeftSec)}`;
       }
       aura?.setTarget(auraTarget(s, flow.read(Date.now())));
@@ -310,7 +308,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       change.textContent = '\u00a0';
       lastEvent.className = '';
       fill.style.width = '0';
-      fill.dataset.level = 'low';
+      fill.style.backgroundColor = '';
       fx.clear();
       chart.draw(h, Date.now());
       aura?.setTarget(auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 }));
@@ -331,8 +329,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       const what = e.kind === 'liquidation' ? `LIQ ${e.side.toUpperCase()}` : e.side.toUpperCase();
       const times = e.count > 1 ? ` ×${e.count}` : '';
       lastEvent.textContent = `${what} ${usdFmt.format(e.usd)}${times}`;
-      // A long liquidation and an aggressive sell both push price down.
-      lastEvent.className = e.side === 'long' || e.side === 'sell' ? 'down' : 'up';
+      lastEvent.className = isDown(e.side) ? 'down' : 'up';
     },
     trade(t) {
       if (!fresh(t.ts)) return;

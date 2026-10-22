@@ -1,3 +1,4 @@
+import type { LiquidationSide, TradeSide } from '../feed/market-feed';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type FlowState, QUIET_FLOW } from './flow';
 
@@ -95,6 +96,13 @@ export function css(c: Rgb, alpha = 1): string {
   return `rgba(${b(c[0])}, ${b(c[1])}, ${b(c[2])}, ${alpha})`;
 }
 
-/** Side colours shared by particles, waves and chart: up-moving teal, down-moving magenta. */
+/** Side colours shared by particles, waves, chart and CSS (--up/--down): up teal, down magenta. */
 export const UP_COLOR: Rgb = RISING[1];
 export const DOWN_COLOR: Rgb = [0.95, 0.3, 0.55];
+
+/** Whether a side pushes price down: an aggressive sell, or a long liquidated (forced sell). */
+export const isDown = (side: TradeSide | LiquidationSide): boolean =>
+  side === 'sell' || side === 'long';
+
+export const sideColor = (side: TradeSide | LiquidationSide): Rgb =>
+  isDown(side) ? DOWN_COLOR : UP_COLOR;

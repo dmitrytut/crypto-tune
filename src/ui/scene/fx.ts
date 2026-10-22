@@ -1,6 +1,6 @@
 import type { LiquidationSide, TradeSide } from '../../feed/market-feed';
 import { usdFmt } from '../dom';
-import { css, DOWN_COLOR, type Rgb, UP_COLOR } from '../palette';
+import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
 import { bubbleStart, planSpawns, sizeDecades } from './spawn';
 
 /** Live bubbles cap; above it the oldest are recycled. */
@@ -160,7 +160,7 @@ export class Fx {
   }
 
   liquidation(side: LiquidationSide, usd: number, thresholdUsd: number): void {
-    const color = side === 'long' ? DOWN_COLOR : UP_COLOR;
+    const color = sideColor(side);
     const short = Math.min(this.canvas.clientWidth, this.canvas.clientHeight);
     const d = sizeDecades(usd);
     const above = Math.log10(usd / thresholdUsd);
@@ -231,7 +231,7 @@ export class Fx {
         halo: s.big ? this.halos[s.side] : null,
       });
       if (s.big) {
-        const color = s.side === 'buy' ? UP_COLOR : DOWN_COLOR;
+        const color = sideColor(s.side);
         const sign = s.side === 'buy' ? '+' : '−';
         this.labels.push({
           x: b.x,

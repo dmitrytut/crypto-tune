@@ -8,8 +8,7 @@
   --text: #f4f2fa;
   --muted: rgba(244, 242, 250, 0.62);
   --accent: #f4ec5a;
-  --up: #4de6d1;
-  --down: #f2508c;
+  /* --up and --down are set at mount from palette.ts (UP_COLOR / DOWN_COLOR), the one source. */
   --warn: #e0af68;
   font-family: "Onest Variable", ui-sans-serif, system-ui, sans-serif;
   color: var(--text);
@@ -214,23 +213,15 @@ body::after {
   background: var(--glass-strong);
   overflow: hidden;
 }
+/* Grey while calibrating; once ready the view paints it with palette.ts tensionColor. */
 .meter-fill {
   height: 100%;
   width: 0;
   border-radius: 3px;
-  background: #7aa2f7;
+  background: rgba(255, 255, 255, 0.35);
   transition:
     width 0.25s linear,
     background-color 0.6s;
-}
-.meter-fill[data-level="mid"] {
-  background: var(--warn);
-}
-.meter-fill[data-level="high"] {
-  background: var(--down);
-}
-.meter-fill[data-level="warmup"] {
-  background: rgba(255, 255, 255, 0.35);
 }
 .meter-mark {
   position: absolute;
@@ -311,13 +302,13 @@ body::after {
 @keyframes digit-up {
   from {
     color: var(--up);
-    text-shadow: 0 0 18px rgba(77, 230, 209, 0.45);
+    text-shadow: 0 0 18px color-mix(in srgb, var(--up) 45%, transparent);
   }
 }
 @keyframes digit-down {
   from {
     color: var(--down);
-    text-shadow: 0 0 18px rgba(242, 80, 140, 0.45);
+    text-shadow: 0 0 18px color-mix(in srgb, var(--down) 45%, transparent);
   }
 }
 .play:hover {
