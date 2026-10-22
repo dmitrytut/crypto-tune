@@ -38,7 +38,7 @@ interface CombinedMsg {
 }
 
 /** @package */
-export function parseAggTrade(d: AggTradeMsg): Trade {
+export function parseAggTrade(d: Pick<AggTradeMsg, 'T' | 'p' | 'q' | 'm'>): Trade {
   return { ts: d.T, price: Number(d.p), qty: Number(d.q), side: d.m ? 'sell' : 'buy' };
 }
 
@@ -137,4 +137,43 @@ export async function fetchBinanceSymbols(signal?: AbortSignal): Promise<string[
     .filter((s) => s.contractType === 'PERPETUAL' && s.status === 'TRADING')
     .map((s) => s.symbol)
     .sort();
+}
+
+/** REST aggregate trade; same fields as the stream message plus its id. */
+interface RestAggTrade extends Pick<AggTradeMsg, 'T' | 'p' | 'q' | 'm'> {
+  /** Aggregate trade id, consecutive per symbol. */
+  a: number;
+}
+
+const AGG_PAGE = 1_000;
+/**
+ * Weight 20 per page against a 2400/min IP budget: 30 pages (600) leaves room
+ * for reloads and the symbol list. 30k trades covers several busy minutes.
+ */
+const MAX_HISTORY_PAGES = 30;
+
+/**
+ * Aggregate trades from `sinceTs` (inclusive) to now, oldest first. The first
+ * page is located by time, the rest follow by id (Binance advises against
+ * mixing the two). Stops at the newest trade or after MAX_HISTORY_PAGES —
+ * a truncated history is still a head start, the live stream fills the rest.
+ */
+export async function fetchBinanceTradesSince(
+  symbol: string,
+  sinceTs: number,
+  signal?: AbortSignal,
+): Promise<Trade[]> {
+  const base = `${REST_BASE}/fapi/v1/aggTrades?symbol=${encodeURIComponent(symbol.toUpperCase())}&limit=${AGG_PAGE}`;
+  const out: Trade[] = [];
+  let query = `&startTime=${Math.floor(sinceTs)}`;
+  for (let page = 0; page < MAX_HISTORY_PAGES; page++) {
+    const res = await fetch(base + query, { signal });
+    if (!res.ok) throw new Error(`aggTrades HTTP ${res.status}`);
+    const rows = (await res.json()) as RestAggTrade[];
+    for (const r of rows) out.push(parseAggTrade(r));
+    const last = rows.at(-1);
+    if (!last || rows.length < AGG_PAGE) break;
+    query = `&fromId=${last.a + 1}`;
+  }
+  return out;
 }

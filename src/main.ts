@@ -1,7 +1,9 @@
 import { AudioEngine, type AudioParams } from './audio/engine';
-import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
+import { BinanceFuturesFeed, fetchBinanceSymbols, fetchBinanceTradesSince } from './feed/binance';
 import type { MarketFeed, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
+import { indexedDbTradeStore } from './feed/trade-cache';
+import { WarmStartFeed } from './feed/warm-start';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
 import { MarketHistory } from './metrics/history';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
@@ -66,14 +68,37 @@ const view = mountApp(settings, {
 
 /** Visual events older than this (wall clock) are history replays, not news: no sparks. */
 const VISUAL_MAX_AGE_MS = 2_000;
+/** Extra history beyond the warm-up so the first live tick already has full statistics. */
+const WARM_MARGIN_SEC = 20;
+
+/**
+ * Live feed that starts warm: the trades needed for window N plus the stats
+ * warm-up are restored from IndexedDB and/or fetched over REST.
+ */
+function warmBinanceFeed(symbol: string): WarmStartFeed {
+  const spanSec = settings.windowSec + DEFAULT_METRICS_CONFIG.warmupMin * 60 + WARM_MARGIN_SEC;
+  return new WarmStartFeed(
+    new BinanceFuturesFeed(symbol),
+    (from, signal) => fetchBinanceTradesSince(symbol, from, signal),
+    indexedDbTradeStore(`binance:${symbol}`),
+    spanSec * 1000,
+  );
+}
 
 /** (Re)create feed, metrics and chart history from current settings; history is discarded. */
 function startPipeline(): void {
   for (const u of unsubs) u();
   feed?.disconnect();
 
-  const f: MarketFeed =
-    settings.source === 'simulator' ? new SimulatorFeed() : new BinanceFuturesFeed(settings.symbol);
+  const extra: Unsubscribe[] = [];
+  let f: MarketFeed;
+  if (settings.source === 'simulator') {
+    f = new SimulatorFeed();
+  } else {
+    const warm = warmBinanceFeed(settings.symbol);
+    extra.push(warm.onLoading((loading) => view.setHistoryLoading(loading)));
+    f = warm;
+  }
   const e = new MetricsEngine({
     ...DEFAULT_METRICS_CONFIG,
     windowSec: settings.windowSec,
@@ -82,6 +107,7 @@ function startPipeline(): void {
   const h = new MarketHistory();
   const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
   unsubs = [
+    ...extra,
     f.onTrade((t) => {
       e.addTrade(t);
       h.addTrade(t);
