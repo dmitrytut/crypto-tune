@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TENSION_LEVELS } from '../../metrics/tension';
-import { tensionMix } from '../tension-map';
+import { INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from '../tension-map';
 
 const { mid, high } = TENSION_LEVELS;
 
@@ -37,6 +37,13 @@ describe('tensionMix', () => {
     expect(a.subLevel).toBeGreaterThan(a.percLevel);
     expect(at(high)).toMatchObject({ bpm: 90, subLevel: 1, percLevel: 1, riserLevel: 0 });
     expect(at(high).arpCutoffHz).toBeCloseTo(6000, 6);
+  });
+
+  it('is clearly audible in the typical mid zone, not only near high', () => {
+    // Median tension inside 1–2.5 on live BTCUSDT was ~1.5.
+    const m = tensionMix(1.5, 0, false);
+    expect(m.subLevel).toBeGreaterThanOrEqual(0.5);
+    expect(m.percLevel).toBeGreaterThanOrEqual(0.3);
   });
 
   it('adds riser, detune and vibrato only above high, capped at full depth', () => {
@@ -77,5 +84,46 @@ describe('tensionMix', () => {
       expect(Math.abs(m.bpm - prev.bpm)).toBeLessThan(0.5);
       prev = m;
     }
+  });
+});
+
+describe('stepShock', () => {
+  const TICK = 250;
+  /** Feeds a tension series one tick apart; returns the ticks that fired. */
+  function run(series: number[], from: ShockState = INITIAL_SHOCK, t0 = 0) {
+    let state = from;
+    const fired: number[] = [];
+    series.forEach((tension, i) => {
+      const r = stepShock(state, tension, t0 + i * TICK);
+      state = r.state;
+      if (r.fired) fired.push(i);
+    });
+    return { fired, state };
+  }
+
+  it('fires once on a sudden jump into the peak zone', () => {
+    // Tension after raw jumps from ~0 to 6 (attack 0.4 per tick).
+    expect(run([0.2, 0.2, 2.52, 3.95, 4.77, 5.26, 5.5]).fired).toEqual([3]);
+  });
+
+  it('stays quiet on a slow climb to the same level', () => {
+    const climb = Array.from({ length: 80 }, (_, i) => 0.2 + i * 0.07);
+    expect(run(climb).fired).toEqual([]);
+  });
+
+  it('stays quiet on an ordinary jump into the mid zone', () => {
+    // The kind of move that happens dozens of times an hour on a calm market.
+    expect(run([0.2, 0.2, 1.3, 2.0, 2.4, 2.6, 2.7]).fired).toEqual([]);
+  });
+
+  it('waits out the cooldown before firing again', () => {
+    const jump = [0.1, 0.1, 4];
+    const first = run(jump);
+    expect(first.fired).toEqual([2]);
+    // Tension relaxes, then jumps again 5 s later: too soon.
+    const soon = run(jump, first.state, 5_000);
+    expect(soon.fired).toEqual([]);
+    const later = run(jump, soon.state, 60_000);
+    expect(later.fired).toEqual([2]);
   });
 });

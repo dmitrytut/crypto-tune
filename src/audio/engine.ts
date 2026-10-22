@@ -1,12 +1,13 @@
 import * as Tone from 'tone';
 import type { Liquidation, LiquidationSide, Trade, TradeSide } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
+import { AmbienceLayer } from './ambience-layer';
 import { BaseLayer } from './base-layer';
 import { EventsLayer } from './events-layer';
 import { collapse, type EventCue, eventVelocity, type PendingEvent } from './events-map';
 import { Mixer } from './mixer';
 import { TensionLayer } from './tension-layer';
-import { tensionMix } from './tension-map';
+import { INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from './tension-map';
 
 /** Calm tempo; the tension mix raises it toward 90 BPM. */
 const BASE_BPM = 60;
@@ -39,6 +40,7 @@ export interface EventCues {
 interface Graph {
   mixer: Mixer;
   base: BaseLayer;
+  ambience: AmbienceLayer;
   baseChannel: Tone.Volume;
   tension: TensionLayer;
   tensionChannel: Tone.Volume;
@@ -58,6 +60,7 @@ export class AudioEngine {
   private doubleTime = false;
   /** Last tempo written to the transport, whole BPM. */
   private bpm = BASE_BPM;
+  private shock: ShockState = INITIAL_SHOCK;
   private pendingLiqs: PendingEvent<LiquidationSide>[] = [];
   private pendingTrades: PendingEvent<TradeSide>[] = [];
 
@@ -102,6 +105,9 @@ export class AudioEngine {
     this.doubleTime = mix.doubleTime;
     g.base.setTrend(s.emaZ);
     g.base.applyMix(mix);
+    const shock = stepShock(this.shock, s.tension, s.ts);
+    this.shock = shock.state;
+    if (shock.fired && this.state === 'running') g.tension.shock(s.ret >= 0, Tone.now());
     g.tension.applyMix(mix);
     // Tempo moves in whole-BPM steps, written only on change. Re-issuing
     // bpm.rampTo every tick crashes Tone 15's transport clock after ~1 min of
@@ -159,6 +165,7 @@ export class AudioEngine {
     if (!g) return;
     if (next.tonicPc !== prev.tonicPc) {
       g.base.setTonic(next.tonicPc);
+      g.ambience.setTonic(next.tonicPc);
       g.tension.setTonic(next.tonicPc);
       g.events.setTonic(next.tonicPc);
     }
@@ -184,6 +191,7 @@ export class AudioEngine {
       tensionChannel,
       eventsChannel,
       base: new BaseLayer(baseChannel, this.params.tonicPc),
+      ambience: new AmbienceLayer(baseChannel, this.params.tonicPc),
       tension: new TensionLayer(tensionChannel, this.params.tonicPc),
       events: new EventsLayer(eventsChannel, this.params.tonicPc),
     };
