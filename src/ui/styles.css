@@ -32,6 +32,18 @@ body {
   background: radial-gradient(120% 90% at 50% 40%, #2a1a5e 0%, #0d0820 55%, var(--bg) 100%);
 }
 
+/* Film grain over everything: kills gradient banding and gives the glow a printed texture. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 .layer {
   position: fixed;
   inset: 0;
@@ -126,6 +138,7 @@ body {
 
 /* ── hero ── */
 .hero {
+  position: relative;
   align-self: center;
   justify-self: center;
   width: min(560px, 100%);
@@ -135,19 +148,36 @@ body {
   /* Particles start here; keep it above the chart. */
   grid-row: 3;
 }
+/* Soft dark pool behind the readout: the aura can blaze without swallowing the numbers. */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: -12% -22%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    rgba(5, 3, 14, 0.5),
+    rgba(5, 3, 14, 0.28) 55%,
+    transparent
+  );
+}
 .price {
   font-size: clamp(56px, 11vw, 120px);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 4px 40px rgba(0, 0, 0, 0.35);
+  text-shadow:
+    0 2px 24px rgba(0, 0, 0, 0.45),
+    0 0 2px rgba(0, 0, 0, 0.3);
 }
 .change {
   font-size: 18px;
   font-weight: 600;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
 }
 .up {
   color: var(--up);
@@ -209,6 +239,7 @@ body {
   display: flex;
   gap: 8px;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
 }
 
 .play {
@@ -242,8 +273,39 @@ body {
 .play[data-state="running"] {
   background: var(--glass-strong);
   color: var(--text);
-  box-shadow: none;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(12px);
+  animation: breathe 4s ease-in-out infinite;
+}
+/* While playing, the button breathes slowly: a quiet "on air" sign. */
+@keyframes breathe {
+  50% {
+    box-shadow: 0 0 0 14px rgba(255, 255, 255, 0);
+  }
+}
+
+/* Each price tick flashes the digits in its direction's colour, then settles. */
+.price.tick-up {
+  animation: tick-up 0.9s ease-out;
+}
+.price.tick-down {
+  animation: tick-down 0.9s ease-out;
+}
+@keyframes tick-up {
+  from {
+    color: #c9fff6;
+    text-shadow:
+      0 0 24px rgba(77, 230, 209, 0.9),
+      0 0 60px rgba(77, 230, 209, 0.5);
+  }
+}
+@keyframes tick-down {
+  from {
+    color: #ffd6e6;
+    text-shadow:
+      0 0 24px rgba(242, 80, 140, 0.9),
+      0 0 60px rgba(242, 80, 140, 0.5);
+  }
 }
 .play:hover {
   transform: scale(1.05);
@@ -390,5 +452,6 @@ body.idle {
   .meter-fill,
   .play {
     transition: none;
+    animation: none;
   }
 }

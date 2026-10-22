@@ -38,9 +38,11 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   minute. Write whole-BPM steps with `setValueAtTime` only when the value changes.
 - `src/ui/` — DOM view; `index.html` holds the static markup. `app.ts` (main screen, render loop,
   immersive mode, tab title), `settings-panel.ts` (settings `<dialog>`), `scene/` (`aura.ts` WebGL
-  background, `fx.ts` trade sparks and liquidation waves, `chart.ts` price/volume strip). Pure,
-  spec-covered: `palette.ts` (market → aura colours/motion), `scene/spawn.ts` (spark merging).
-  Visuals are wall-clock animation; anything older than 2 s is not animated (history replays).
+  background with drift/shock/bloom uniforms, `fx.ts` trade bubbles/drops and liquidation bursts,
+  `chart.ts` price/volume strip). Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no
+  warm-up), `palette.ts` (market + flow → aura colours/motion), `scene/spawn.ts` (merging, bubble
+  start state). Visuals are wall-clock animation; anything older than 2 s is not animated (history
+  replays). Every motion effect respects `prefers-reduced-motion`.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 

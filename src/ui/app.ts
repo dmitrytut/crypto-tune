@@ -10,6 +10,7 @@ import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { el, usdFmt } from './dom';
+import { FlowMeter } from './flow';
 import { auraTarget } from './palette';
 import { Aura } from './scene/aura';
 import { Chart } from './scene/chart';
@@ -143,11 +144,30 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   // ── scene ──
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const aura = Aura.create(el('aura'), auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 }));
-  const fx = new Fx(el('fx'));
+  const stage = document.querySelector<HTMLElement>('.stage');
+  const fx = new Fx(el('fx'), {
+    bloom: (x, y, color, strength) => aura?.bloom(x, y, color, strength),
+    shock: (x, y, strength) => aura?.shock(x, y, strength),
+    shake: (strength) => {
+      const a = 3 + 5 * strength;
+      stage?.animate(
+        [
+          { transform: 'translate(0, 0)' },
+          { transform: `translate(${a}px, ${-a * 0.6}px)` },
+          { transform: `translate(${-a * 0.8}px, ${a * 0.5}px)` },
+          { transform: `translate(${a * 0.4}px, ${a * 0.3}px)` },
+          { transform: 'translate(0, 0)' },
+        ],
+        { duration: 420, easing: 'ease-out' },
+      );
+    },
+  });
   const chart = new Chart(el('chart'));
+  let flow = new FlowMeter();
   let history: HistorySeries | null = null;
   let last: MetricsSnapshot | null = null;
   let chartDirty = false;
+  let shownPrice = Number.NaN;
 
   const placeOrigin = () => {
     const r = price.getBoundingClientRect();
@@ -166,7 +186,10 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     prevFrame = t;
     // Reduced motion: the aura barely drifts and no particles fly.
     aura?.frame(reducedMotion.matches ? dt * 0.1 : dt);
-    if (!reducedMotion.matches) fx.frame(dt, settings.tradeThresholdUsd);
+    // Reduced motion: no new events are queued; clearing also wipes anything already
+    // flying when the preference flips mid-session, so nothing freezes on screen.
+    if (reducedMotion.matches) fx.clear();
+    fx.frame(dt, settings.tradeThresholdUsd);
     if (chartDirty && history && last) {
       chart.draw(history, last.ts);
       chartDirty = false;
@@ -204,6 +227,13 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       last = s;
       chartDirty = true;
       price.textContent = Number.isNaN(s.price) ? '—' : priceFmt.format(s.price);
+      if (!Number.isNaN(shownPrice) && s.price !== shownPrice && !reducedMotion.matches) {
+        // Restart the flash animation: drop the class, force a style flush, add it back.
+        price.classList.remove('tick-up', 'tick-down');
+        void price.offsetWidth;
+        price.classList.add(s.price > shownPrice ? 'tick-up' : 'tick-down');
+      }
+      shownPrice = s.price;
       const pct = (Math.exp(s.ret) - 1) * 100;
       // Arrow and colour follow the number shown, not the smoothed direction.
       const shown = Math.abs(pct) < 0.005 ? 0 : pct;
@@ -225,7 +255,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
         fill.dataset.level = 'warmup';
         vol.textContent = `разогрев ${Math.floor(s.warmup * 100)}%`;
       }
-      aura?.setTarget(auraTarget(s));
+      aura?.setTarget(auraTarget(s, flow.read(Date.now())));
       updateTitle(s);
       debug.tension.textContent = s.tension.toFixed(2);
       debug.direction.textContent = `${arrowOf(s.direction)} ${s.direction.toFixed(2)}`;
@@ -237,6 +267,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     reset(h) {
       history = h;
       last = null;
+      shownPrice = Number.NaN;
+      // A new pair trades on a different notional scale; its pace baseline starts fresh.
+      flow = new FlowMeter();
       for (const node of [price, vol, lastEvent, ...Object.values(debug)]) node.textContent = '—';
       change.textContent = '\u00a0';
       lastEvent.className = '';
@@ -268,10 +301,12 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       lastEvent.className = e.side === 'long' || e.side === 'sell' ? 'down' : 'up';
     },
     trade(t) {
-      if (!document.hidden) fx.trade(t.side, t.price * t.qty);
+      flow.add(t.side, t.price * t.qty, t.ts);
+      if (!document.hidden && !reducedMotion.matches) fx.trade(t.side, t.price * t.qty);
     },
     liquidation(l) {
-      if (document.hidden) return;
+      // Hidden tab: nothing to see. Reduced motion: no waves, shocks or shake at all.
+      if (document.hidden || reducedMotion.matches) return;
       fx.liquidation(l.side, l.usd, settings.liqThresholdUsd);
       if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(0.35);
     },

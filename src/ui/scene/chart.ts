@@ -9,7 +9,7 @@ const PRICE_PAD = 0.12;
 /** Tension colour stops along the fill: every Nth point is plenty for a gradient. */
 const GRADIENT_EVERY = 6;
 /** Shortest span drawn: a fresh live session fills the width instead of hugging the right edge. */
-const MIN_SPAN_MS = 2 * 60_000;
+const MIN_SPAN_MS = 30_000;
 
 /**
  * Bottom strip: up to the last 15 minutes of price with the area under the line

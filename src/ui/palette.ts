@@ -1,4 +1,5 @@
 import { TENSION_LEVELS } from '../metrics/tension';
+import { type FlowState, QUIET_FLOW } from './flow';
 
 /** Linear RGB, each channel 0…1. */
 export type Rgb = readonly [number, number, number];
@@ -18,8 +19,12 @@ const FALLING: readonly [Rgb, Rgb] = [
 ];
 /** Even a calm market tints toward its direction this much. */
 const CALM_TINT = 0.35;
+/** Order-flow imbalance alone can carry the colour this far toward a side. */
+const FLOW_TINT = 0.75;
 /** Tension above `high` at which the aura is at full turbulence. */
 const PEAK_SPAN = 1.5;
+/** Fastest vertical drift of the field from one-sided flow, noise units per second. */
+const MAX_DRIFT = 0.18;
 
 /** What the aura shader should look like for the current market state. */
 export interface AuraTarget {
@@ -30,13 +35,16 @@ export interface AuraTarget {
   speed: number;
   /** Domain-warp strength: calm blobs are round, tense ones tear. */
   warp: number;
-  /** Overall brightness multiplier; volume spikes brighten the aura. */
+  /** Overall brightness multiplier; busy trading and volume spikes brighten the aura. */
   glow: number;
   /** Vertical offset of the bright mass, −0.25 … 0.25 of screen height; up = price above EMA. */
   shiftY: number;
+  /** Vertical drift of the field: buying pressure lifts it, selling sinks it (noise units/s). */
+  drift: number;
 }
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const clampSigned = (x: number) => Math.max(-1, Math.min(1, x));
 const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
   a[0] + (b[0] - a[0]) * t,
   a[1] + (b[1] - a[1]) * t,
@@ -44,27 +52,30 @@ const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
 ];
 
 /**
- * Market → aura. Tension drives motion (speed, tearing), direction drives
- * colour (teal rising, magenta/amber falling, indigo calm), volume spikes
- * drive brightness, and the price vs its hour EMA lifts or sinks the glow.
+ * Market → aura, in two time scales. Order flow (seconds, no warm-up): who is
+ * hitting the book tints and drifts the field, how busy trading is speeds and
+ * brightens it. Tension (after warm-up): sustained moves tear the field and
+ * saturate the colour; volume spikes brighten; price vs hour EMA lifts the glow.
  */
-export function auraTarget(s: {
-  tension: number;
-  direction: number;
-  volZ: number;
-  emaZ: number;
-}): AuraTarget {
+export function auraTarget(
+  s: { tension: number; direction: number; volZ: number; emaZ: number },
+  flow: FlowState = QUIET_FLOW,
+): AuraTarget {
   const intensity = clamp01(s.tension / TENSION_LEVELS.high);
   const peak = clamp01((s.tension - TENSION_LEVELS.high) / PEAK_SPAN);
-  const mood = clamp01(Math.abs(s.direction) * (CALM_TINT + (1 - CALM_TINT) * intensity));
-  const toward = s.direction >= 0 ? RISING : FALLING;
+  const lean = clampSigned(
+    s.direction * (CALM_TINT + (1 - CALM_TINT) * intensity) + flow.imbalance * FLOW_TINT,
+  );
+  const toward = lean >= 0 ? RISING : FALLING;
+  const mood = Math.abs(lean);
   return {
     colorA: mix(CALM[0], toward[0], mood),
     colorB: mix(CALM[1], toward[1], mood),
-    speed: 0.04 + 0.35 * intensity + 0.5 * peak,
-    warp: 0.8 + 1.4 * intensity + 1.2 * peak,
-    glow: 0.95 + 0.45 * clamp01(s.volZ / 4),
-    shiftY: 0.25 * Math.max(-1, Math.min(1, s.emaZ / 3)),
+    speed: 0.05 + 0.22 * flow.activity + 0.35 * intensity + 0.5 * peak,
+    warp: 0.8 + 0.5 * flow.activity + 1.4 * intensity + 1.2 * peak,
+    glow: 0.85 + 0.35 * flow.activity + 0.35 * clamp01(s.volZ / 4),
+    shiftY: 0.25 * clampSigned(s.emaZ / 3),
+    drift: MAX_DRIFT * flow.imbalance * (0.4 + 0.6 * flow.activity),
   };
 }
 

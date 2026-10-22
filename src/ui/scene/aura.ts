@@ -1,29 +1,43 @@
 import type { AuraTarget, Rgb } from '../palette';
 
 /** Render at this fraction of the screen; the soft upscale is part of the look and keeps the GPU idle. */
-const RESOLUTION_SCALE = 0.25;
-/** Seconds for colours / motion to settle on a new target. */
-const COLOR_TAU_SEC = 1.6;
-const MOTION_TAU_SEC = 0.8;
+const RESOLUTION_SCALE = 0.33;
+/** Seconds for colours / motion to settle on a new target. Short enough to feel a single trade burst. */
+const COLOR_TAU_SEC = 0.9;
+const MOTION_TAU_SEC = 0.6;
 /** The drone filter LFO rate (base layer), so the aura breathes with the sound. */
 const BREATH_HZ = 0.03;
-const PULSE_DECAY_PER_SEC = 1.6;
+const PULSE_DECAY_PER_SEC = 1.4;
+const MAX_SHOCKS = 3;
+const SHOCK_SEC = 2.2;
+/** Ring expansion speed in screen heights per second. */
+const SHOCK_SPEED = 0.6;
+const MAX_BLOOMS = 6;
+const BLOOM_DECAY_PER_SEC = 1.8;
 
 const VERTEX = `
 attribute vec2 aPos;
 void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
 `;
 
-/** Domain-warped value-noise fbm: two warps give the soft, tearing blobs. */
+/**
+ * Domain-warped value-noise fbm (two warps → soft, tearing blobs), plus:
+ * drift (order flow lifts/sinks the field), shock rings that displace the
+ * field and glow (liquidations), and point blooms (large trades).
+ */
 const FRAGMENT = `
 precision mediump float;
 uniform vec2 uRes;
 uniform float uTime;
+uniform vec2 uDrift;
 uniform vec3 uA;
 uniform vec3 uB;
 uniform float uWarp;
 uniform float uGlow;
 uniform float uShift;
+uniform vec4 uShock[${MAX_SHOCKS}];
+uniform vec4 uBloom[${MAX_BLOOMS}];
+uniform vec3 uBloomColor[${MAX_BLOOMS}];
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -40,17 +54,42 @@ float fbm(vec2 p) {
   return v;
 }
 void main() {
-  vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  vec2 screen = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+
+  // Shock rings: push the field outward along a thin band and light the band.
+  vec2 push = vec2(0.0);
+  float ring = 0.0;
+  for (int i = 0; i < ${MAX_SHOCKS}; i++) {
+    vec4 s = uShock[i];
+    vec2 d = screen - s.xy;
+    float r = length(d) + 1e-4;
+    float band = exp(-pow((r - s.z) * 12.0, 2.0)) * s.w;
+    push += d / r * band * 0.12;
+    ring += band;
+  }
+
+  vec2 p = screen + push + uDrift;
   p.y -= uShift;
   float t = uTime;
   vec2 q = vec2(fbm(p * 1.2 + vec2(0.0, t)), fbm(p * 1.2 + vec2(5.2, -0.8 * t)));
   vec2 r = vec2(fbm(p * 1.4 + uWarp * q + vec2(1.7, 9.2) + 0.3 * t),
                 fbm(p * 1.4 + uWarp * q + vec2(8.3, 2.8) - 0.4 * t));
   float f = fbm(p * 1.3 + uWarp * r);
+
   vec3 col = mix(vec3(0.02, 0.015, 0.05), uA, smoothstep(0.18, 0.62, f));
   col = mix(col, uB, smoothstep(0.48, 0.85, f));
-  float vignette = smoothstep(1.45, 0.1, length(p));
-  gl_FragColor = vec4(col * vignette * uGlow, 1.0);
+  // Hot cores lean toward white: the "juice" in the brightest folds.
+  col += uB * smoothstep(0.78, 0.98, f) * 0.35;
+  float vignette = smoothstep(1.45, 0.1, length(screen));
+  col *= vignette * uGlow;
+  col += uB * ring * 0.55;
+
+  for (int i = 0; i < ${MAX_BLOOMS}; i++) {
+    vec4 b = uBloom[i];
+    vec2 d = screen - b.xy;
+    col += uBloomColor[i] * b.z * exp(-dot(d, d) * 22.0);
+  }
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -62,23 +101,54 @@ const approachRgb = (cur: Rgb, target: Rgb, dt: number, tau: number): Rgb => [
   approach(cur[2], target[2], dt, tau),
 ];
 
+interface Shock {
+  x: number;
+  y: number;
+  age: number;
+  strength: number;
+}
+
+interface Bloom {
+  x: number;
+  y: number;
+  strength: number;
+  color: Rgb;
+}
+
+type UniformName =
+  | 'res'
+  | 'time'
+  | 'drift'
+  | 'a'
+  | 'b'
+  | 'warp'
+  | 'glow'
+  | 'shift'
+  | 'shock'
+  | 'bloom'
+  | 'bloomColor';
+
 /**
  * Full-screen flowing aura. Targets come from `auraTarget()`; every value
  * glides toward its target so a jumpy market never makes the background jump.
- * Returns null when WebGL is unavailable (the CSS gradient behind stays).
+ * Events land as shocks (liquidations) and blooms (large trades) at their
+ * screen positions. `create` returns null without WebGL (the CSS gradient stays).
  */
 export class Aura {
   private readonly gl: WebGLRenderingContext;
-  private readonly u: Record<
-    'res' | 'time' | 'a' | 'b' | 'warp' | 'glow' | 'shift',
-    WebGLUniformLocation | null
-  >;
+  private readonly u: Record<UniformName, WebGLUniformLocation | null>;
   private current: AuraTarget;
   private target: AuraTarget;
-  /** Noise-space time; integrates speed so speed changes never jump the picture. */
+  /** Noise-space time and drift; integrating them keeps speed changes from jumping the picture. */
   private flow = 0;
+  private driftY = 0;
   private clock = 0;
   private pulse = 0;
+  private shocks: Shock[] = [];
+  private blooms: Bloom[] = [];
+  private readonly shockBuf = new Float32Array(MAX_SHOCKS * 4);
+  private readonly bloomBuf = new Float32Array(MAX_BLOOMS * 4);
+  private readonly bloomColorBuf = new Float32Array(MAX_BLOOMS * 3);
 
   private constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -93,11 +163,15 @@ export class Aura {
     this.u = {
       res: loc('uRes'),
       time: loc('uTime'),
+      drift: loc('uDrift'),
       a: loc('uA'),
       b: loc('uB'),
       warp: loc('uWarp'),
       glow: loc('uGlow'),
       shift: loc('uShift'),
+      shock: loc('uShock'),
+      bloom: loc('uBloom'),
+      bloomColor: loc('uBloomColor'),
     };
   }
 
@@ -120,9 +194,21 @@ export class Aura {
     this.target = t;
   }
 
-  /** Brief brightening, e.g. on a liquidation; `strength` 0…1. */
+  /** Brief overall brightening; `strength` 0…1. */
   pulseBy(strength: number): void {
     this.pulse = Math.min(1, this.pulse + strength);
+  }
+
+  /** Liquidation: a ring that tears outward through the field from (x, y) in CSS px. */
+  shock(x: number, y: number, strength: number): void {
+    this.shocks.push({ ...this.toField(x, y), age: 0, strength: Math.min(1, strength) });
+    if (this.shocks.length > MAX_SHOCKS) this.shocks.shift();
+  }
+
+  /** Large trade: a soft burst of light at (x, y) in CSS px. */
+  bloom(x: number, y: number, color: Rgb, strength: number): void {
+    this.blooms.push({ ...this.toField(x, y), strength: Math.min(1.2, strength), color });
+    if (this.blooms.length > MAX_BLOOMS) this.blooms.shift();
   }
 
   frame(dtSec: number): void {
@@ -136,11 +222,26 @@ export class Aura {
       warp: approach(c.warp, t.warp, dt, MOTION_TAU_SEC),
       glow: approach(c.glow, t.glow, dt, MOTION_TAU_SEC),
       shiftY: approach(c.shiftY, t.shiftY, dt, COLOR_TAU_SEC),
+      drift: approach(c.drift, t.drift, dt, MOTION_TAU_SEC),
     };
     this.flow += this.current.speed * dt;
+    // Field coordinates move opposite to the drift so buying pressure reads as the light rising.
+    this.driftY -= this.current.drift * dt;
     this.clock += dt;
     this.pulse *= Math.exp(-PULSE_DECAY_PER_SEC * dt);
+    for (const s of this.shocks) s.age += dt;
+    this.shocks = this.shocks.filter((s) => s.age < SHOCK_SEC);
+    const fade = Math.exp(-BLOOM_DECAY_PER_SEC * dt);
+    for (const b of this.blooms) b.strength *= fade;
+    this.blooms = this.blooms.filter((b) => b.strength > 0.01);
     this.draw();
+  }
+
+  /** CSS px → shader space: centred, y up, unit = screen height. */
+  private toField(x: number, y: number): { x: number; y: number } {
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight || 1;
+    return { x: (x - w / 2) / h, y: (h / 2 - y) / h };
   }
 
   private draw(): void {
@@ -155,11 +256,27 @@ export class Aura {
     const breath = 1 + 0.06 * Math.sin(2 * Math.PI * BREATH_HZ * this.clock);
     gl.uniform2f(u.res, w, h);
     gl.uniform1f(u.time, this.flow);
+    gl.uniform2f(u.drift, 0, this.driftY);
     gl.uniform3f(u.a, c.colorA[0], c.colorA[1], c.colorA[2]);
     gl.uniform3f(u.b, c.colorB[0], c.colorB[1], c.colorB[2]);
     gl.uniform1f(u.warp, c.warp);
-    gl.uniform1f(u.glow, c.glow * breath * (1 + 0.5 * this.pulse));
+    gl.uniform1f(u.glow, c.glow * breath * (1 + 0.6 * this.pulse));
     gl.uniform1f(u.shift, c.shiftY);
+
+    this.shockBuf.fill(0);
+    for (const [i, s] of this.shocks.entries()) {
+      const k = s.age / SHOCK_SEC;
+      this.shockBuf.set([s.x, s.y, 0.04 + SHOCK_SPEED * s.age, s.strength * (1 - k) ** 2], i * 4);
+    }
+    gl.uniform4fv(u.shock, this.shockBuf);
+
+    this.bloomBuf.fill(0);
+    for (const [i, b] of this.blooms.entries()) {
+      this.bloomBuf.set([b.x, b.y, b.strength, 0], i * 4);
+      this.bloomColorBuf.set(b.color, i * 3);
+    }
+    gl.uniform4fv(u.bloom, this.bloomBuf);
+    gl.uniform3fv(u.bloomColor, this.bloomColorBuf);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }

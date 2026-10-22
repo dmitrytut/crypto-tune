@@ -45,4 +45,21 @@ describe('auraTarget', () => {
     expect(auraTarget({ ...calm, emaZ: -2 }).shiftY).toBeLessThan(0);
     expect(auraTarget({ ...calm, emaZ: 99 }).shiftY).toBe(0.25);
   });
+
+  it('reacts to order flow immediately, with tension still zero (warm-up or calm)', () => {
+    const buying = auraTarget(calm, { imbalance: 0.8, activity: 0.9 });
+    const selling = auraTarget(calm, { imbalance: -0.8, activity: 0.9 });
+    const quiet = auraTarget(calm, { imbalance: 0, activity: 0 });
+    expect(buying.colorB[1]).toBeGreaterThan(quiet.colorB[1]);
+    expect(selling.colorB[0]).toBeGreaterThan(quiet.colorB[0]);
+    expect(buying.drift).toBeGreaterThan(0);
+    expect(selling.drift).toBeLessThan(0);
+    expect(buying.speed).toBeGreaterThan(quiet.speed);
+    expect(buying.glow).toBeGreaterThan(quiet.glow);
+  });
+
+  it('lets strong opposite flow override a stale direction', () => {
+    const a = auraTarget({ ...calm, direction: 0.3 }, { imbalance: -1, activity: 0.5 });
+    expect(a.colorB[0]).toBeGreaterThan(a.colorB[2]);
+  });
 });
