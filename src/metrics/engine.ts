@@ -41,6 +41,8 @@ export interface MetricsSnapshot extends TensionState {
   ready: boolean;
   /** Warm-up progress 0…1. */
   warmup: number;
+  /** Time until `ready` at the current rate of ticks, seconds; 0 once ready. */
+  warmupLeftSec: number;
   /**
    * Price vs its EMA(emaHorizonMin) in units of the EW spread of log price:
    * > 0 above the trend, < 0 below. 0 until `ready`.
@@ -150,9 +152,11 @@ export class MetricsEngine {
     const hasRet = fresh >= this.lagTicks;
     const past = this.prices[(i - this.lagTicks) % this.prices.length] as number;
     const ret = hasRet ? Math.log(this.price / past) : 0;
-    const warmup =
-      (Math.min(fresh, this.lagTicks) + Math.min(this.retStats.count, this.warmupTicks)) /
-      (this.lagTicks + this.warmupTicks);
+    const warmupTotal = this.lagTicks + this.warmupTicks;
+    const warmupDone =
+      Math.min(fresh, this.lagTicks) + Math.min(this.retStats.count, this.warmupTicks);
+    const warmup = warmupDone / warmupTotal;
+    const warmupLeftSec = (warmupTotal - warmupDone) / TICKS_PER_SEC;
     const ready = hasRet && this.retStats.count >= this.warmupTicks;
 
     this.state = stepTension(
@@ -176,7 +180,17 @@ export class MetricsEngine {
     const emaZ = ready && trend ? zScore(logPrice, trend.mean, Math.sqrt(trend.variance)) : 0;
     this.trend = ewmStep(trend, logPrice, this.emaAlpha);
 
-    return { ...this.state, ts: end, price: this.price, ret, volPerSec, ready, warmup, emaZ };
+    return {
+      ...this.state,
+      ts: end,
+      price: this.price,
+      ret,
+      volPerSec,
+      ready,
+      warmup,
+      warmupLeftSec,
+      emaZ,
+    };
   }
 
   private compactPending(): void {

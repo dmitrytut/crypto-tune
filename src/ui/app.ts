@@ -5,7 +5,7 @@ import type {
   Trade,
   TradeSide,
 } from '../feed/market-feed';
-import { DEFAULT_METRICS_CONFIG, type MetricsSnapshot } from '../metrics/engine';
+import type { MetricsSnapshot } from '../metrics/engine';
 import type { EventCue } from '../metrics/events';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
@@ -281,10 +281,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
         vol.textContent = `vol ${volFmt.format(s.volPerSec)}/s`;
       } else {
         // Tension needs a few minutes of this market's own statistics before it means anything.
-        const total = settings.windowSec + DEFAULT_METRICS_CONFIG.warmupMin * 60;
         fill.style.width = `${Math.floor(s.warmup * 100)}%`;
         fill.dataset.level = 'warmup';
-        vol.textContent = `calibrating tension · ${clock((1 - s.warmup) * total)}`;
+        vol.textContent = `calibrating tension · ${clock(s.warmupLeftSec)}`;
       }
       aura?.setTarget(auraTarget(s, flow.read(Date.now())));
       updateTitle(s);
