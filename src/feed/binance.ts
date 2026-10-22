@@ -9,14 +9,20 @@ import { ReconnectingSocket } from './reconnecting-socket';
 const WS_BASE = 'wss://fstream.binance.com/market/stream';
 const REST_BASE = 'https://fapi.binance.com';
 
-interface AggTradeMsg {
-  e: 'aggTrade';
-  E: number;
+/** A row of `GET /fapi/v1/aggTrades`; the stream message carries the same fields. */
+interface AggTradeRow {
+  /** Aggregate trade id, contiguous per symbol. */
+  a: number;
   T: number;
   p: string;
   q: string;
   /** Buyer is the maker → the aggressor sold. */
   m: boolean;
+}
+
+interface AggTradeMsg extends AggTradeRow {
+  e: 'aggTrade';
+  E: number;
 }
 
 interface ForceOrderMsg {
@@ -38,7 +44,7 @@ interface CombinedMsg {
 }
 
 /** @package */
-export function parseAggTrade(d: AggTradeMsg): Trade {
+export function parseAggTrade(d: Omit<AggTradeRow, 'a'>): Trade {
   return { ts: d.T, price: Number(d.p), qty: Number(d.q), side: d.m ? 'sell' : 'buy' };
 }
 
@@ -60,9 +66,42 @@ export function binanceStreamUrl(symbol: string): string {
 
 /** Weight of each new clock-offset observation. */
 const CLOCK_ALPHA = 0.05;
+/** Trade history loaded on connect, so metrics start warm instead of after a 5-minute warm-up. */
+const HISTORY_MS = 30 * 60_000;
+/** `aggTrades` weighs 20; 20 pages = 400 of the 2400/min per-IP budget. */
+const HISTORY_MAX_PAGES = 20;
+const HISTORY_PAGE_SIZE = 1000;
+
+/**
+ * Recent aggregate trades, oldest first, back to `sinceMs` or HISTORY_MAX_PAGES
+ * pages, whichever comes first. Pages walk back by id: ids are contiguous.
+ */
+async function fetchAggTradesSince(
+  symbol: string,
+  sinceMs: number,
+  signal: AbortSignal,
+): Promise<AggTradeRow[]> {
+  const base = `${REST_BASE}/fapi/v1/aggTrades?symbol=${encodeURIComponent(symbol)}&limit=${HISTORY_PAGE_SIZE}`;
+  const pages: AggTradeRow[][] = [];
+  let fromId: number | null = null;
+  for (let i = 0; i < HISTORY_MAX_PAGES; i++) {
+    const res = await fetch(fromId === null ? base : `${base}&fromId=${fromId}`, { signal });
+    if (!res.ok) throw new Error(`aggTrades HTTP ${res.status}`);
+    const page = (await res.json()) as AggTradeRow[];
+    const first = page[0];
+    if (!first) break;
+    // A page clamped at id 0 overlaps the next newer one.
+    const end = pages[0]?.[0]?.a ?? Number.POSITIVE_INFINITY;
+    pages.unshift(page.filter((r) => r.a < end));
+    if (first.T <= sinceMs || first.a === 0) break;
+    fromId = Math.max(0, first.a - HISTORY_PAGE_SIZE);
+  }
+  return pages.flat();
+}
 
 export class BinanceFuturesFeed implements MarketFeed {
   readonly label: string;
+  private readonly symbol: string;
   private readonly trades = new Emitter<Trade>();
   private readonly liquidations = new Emitter<Liquidation>();
   private readonly status = new Emitter<FeedStatus>();
@@ -70,12 +109,18 @@ export class BinanceFuturesFeed implements MarketFeed {
   /** Smoothed (exchange event time − local time), ms. */
   private clockOffset = 0;
   private clockSynced = false;
+  private history: 'pending' | 'loading' | 'done' = 'pending';
+  /** Live trades held back while history loads, so trades reach consumers in time order. */
+  private held: AggTradeMsg[] = [];
+  /** Newest id emitted from history; live trades up to it are duplicates. */
+  private lastHistoryId = -1;
+  private readonly abort = new AbortController();
 
   constructor(symbol: string) {
-    const sym = symbol.toUpperCase();
-    this.label = `Binance ${sym}`;
+    this.symbol = symbol.toUpperCase();
+    this.label = `Binance ${this.symbol}`;
     this.socket = new ReconnectingSocket(
-      binanceStreamUrl(sym),
+      binanceStreamUrl(this.symbol),
       (raw) => this.handle(raw),
       (s) => this.status.emit(s),
     );
@@ -86,6 +131,7 @@ export class BinanceFuturesFeed implements MarketFeed {
   }
 
   disconnect(): void {
+    this.abort.abort();
     this.socket.stop();
   }
 
@@ -109,8 +155,41 @@ export class BinanceFuturesFeed implements MarketFeed {
     const msg = JSON.parse(raw) as CombinedMsg;
     const d = msg.data;
     if (typeof d.E === 'number') this.observeClock(d.E);
-    if (d.e === 'aggTrade') this.trades.emit(parseAggTrade(d as AggTradeMsg));
+    if (d.e === 'aggTrade') this.onAggTrade(d as AggTradeMsg);
     else if (d.e === 'forceOrder') this.liquidations.emit(parseForceOrder(d as ForceOrderMsg));
+  }
+
+  private onAggTrade(d: AggTradeMsg): void {
+    if (this.history === 'done') {
+      if (d.a > this.lastHistoryId) this.trades.emit(parseAggTrade(d));
+      return;
+    }
+    this.held.push(d);
+    if (this.history === 'pending') {
+      // Starting on the first live trade makes the REST snapshot overlap the
+      // stream; the overlap is dropped by id.
+      this.history = 'loading';
+      void this.loadHistory(d.T);
+    }
+  }
+
+  private async loadHistory(liveTs: number): Promise<void> {
+    let rows: AggTradeRow[] = [];
+    try {
+      rows = await fetchAggTradesSince(this.symbol, liveTs - HISTORY_MS, this.abort.signal);
+    } catch (err) {
+      if (this.abort.signal.aborted) return;
+      console.warn('Trade history unavailable; metrics warm up live', err);
+    }
+    if (this.abort.signal.aborted) return;
+    // shortcut: if REST lags the stream, trades between its newest and the first
+    // held one are lost (sub-second); fetch forward from lastHistoryId if it ever matters.
+    for (const r of rows) this.trades.emit(parseAggTrade(r));
+    this.lastHistoryId = rows.at(-1)?.a ?? -1;
+    this.history = 'done';
+    const held = this.held;
+    this.held = [];
+    for (const d of held) this.onAggTrade(d);
   }
 
   private observeClock(eventTime: number): void {
