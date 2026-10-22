@@ -38,11 +38,11 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
   feed     → nothing from src/
   metrics  → feed/market-feed only
   audio    → metrics/, feed/market-feed; settings arrive as params, never imported
-  ui       → metrics/ (types only), feed/market-feed, settings
+  ui       → metrics/ (types and domain constants only), feed/market-feed, settings
   main.ts  → everything; the only place concrete implementations are wired together
   ```
 
-  `ui → metrics` "types only" is a convention: Biome cannot tell `import type` apart.
+  `ui → metrics` "no computation" is a convention: Biome cannot restrict what is imported, only from where.
 - **No import cycles** (`noImportCycles`).
 - **Types live with their owner.** Declare a type in the file that produces or accepts it
   (params, results, options, state); consumers import it from there.
@@ -54,6 +54,18 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
 - **Exports used only inside the module's folder** (helpers shared by sibling files, functions
   exported for specs) get a `/** @package */` JSDoc tag; `noPrivateImports` then rejects imports
   from other folders. Untagged exports are public.
+- **Constants live with their owner too.** No `consts.ts`, `constants.ts` or `config/` dump.
+  - Implementation constant used by one file: `UPPER_SNAKE` at the top of that file, unexported,
+    documented when the value is not self-evident (units, source).
+  - Tunable parameters: a typed `DEFAULT_X: X` object next to type `X`
+    (`DEFAULT_TENSION_PARAMS`, `DEFAULT_SIM_PARAMS`). Code receives them as arguments rather than
+    reading module constants, so specs and the simulator can substitute values.
+  - Domain constant needed by 2+ modules: exported once from the module whose semantics define it
+    (`TICK_MS` from `metrics/engine`, `TENSION_LEVELS` from `metrics/tension`). Never duplicate the
+    literal elsewhere, markup included: derive positions/labels from the constant.
+  - Magic numbers: name a value when its meaning is not obvious at the use site or it appears
+    twice; model coefficients belong in the params object. Self-evident literals (`1000` ms/s, `0.5`
+    in a jitter formula) stay inline. Put units in the name or doc (`_MS`, `_SEC`, `Usd`).
 
 ## Conventions
 

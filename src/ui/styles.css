@@ -117,21 +117,6 @@ section {
 }
 .meter-scale span {
   position: absolute;
-  transform: translateX(-50%);
-}
-.meter-scale span:nth-child(1) {
-  left: 0;
-  transform: none;
-}
-.meter-scale span:nth-child(2) {
-  left: 20%;
-}
-.meter-scale span:nth-child(3) {
-  left: 50%;
-}
-.meter-scale span:nth-child(4) {
-  right: 0;
-  transform: none;
 }
 
 .stats {

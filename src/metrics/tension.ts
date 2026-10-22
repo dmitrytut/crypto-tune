@@ -24,6 +24,12 @@ export const DEFAULT_TENSION_PARAMS: TensionParams = {
   sensitivity: 1,
 };
 
+/**
+ * Tension thresholds shared by UI and audio: `mid` brings in the tension layer
+ * (filter, tempo, sub, percussion), `high` adds riser, detune, double tempo.
+ */
+export const TENSION_LEVELS = { mid: 1, high: 2.5 } as const;
+
 export interface TensionInput {
   /** log(price / price N seconds ago). */
   ret: number;
@@ -41,7 +47,7 @@ export interface TensionState {
   z: number;
   volZ: number;
   raw: number;
-  /** Smoothed, ≥ 0. Thresholds: 1 (tension layer in), 2.5 (riser/double tempo). */
+  /** Smoothed, ≥ 0. See TENSION_LEVELS for the musical thresholds. */
   tension: number;
   /** Smoothed sign(ret), −1 … 1. */
   direction: number;

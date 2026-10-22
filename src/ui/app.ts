@@ -1,5 +1,6 @@
 import type { FeedStatus } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
+import { TENSION_LEVELS } from '../metrics/tension';
 import { LIMITS, type Settings, type SourceKind } from '../settings';
 import './styles.css';
 
@@ -42,6 +43,26 @@ function statusText(s: FeedStatus): string {
   }
 }
 
+/** Threshold marks on the track and value labels under it, positioned from TENSION_LEVELS. */
+function buildMeterScale(track: HTMLElement, scale: HTMLElement): void {
+  const stops = [0, TENSION_LEVELS.mid, TENSION_LEVELS.high, METER_MAX];
+  for (const v of stops) {
+    const pct = (v / METER_MAX) * 100;
+    if (v > 0 && v < METER_MAX) {
+      const mark = document.createElement('span');
+      mark.className = 'meter-mark';
+      mark.style.left = `${pct}%`;
+      track.append(mark);
+    }
+    const label = document.createElement('span');
+    label.textContent = String(v);
+    label.style.left = `${pct}%`;
+    // Edge labels align inward so they never overflow the meter.
+    label.style.transform = `translateX(${v === 0 ? 0 : v === METER_MAX ? -100 : -50}%)`;
+    scale.append(label);
+  }
+}
+
 export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let settings = initial;
   let symbols = new Set<string>();
@@ -54,6 +75,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const label = el('feed-label');
   const price = el('price');
   const fill = el('tension-fill');
+  buildMeterScale(el('tension-track'), el('tension-scale'));
   const tension = el('tension');
   const direction = el('direction');
   const z = el('z');
@@ -133,7 +155,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     render(s) {
       price.textContent = Number.isNaN(s.price) ? '—' : priceFmt.format(s.price);
       fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
-      fill.dataset.level = s.tension >= 2.5 ? 'high' : s.tension >= 1 ? 'mid' : 'low';
+      fill.dataset.level =
+        s.tension >= TENSION_LEVELS.high ? 'high' : s.tension >= TENSION_LEVELS.mid ? 'mid' : 'low';
       tension.textContent = s.tension.toFixed(2);
       const arrow = s.direction > 0.2 ? '▲' : s.direction < -0.2 ? '▼' : '•';
       direction.textContent = `${arrow} ${s.direction.toFixed(2)}`;
