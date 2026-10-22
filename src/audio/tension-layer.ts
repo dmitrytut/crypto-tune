@@ -52,7 +52,6 @@ export class TensionLayer {
   private readonly subLoop: Tone.Loop;
   private readonly percLoop: Tone.Loop;
   private subHz: number;
-  private percStep = 0;
 
   constructor(output: Tone.InputNode, tonicPc: number) {
     this.subHz = midiToHz(pitchClassMidi(tonicPc, SUB_OCTAVE));
@@ -65,8 +64,11 @@ export class TensionLayer {
     this.subLoop = new Tone.Loop((time) => {
       this.sub.triggerAttackRelease(this.subHz, '4n', time, 0.8);
     }, '2n');
+    const transport = this.perc.context.transport;
     this.percLoop = new Tone.Loop((time) => {
-      const accent = PERC_ACCENTS[this.percStep++ % PERC_ACCENTS.length] as number;
+      // Eighth in the beat from the transport, so accents stay on the beat after a restart.
+      const eighth = Math.round(transport.getTicksAtTime(time) / (transport.PPQ / 2));
+      const accent = PERC_ACCENTS[eighth % PERC_ACCENTS.length] as number;
       this.perc.triggerAttackRelease('32n', time, accent);
     }, '8n');
   }

@@ -75,6 +75,8 @@ export class BaseLayer {
   private contour: Contour = 'calm';
   private nextContour: Contour = 'calm';
   private doubleTime = false;
+  /** What the loop plays now; trails `doubleTime` until the queued switch lands. */
+  private eighths = false;
   /** Transport event of the pending quarter↔eighth switch, if one is queued. */
   private pendingSwitch: number | undefined;
   private restProb = MAX_REST_PROB;
@@ -110,8 +112,13 @@ export class BaseLayer {
       }
       const step = this.step++;
       this.lastDegree = arpDegree(step, 0, this.contour);
-      // Odd steps are weak beats; resting there thins a calm line without losing the pulse.
-      if (step % 2 === 1 && Math.random() < this.restProb) return;
+      // Weak beats from the transport, not the pattern step (a contour entry can set it
+      // to either parity): odd quarters, or off-beat eighths in double time. Resting there
+      // thins a calm line without losing the pulse.
+      const transport = this.loop.context.transport;
+      const stepTicks = this.eighths ? transport.PPQ / 2 : transport.PPQ;
+      const weak = Math.round(transport.getTicksAtTime(time) / stepTicks) % 2 === 1;
+      if (weak && Math.random() < this.restProb) return;
       const degree = this.lastDegree + this.shift + this.bias;
       const midi = degreeToMidi(pitchClassMidi(this.tonicPc, ARP_OCTAVE), degree);
       // Slight velocity variation so the loop never sounds mechanical.
@@ -147,7 +154,7 @@ export class BaseLayer {
     // A queued switch would otherwise fire at its tick after the next start, which
     // replays the timeline from 0; apply it now so the next start begins in step.
     this.clearPendingSwitch();
-    this.loop.interval = this.doubleTime ? '8n' : '4n';
+    this.setEighths(this.doubleTime);
   }
 
   setTonic(pc: number): void {
@@ -173,7 +180,7 @@ export class BaseLayer {
     this.restProb = MAX_REST_PROB * (1 - mix.intensity);
     if (mix.doubleTime !== this.doubleTime) {
       this.doubleTime = mix.doubleTime;
-      const interval = mix.doubleTime ? '8n' : '4n';
+      const eighths = mix.doubleTime;
       // Switch on the next beat so the pulse never stumbles. nextSubdivision
       // returns context time but scheduleOnce reads transport time, so convert
       // through ticks. The loop's own context, not the global one, so the layer
@@ -183,9 +190,14 @@ export class BaseLayer {
       this.clearPendingSwitch();
       this.pendingSwitch = transport.scheduleOnce(() => {
         this.pendingSwitch = undefined;
-        this.loop.interval = interval;
+        this.setEighths(eighths);
       }, `${beat}i`);
     }
+  }
+
+  private setEighths(on: boolean): void {
+    this.eighths = on;
+    this.loop.interval = on ? '8n' : '4n';
   }
 
   private clearPendingSwitch(): void {
