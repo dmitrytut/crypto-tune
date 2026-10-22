@@ -191,7 +191,8 @@ section {
   font-size: 12px;
   color: var(--muted);
 }
-.field input:not([type="range"]) {
+.field input:not([type="range"]),
+.field select {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--line);
@@ -203,6 +204,30 @@ section {
 }
 .field input:disabled {
   opacity: 0.4;
+}
+
+.play {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.play[data-state="running"] {
+  background: var(--accent);
+  color: var(--bg);
+}
+.play:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.play:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .field input[type="range"] {
   accent-color: var(--accent);

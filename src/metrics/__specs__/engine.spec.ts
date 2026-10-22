@@ -51,6 +51,19 @@ describe('MetricsEngine', () => {
     }
   });
 
+  it('reports price above/below its hour EMA as positive/negative emaZ, 0 before ready', () => {
+    for (const sign of [1, -1]) {
+      const e = new MetricsEngine(CFG);
+      feedCalm(e, 0, READY_TICK + 40);
+      expect(runTo(e, READY_TICK - 1).emaZ).toBe(0);
+      runTo(e, READY_TICK + 40);
+      feedCalm(e, READY_TICK + 40, READY_TICK + 80, 100 * (1 + sign * 0.002));
+      const s = runTo(e, READY_TICK + 80);
+      expect(Math.sign(s.emaZ)).toBe(sign);
+      expect(Math.abs(s.emaZ)).toBeGreaterThan(2);
+    }
+  });
+
   it('carries the last price through ticks without trades', () => {
     const e = new MetricsEngine(CFG);
     e.addTrade({ ts: T0 + 5, price: 123, qty: 1, side: 'sell' });

@@ -1,8 +1,9 @@
+import { AudioEngine, type AudioParams } from './audio/engine';
 import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
 import type { MarketFeed, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
-import { loadSettings, type Settings, saveSettings } from './settings';
+import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { mountApp } from './ui/app';
 
 const SYMBOLS_CACHE_KEY = 'crypto-tune.binance-symbols';
@@ -17,6 +18,13 @@ const tensionParams = (s: Settings) => ({
   sensitivity: s.sensitivity,
 });
 
+const audioParams = (s: Settings): AudioParams => ({
+  tonicPc: TONICS.indexOf(s.tonic),
+  baseVolumeDb: s.baseVolumeDb,
+});
+
+const audio = new AudioEngine(audioParams(settings));
+
 const view = mountApp(settings, {
   onSettings(next) {
     const prev = settings;
@@ -30,7 +38,23 @@ const view = mountApp(settings, {
     } else if (next.sensitivity !== prev.sensitivity) {
       engine?.setTensionParams(tensionParams(next));
     }
+    audio.setParams(audioParams(next));
     saveSettings(next);
+  },
+  onToggleAudio() {
+    if (audio.current === 'running') {
+      audio.stop();
+      view.setPlayback('stopped');
+      return;
+    }
+    view.setPlayback('starting');
+    audio.start().then(
+      () => view.setPlayback('running'),
+      (err: unknown) => {
+        console.error('Audio failed to start', err);
+        view.setPlayback('stopped');
+      },
+    );
   },
 });
 
@@ -65,7 +89,9 @@ function startPipeline(): void {
 window.setInterval(() => {
   if (!feed || !engine) return;
   const snap = engine.advanceTo(feed.now());
-  if (snap) view.render(snap);
+  if (!snap) return;
+  view.render(snap);
+  audio.update(snap);
 }, TICK_MS);
 
 async function loadSymbols(): Promise<void> {

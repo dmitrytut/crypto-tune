@@ -13,6 +13,8 @@
         <span id="status" class="status" data-state="idle">idle</span>
       </header>
 
+      <button id="audio-toggle" class="play" type="button" data-state="stopped">▶ Start</button>
+
       <section class="readout">
         <div class="label" id="feed-label">—</div>
         <div class="price" id="price">—</div>
@@ -29,6 +31,7 @@
           <dt>volZ</dt><dd id="volz">—</dd>
           <dt>vol/s</dt><dd id="vol">—</dd>
           <dt>warm-up</dt><dd id="warmup">—</dd>
+          <dt>vs EMA 1h</dt><dd id="emaz">—</dd>
         </dl>
       </section>
 
@@ -54,6 +57,16 @@
         <label class="field">
           <span>Чувствительность: ×<output id="sens-out"></output></span>
           <input id="sensitivity" type="range" />
+        </label>
+
+        <label class="field">
+          <span>Тоника</span>
+          <select id="tonic"></select>
+        </label>
+
+        <label class="field">
+          <span>Громкость базы: <output id="base-vol-out"></output> dB</span>
+          <input id="base-volume" type="range" />
         </label>
       </section>
     </main>

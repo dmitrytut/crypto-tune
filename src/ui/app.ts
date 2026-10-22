@@ -1,7 +1,7 @@
 import type { FeedStatus } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
 import { TENSION_LEVELS } from '../metrics/tension';
-import { LIMITS, type Settings, type SourceKind, SYMBOL_PATTERN } from '../settings';
+import { LIMITS, type Settings, type SourceKind, SYMBOL_PATTERN, TONICS } from '../settings';
 import './styles.css';
 
 /** Tension value at the right edge of the meter. */
@@ -10,7 +10,12 @@ const METER_MAX = 5;
 export interface AppHandlers {
   /** Called with the full updated settings after any control change. */
   onSettings(next: Settings): void;
+  /** Start/Stop pressed; runs inside the click so the AudioContext may start. */
+  onToggleAudio(): void;
 }
+
+/** What the Start/Stop button shows. */
+export type PlaybackView = 'stopped' | 'starting' | 'running';
 
 export interface AppView {
   render(s: MetricsSnapshot): void;
@@ -19,6 +24,7 @@ export interface AppView {
   setStatus(s: FeedStatus): void;
   setFeedLabel(label: string): void;
   setSymbols(symbols: string[]): void;
+  setPlayback(state: PlaybackView): void;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -89,6 +95,25 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const windowOut = el<HTMLOutputElement>('window-out');
   const sens = el<HTMLInputElement>('sensitivity');
   const sensOut = el<HTMLOutputElement>('sens-out');
+  const emaz = el('emaz');
+  const audioToggle = el<HTMLButtonElement>('audio-toggle');
+  const tonic = el<HTMLSelectElement>('tonic');
+  const baseVol = el<HTMLInputElement>('base-volume');
+  const baseVolOut = el<HTMLOutputElement>('base-vol-out');
+
+  audioToggle.addEventListener('click', () => handlers.onToggleAudio());
+
+  tonic.replaceChildren(
+    ...TONICS.map((t) => {
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = t;
+      return opt;
+    }),
+  );
+  tonic.value = settings.tonic;
+  tonic.addEventListener('change', () => {
+    update({ tonic: TONICS.find((t) => t === tonic.value) ?? settings.tonic });
+  });
 
   for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="source"]')) {
     radio.checked = radio.value === settings.source;
@@ -150,6 +175,15 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     (v) => update({ sensitivity: v }),
     'input',
   );
+  bindRange(
+    baseVol,
+    baseVolOut,
+    LIMITS.baseVolumeDb,
+    settings.baseVolumeDb,
+    String,
+    (v) => update({ baseVolumeDb: v }),
+    'input',
+  );
 
   return {
     render(s) {
@@ -165,9 +199,12 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       volz.textContent = s.volZ.toFixed(2);
       vol.textContent = volFmt.format(s.volPerSec);
       warmup.textContent = s.ready ? 'готово' : `${Math.floor(s.warmup * 100)}%`;
+      emaz.textContent = s.ready ? s.emaZ.toFixed(2) : '—';
     },
     reset() {
-      for (const node of [price, tension, direction, z, volz, vol, warmup]) node.textContent = '—';
+      for (const node of [price, tension, direction, z, volz, vol, warmup, emaz]) {
+        node.textContent = '—';
+      }
       direction.className = '';
       fill.style.width = '0';
       fill.dataset.level = 'low';
@@ -178,6 +215,12 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     },
     setFeedLabel(text) {
       label.textContent = text;
+    },
+    setPlayback(state) {
+      audioToggle.dataset.state = state;
+      audioToggle.disabled = state === 'starting';
+      audioToggle.textContent =
+        state === 'running' ? '■ Stop' : state === 'starting' ? '…' : '▶ Start';
     },
     setSymbols(list) {
       symbols = new Set(list);

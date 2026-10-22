@@ -1,5 +1,6 @@
 import type { Trade } from '../feed/market-feed';
 import { RollingStats } from './rolling';
+import { type Ewm, ewmAlpha, ewmStep, zScore } from './stats';
 import {
   DEFAULT_TENSION_PARAMS,
   INITIAL_TENSION,
@@ -18,6 +19,8 @@ export interface MetricsConfig {
   statsWindowMin: number;
   /** Minimum statistics history before tension is released, minutes. */
   warmupMin: number;
+  /** Time constant of the price EMA the arpeggio register follows, minutes. */
+  emaHorizonMin: number;
   tension: TensionParams;
 }
 
@@ -25,6 +28,7 @@ export const DEFAULT_METRICS_CONFIG: MetricsConfig = {
   windowSec: 10,
   statsWindowMin: 30,
   warmupMin: 5,
+  emaHorizonMin: 60,
   tension: DEFAULT_TENSION_PARAMS,
 };
 
@@ -37,6 +41,11 @@ export interface MetricsSnapshot extends TensionState {
   ready: boolean;
   /** Warm-up progress 0…1. */
   warmup: number;
+  /**
+   * Price vs its EMA(emaHorizonMin) in units of the EW spread of log price:
+   * > 0 above the trend, < 0 below. 0 until `ready`.
+   */
+  emaZ: number;
 }
 
 /**
@@ -64,6 +73,9 @@ export class MetricsEngine {
   private price = Number.NaN;
   private state: TensionState = INITIAL_TENSION;
   private params: TensionParams;
+  /** EW mean/variance of log price; survives resync (the hour-scale trend outlives a gap). */
+  private trend: Ewm | null = null;
+  private readonly emaAlpha: number;
 
   constructor(cfg: MetricsConfig = DEFAULT_METRICS_CONFIG) {
     this.lagTicks = Math.max(1, Math.round(cfg.windowSec * TICKS_PER_SEC));
@@ -73,6 +85,7 @@ export class MetricsEngine {
     this.retStats = new RollingStats(statsTicks);
     this.volStats = new RollingStats(statsTicks);
     this.params = cfg.tension;
+    this.emaAlpha = ewmAlpha(TICK_MS, cfg.emaHorizonMin * 60_000);
   }
 
   /** Change smoothing/sensitivity without losing history. */
@@ -153,7 +166,12 @@ export class MetricsEngine {
     if (hasRet) this.retStats.push(ret);
     this.volStats.push(volPerSec);
 
-    return { ...this.state, ts: end, price: this.price, ret, volPerSec, ready, warmup };
+    const logPrice = Math.log(this.price);
+    const trend = this.trend;
+    const emaZ = ready && trend ? zScore(logPrice, trend.mean, Math.sqrt(trend.variance)) : 0;
+    this.trend = ewmStep(trend, logPrice, this.emaAlpha);
+
+    return { ...this.state, ts: end, price: this.price, ret, volPerSec, ready, warmup, emaZ };
   }
 
   private compactPending(): void {
