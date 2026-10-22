@@ -114,11 +114,16 @@ export class MetricsEngine {
     this.pending.push(t);
   }
 
-  /** Process every whole tick ending at or before `now`. Returns the latest snapshot, if any. */
-  advanceTo(now: number): MetricsSnapshot | null {
+  /**
+   * Process every whole tick ending at or before `now`. Returns the latest
+   * snapshot, if any; `onTick` sees every one (a catch-up after a throttled
+   * tab or the simulator's pre-history processes many ticks in one call).
+   */
+  advanceTo(now: number, onTick?: (s: MetricsSnapshot) => void): MetricsSnapshot | null {
     let snap: MetricsSnapshot | null = null;
     while (this.boundary + TICK_MS <= now) {
       snap = this.step(this.boundary + TICK_MS);
+      onTick?.(snap);
     }
     this.compactPending();
     return snap;
