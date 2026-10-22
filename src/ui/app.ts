@@ -25,6 +25,9 @@ const METER_MAX = 5;
 /** Chrome fades after this long without pointer or keyboard input. */
 const IDLE_MS = 10_000;
 const TITLE_EVERY_MS = 1_000;
+/** Events older than this (wall clock) are history replays, not news: no sparks, no flow. */
+const VISUAL_MAX_AGE_MS = 2_000;
+const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
 
 export interface AppHandlers {
   /** Called with the full updated settings after any control change. */
@@ -49,9 +52,9 @@ export interface AppView {
   setPlayback(state: PlaybackView): void;
   /** Last event that crossed its threshold (shown even while audio is stopped). */
   showEvent(e: EventReadout): void;
-  /** Every trade, for the particle stream. */
+  /** Every trade, for the flow and the particle stream; replayed history is ignored. */
   trade(t: Trade): void;
-  /** Every liquidation, for the shock waves. */
+  /** Every liquidation, for the shock waves; replayed history is ignored. */
   liquidation(l: Liquidation): void;
 }
 
@@ -329,12 +332,13 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       lastEvent.className = e.side === 'long' || e.side === 'sell' ? 'down' : 'up';
     },
     trade(t) {
+      if (!fresh(t.ts)) return;
       flow.add(t.side, t.price * t.qty, t.ts);
       if (!document.hidden && !reducedMotion.matches) fx.trade(t.side, t.price * t.qty);
     },
     liquidation(l) {
       // Hidden tab: nothing to see. Reduced motion: no waves, shocks or shake at all.
-      if (document.hidden || reducedMotion.matches) return;
+      if (!fresh(l.ts) || document.hidden || reducedMotion.matches) return;
       fx.liquidation(l.side, l.usd, settings.liqThresholdUsd);
       if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(0.35);
     },

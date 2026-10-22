@@ -71,8 +71,6 @@ const view = mountApp(settings, {
   },
 });
 
-/** Visual events older than this (wall clock) are history replays, not news: no sparks. */
-const VISUAL_MAX_AGE_MS = 2_000;
 /** Feeds replay this much history on connect: exactly the window the tension statistics need. */
 const HISTORY_MS = DEFAULT_METRICS_CONFIG.statsWindowMin * 60_000;
 
@@ -94,17 +92,16 @@ function startPipeline(): void {
     tension: tensionParams(settings),
   });
   const h = new MarketHistory();
-  const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
   unsubs = [
     f.onTrade((t) => {
       e.addTrade(t);
       h.addTrade(t);
       events.addTrade(t);
-      if (fresh(t.ts)) view.trade(t);
+      view.trade(t);
     }),
     f.onLiquidation((l) => {
       events.addLiquidation(l);
-      if (fresh(l.ts)) view.liquidation(l);
+      view.liquidation(l);
     }),
     f.onStatus((s) => {
       view.setStatus(s);
