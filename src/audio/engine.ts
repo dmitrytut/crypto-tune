@@ -1,10 +1,10 @@
 import * as Tone from 'tone';
-import type { Liquidation, LiquidationSide, Trade, TradeSide } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
+import type { EventCues } from '../metrics/events';
 import { AmbienceLayer } from './ambience-layer';
 import { BaseLayer } from './base-layer';
 import { EventsLayer } from './events-layer';
-import { collapse, type EventCue, eventVelocity, type PendingEvent } from './events-map';
+import { eventVelocity } from './events-map';
 import { Mixer } from './mixer';
 import { TensionLayer } from './tension-layer';
 import { CALM_BPM, INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from './tension-map';
@@ -12,8 +12,6 @@ import { CALM_BPM, INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from 
 const FADE_IN_SEC = 3;
 const FADE_OUT_SEC = 1.5;
 const MASTER_DB = -2;
-/** Events older than this on the feed clock are dropped instead of played late. */
-const EVENT_MAX_AGE_MS = 2_000;
 
 export interface AudioParams {
   /** Tonic pitch class, 0 = C … 11 = B. */
@@ -21,19 +19,9 @@ export interface AudioParams {
   baseVolumeDb: number;
   tensionVolumeDb: number;
   eventsVolumeDb: number;
-  /** Liquidations at or above this quote notional strike a gong. */
-  liqThresholdUsd: number;
-  /** Aggressive trades at or above this quote notional pluck an accent. */
-  tradeThresholdUsd: number;
 }
 
 export type AudioState = 'stopped' | 'starting' | 'running';
-
-/** What one tick's events collapsed to; each kind plays at most one voice. */
-export interface EventCues {
-  liquidation: EventCue<LiquidationSide> | null;
-  trade: EventCue<TradeSide> | null;
-}
 
 interface Graph {
   mixer: Mixer;
@@ -59,8 +47,6 @@ export class AudioEngine {
   /** Last tempo written to the transport, whole BPM; tracks the market while stopped too. */
   private bpm = CALM_BPM;
   private shock: ShockState = INITIAL_SHOCK;
-  private pendingLiqs: PendingEvent<LiquidationSide>[] = [];
-  private pendingTrades: PendingEvent<TradeSide>[] = [];
   /** Context time at which the last stop's scheduled teardown (sources, transport) runs. */
   private stopAt = 0;
 
@@ -126,41 +112,14 @@ export class AudioEngine {
     if (bpmChanged) Tone.getTransport().bpm.setValueAtTime(bpm, Tone.now());
   }
 
-  /** Called for every trade; only those above the threshold are kept. */
-  onTrade(t: Trade): void {
-    const usd = t.price * t.qty;
-    if (usd >= this.params.tradeThresholdUsd)
-      this.pendingTrades.push({ ts: t.ts, side: t.side, usd });
-  }
-
-  onLiquidation(l: Liquidation): void {
-    if (l.usd >= this.params.liqThresholdUsd)
-      this.pendingLiqs.push({ ts: l.ts, side: l.side, usd: l.usd });
-  }
-
-  /**
-   * Once per tick: collapses buffered events into at most one cue per kind and
-   * plays them if audio is running. Returns the cues either way so the UI can
-   * show events while muted. `now` is the feed clock.
-   */
-  flushEvents(now: number): EventCues {
-    const minTs = now - EVENT_MAX_AGE_MS;
-    const cues: EventCues = {
-      liquidation: collapse(this.pendingLiqs, minTs),
-      trade: collapse(this.pendingTrades, minTs),
-    };
-    this.pendingLiqs = [];
-    this.pendingTrades = [];
+  /** Once per tick: plays the tick's event cues if audio is running. */
+  play(cues: EventCues): void {
     const g = this.graph;
-    if (this.state === 'running' && g) {
-      const t = Tone.now();
-      const { liquidation: liq, trade } = cues;
-      if (liq)
-        g.events.liquidation(liq.side, eventVelocity(liq.usd, this.params.liqThresholdUsd), t);
-      if (trade)
-        g.events.trade(trade.side, eventVelocity(trade.usd, this.params.tradeThresholdUsd), t);
-    }
-    return cues;
+    if (this.state !== 'running' || !g) return;
+    const t = Tone.now();
+    const { liquidation: liq, trade } = cues;
+    if (liq) g.events.liquidation(liq.side, eventVelocity(liq.size), t);
+    if (trade) g.events.trade(trade.side, eventVelocity(trade.size), t);
   }
 
   setParams(next: AudioParams): void {

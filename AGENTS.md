@@ -26,16 +26,17 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   reload fetches only the gap after the cache. History is emitted before live events, trades always
   in `ts` order. Any history or storage failure degrades to a plain live start, never blocks the stream.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
-  trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`.
+  trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`, and `events.ts`
+  (`EventBuffer`: trades and liquidations above their thresholds collapse to at most one
+  `EventCue` per kind per tick, stale replays dropped; audio, readout and chart all use the cues).
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
   first user gesture), `mixer.ts` (layers → reverb → compressor → limiter → master),
   `base-layer.ts` (drone with chord drift + arpeggio), `ambience-layer.ts` (Eno bell loops + pulse,
   base channel), `tension-layer.ts` (sub, percussion, riser, shock swell), `events-layer.ts`
   (liquidation gongs, trade plucks). Pure, spec-covered: `scale.ts`, `arp-pattern.ts`,
   `tension-map.ts` (tension/direction → every sound parameter; `stepShock` detector),
-  `events-map.ts` (cascade collapse, size → velocity, voice placement). Event flow:
-  `AudioEngine.onTrade/onLiquidation` buffer events above threshold, `flushEvents(feed.now())`
-  plays at most one voice per kind per tick.
+  `events-map.ts` (size → velocity, voice placement). `AudioEngine.play(cues)` voices the tick's
+  event cues.
   Keep anything testable out of Tone-importing files: Tone needs a browser AudioContext.
   Layers use their own node's context (`this.loop.context.transport`), not `Tone.getTransport()`,
   so they also render in `Tone.Offline`.

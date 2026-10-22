@@ -4,6 +4,7 @@ import type { MarketFeed, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
 import { indexedDbTradeStore } from './feed/trade-cache';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
+import { EventBuffer, type EventThresholds } from './metrics/events';
 import { MarketHistory } from './metrics/history';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { mountApp } from './ui/app';
@@ -26,11 +27,15 @@ const audioParams = (s: Settings): AudioParams => ({
   baseVolumeDb: s.baseVolumeDb,
   tensionVolumeDb: s.tensionVolumeDb,
   eventsVolumeDb: s.eventsVolumeDb,
-  liqThresholdUsd: s.liqThresholdUsd,
-  tradeThresholdUsd: s.tradeThresholdUsd,
+});
+
+const eventThresholds = (s: Settings): EventThresholds => ({
+  liquidationUsd: s.liqThresholdUsd,
+  tradeUsd: s.tradeThresholdUsd,
 });
 
 const audio = new AudioEngine(audioParams(settings));
+const events = new EventBuffer(eventThresholds(settings));
 
 const view = mountApp(settings, {
   onSettings(next) {
@@ -46,6 +51,7 @@ const view = mountApp(settings, {
       engine?.setTensionParams(tensionParams(next));
     }
     audio.setParams(audioParams(next));
+    events.setThresholds(eventThresholds(next));
     saveSettings(next);
   },
   onToggleAudio() {
@@ -93,11 +99,11 @@ function startPipeline(): void {
     f.onTrade((t) => {
       e.addTrade(t);
       h.addTrade(t);
-      audio.onTrade(t);
+      events.addTrade(t);
       if (fresh(t.ts)) view.trade(t);
     }),
     f.onLiquidation((l) => {
-      audio.onLiquidation(l);
+      events.addLiquidation(l);
       if (fresh(l.ts)) view.liquidation(l);
     }),
     f.onStatus((s) => {
@@ -123,7 +129,9 @@ window.setInterval(() => {
     audio.update(snap);
   }
   // Events flush every tick, with or without new trades (a liquidation can arrive alone).
-  const { liquidation, trade } = audio.flushEvents(now);
+  const cues = events.flush(now);
+  audio.play(cues);
+  const { liquidation, trade } = cues;
   if (trade) {
     view.showEvent({ kind: 'trade', ...trade });
     history?.addMarker({ ts: now, kind: 'trade', side: trade.side, usd: trade.usd });

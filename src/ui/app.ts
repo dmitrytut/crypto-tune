@@ -6,6 +6,7 @@ import type {
   TradeSide,
 } from '../feed/market-feed';
 import { DEFAULT_METRICS_CONFIG, type MetricsSnapshot } from '../metrics/engine';
+import type { EventCue } from '../metrics/events';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
@@ -36,8 +37,8 @@ export interface AppHandlers {
 export type PlaybackView = 'stopped' | 'starting' | 'running';
 
 export type EventReadout =
-  | { kind: 'liquidation'; side: LiquidationSide; usd: number; count: number }
-  | { kind: 'trade'; side: TradeSide; usd: number; count: number };
+  | ({ kind: 'liquidation' } & EventCue<LiquidationSide>)
+  | ({ kind: 'trade' } & EventCue<TradeSide>);
 
 export interface AppView {
   render(s: MetricsSnapshot): void;
