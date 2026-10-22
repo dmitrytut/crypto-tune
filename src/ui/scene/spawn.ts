@@ -1,6 +1,9 @@
 import type { TradeSide } from '../../feed/market-feed';
 
-/** One particle to emit: possibly several trades merged when a frame overflows. */
+/**
+ * One particle to emit: possibly several trades merged when a frame overflows.
+ * @package
+ */
 export interface Spawn {
   side: TradeSide;
   usd: number;
@@ -13,6 +16,7 @@ export interface Spawn {
  * every trade gets its own particle; over budget consecutive same-side trades
  * merge, preserving per-side notional and any big trade, so a cascade reads
  * as fewer, larger sparks instead of stalling the frame.
+ * @package
  */
 export function planSpawns(
   trades: readonly { side: TradeSide; usd: number }[],
@@ -44,12 +48,18 @@ export function planSpawns(
   return out;
 }
 
-/** Decades above $1k, 0…3: the size scale for every event visual. */
+/**
+ * Decades above $1k, 0…3: the size scale for every event visual.
+ * @package
+ */
 export function sizeDecades(usd: number): number {
   return Math.min(3, Math.max(0, Math.log10(usd / 1_000)));
 }
 
-/** Initial state of a trade bubble, CSS px and px/s. */
+/**
+ * Initial state of a trade bubble, CSS px and px/s.
+ * @package
+ */
 export interface BubbleStart {
   x: number;
   y: number;
@@ -68,6 +78,7 @@ const SIDE_CENTER: Record<TradeSide, number> = { buy: 0.6, sell: 0.4 };
  * Buys are bubbles rising out of the chart band; sells are drops sinking from
  * the top. Size, speed and lifetime grow with log notional, so a $1M print is
  * unmistakable next to $1k noise. `rand` is injected for determinism in specs.
+ * @package
  */
 export function bubbleStart(
   side: TradeSide,

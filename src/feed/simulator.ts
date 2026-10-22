@@ -1,7 +1,7 @@
 import { Emitter } from './emitter';
 import type { FeedStatus, Liquidation, MarketFeed, Trade, Unsubscribe } from './market-feed';
 
-/** Deterministic 32-bit PRNG in [0, 1). */
+/** Deterministic 32-bit PRNG in [0, 1); also seeds other modules' specs. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -60,6 +60,7 @@ export interface SimulatorParams {
   impulseBuyBias: number;
 }
 
+/** @package */
 export const DEFAULT_SIM_PARAMS: SimulatorParams = {
   seed: 42,
   startPrice: 60_000,
@@ -85,6 +86,7 @@ export const DEFAULT_SIM_PARAMS: SimulatorParams = {
  * Synthetic market: calm stretches of pure diffusion alternating with
  * directional impulses (higher vol, trade rate, size, and liquidations).
  * Pure stepper: output depends only on params and the target times passed.
+ * @package
  */
 export class MarketSimulator {
   private readonly rand: () => number;

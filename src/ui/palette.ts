@@ -2,7 +2,10 @@ import type { LiquidationSide, TradeSide } from '../feed/market-feed';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type FlowState, QUIET_FLOW } from './flow';
 
-/** Linear RGB, each channel 0…1. */
+/**
+ * Linear RGB, each channel 0…1.
+ * @package
+ */
 export type Rgb = readonly [number, number, number];
 
 /** Two-tone palettes: [body, highlight]. */
@@ -25,7 +28,10 @@ const FLOW_TINT = 0.75;
 /** Fastest vertical drift of the field from one-sided flow, noise units per second. */
 const MAX_DRIFT = 0.18;
 
-/** What the aura shader should look like for the current market state. */
+/**
+ * What the aura shader should look like for the current market state.
+ * @package
+ */
 export interface AuraTarget {
   /** Body and highlight colours of the blobs. */
   colorA: Rgb;
@@ -55,6 +61,7 @@ const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
  * hitting the book tints and drifts the field, how busy trading is speeds and
  * brightens it. Tension (after warm-up): sustained moves tear the field and
  * saturate the colour; volume spikes brighten; price vs hour EMA lifts the glow.
+ * @package
  */
 export function auraTarget(
   s: { tension: number; direction: number; volZ: number; emaZ: number },
@@ -79,7 +86,10 @@ export function auraTarget(
   };
 }
 
-/** Meter/chart colour for a tension value: blue calm → amber mid → red high. */
+/**
+ * Meter/chart colour for a tension value: blue calm → amber mid → red high.
+ * @package
+ */
 export function tensionColor(tension: number): Rgb {
   const blue: Rgb = [0.48, 0.64, 0.97];
   const amber: Rgb = [0.88, 0.69, 0.41];
@@ -90,19 +100,30 @@ export function tensionColor(tension: number): Rgb {
   return mix(amber, red, clamp01((tension - high) / (TENSION_LEVELS.peak - high)));
 }
 
-/** CSS colour string for an Rgb with optional alpha. */
+/**
+ * CSS colour string for an Rgb with optional alpha.
+ * @package
+ */
 export function css(c: Rgb, alpha = 1): string {
   const b = (x: number) => Math.round(clamp01(x) * 255);
   return `rgba(${b(c[0])}, ${b(c[1])}, ${b(c[2])}, ${alpha})`;
 }
 
-/** Side colours shared by particles, waves, chart and CSS (--up/--down): up teal, down magenta. */
+/**
+ * Side colours shared by particles, waves, chart and CSS (--up/--down): up teal, down magenta.
+ * @package
+ */
 export const UP_COLOR: Rgb = RISING[1];
+/** @package */
 export const DOWN_COLOR: Rgb = [0.95, 0.3, 0.55];
 
-/** Whether a side pushes price down: an aggressive sell, or a long liquidated (forced sell). */
+/**
+ * Whether a side pushes price down: an aggressive sell, or a long liquidated (forced sell).
+ * @package
+ */
 export const isDown = (side: TradeSide | LiquidationSide): boolean =>
   side === 'sell' || side === 'long';
 
+/** @package */
 export const sideColor = (side: TradeSide | LiquidationSide): Rgb =>
   isDown(side) ? DOWN_COLOR : UP_COLOR;

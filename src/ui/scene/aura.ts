@@ -133,6 +133,7 @@ type UniformName =
  * glides toward its target so a jumpy market never makes the background jump.
  * Events land as shocks (liquidations) and blooms (large trades) at their
  * screen positions. `create` returns null without WebGL (the CSS gradient stays).
+ * @package
  */
 export class Aura {
   private readonly gl: WebGLRenderingContext;

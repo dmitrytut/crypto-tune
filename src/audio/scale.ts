@@ -5,6 +5,7 @@ const SEMITONES_PER_OCTAVE = 12;
 /**
  * MIDI note of a minor-pentatonic scale degree. Degree 0 is `tonicMidi`;
  * 5 is the tonic an octave up; negative degrees go below.
+ * @package
  */
 export function degreeToMidi(tonicMidi: number, degree: number): number {
   const len = MINOR_PENTATONIC.length;
@@ -13,12 +14,18 @@ export function degreeToMidi(tonicMidi: number, degree: number): number {
   return tonicMidi + octave * SEMITONES_PER_OCTAVE + (MINOR_PENTATONIC[step] as number);
 }
 
-/** MIDI note of pitch class `pc` (0 = C … 11 = B) in octave `octave` (C4 = 60). */
+/**
+ * MIDI note of pitch class `pc` (0 = C … 11 = B) in octave `octave` (C4 = 60).
+ * @package
+ */
 export function pitchClassMidi(pc: number, octave: number): number {
   return (octave + 1) * SEMITONES_PER_OCTAVE + pc;
 }
 
-/** Equal-tempered frequency of a MIDI note, A4 (69) = 440 Hz. */
+/**
+ * Equal-tempered frequency of a MIDI note, A4 (69) = 440 Hz.
+ * @package
+ */
 export function midiToHz(midi: number): number {
   return 440 * 2 ** ((midi - 69) / SEMITONES_PER_OCTAVE);
 }

@@ -4,7 +4,10 @@ const DB_NAME = 'crypto-tune';
 const DB_VERSION = 1;
 const STORE = 'trades';
 
-/** A trade with the exchange's sequence id, so a restored cache can be extended without gaps. */
+/**
+ * A trade with the exchange's sequence id, so a restored cache can be extended without gaps.
+ * @package
+ */
 export interface CachedTrade extends Trade {
   /** Contiguous per symbol (Binance aggregate trade id). */
   id: number;
@@ -18,13 +21,19 @@ export interface TradeStore {
   save(trades: readonly CachedTrade[]): Promise<void>;
 }
 
-/** For feeds without persistence (and specs). */
+/**
+ * For feeds without persistence (and specs).
+ * @package
+ */
 export const NO_STORE: TradeStore = {
   load: async () => [],
   save: async () => {},
 };
 
-/** Column layout: typed arrays clone into IndexedDB compactly (~33 bytes per trade). */
+/**
+ * Column layout: typed arrays clone into IndexedDB compactly (~33 bytes per trade).
+ * @package
+ */
 export interface TradeColumns {
   id: Float64Array;
   ts: Float64Array;
@@ -34,6 +43,7 @@ export interface TradeColumns {
   buy: Uint8Array;
 }
 
+/** @package */
 export function encodeTrades(trades: readonly CachedTrade[]): TradeColumns {
   const n = trades.length;
   const cols: TradeColumns = {
@@ -53,6 +63,7 @@ export function encodeTrades(trades: readonly CachedTrade[]): TradeColumns {
   return cols;
 }
 
+/** @package */
 export function decodeTrades(cols: TradeColumns): CachedTrade[] {
   const out: CachedTrade[] = [];
   for (let i = 0; i < cols.ts.length; i++) {

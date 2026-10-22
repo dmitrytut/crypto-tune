@@ -38,7 +38,10 @@ const SHOCK_COOLDOWN_MS = 20_000;
  */
 export const MIX_RAMP_SEC = 0.5;
 
-/** Everything the layers need for one tick, derived from tension and direction only. */
+/**
+ * Everything the layers need for one tick, derived from tension and direction only.
+ * @package
+ */
 export interface TensionMix {
   /** 0 below TENSION_LEVELS.mid, 1 at TENSION_LEVELS.high. */
   intensity: number;
@@ -68,6 +71,7 @@ const smoothstep = (x: number) => x * x * (3 - 2 * x);
 /** Ease-out: audible early in the zone, still flat-topped at 1. */
 const easeOut = (x: number) => 1 - (1 - x) ** 2;
 
+/** @package */
 export function tensionMix(tension: number, direction: number, wasDoubleTime: boolean): TensionMix {
   const { mid, high, peak: full } = TENSION_LEVELS;
   const intensity = clamp01((tension - mid) / (high - mid));
@@ -104,6 +108,7 @@ export function tensionMix(tension: number, direction: number, wasDoubleTime: bo
   };
 }
 
+/** @package */
 export interface ShockState {
   /** Tension over the last SHOCK_WINDOW_TICKS − 1 ticks, oldest first. */
   recent: readonly number[];
@@ -112,6 +117,7 @@ export interface ShockState {
   lastFireTs: number;
 }
 
+/** @package */
 export const INITIAL_SHOCK: ShockState = {
   recent: [],
   lastTs: Number.NEGATIVE_INFINITY,
@@ -124,6 +130,7 @@ export const INITIAL_SHOCK: ShockState = {
  * accent into a pattern. `ts` is the feed clock. After a gap in updates (a new
  * pipeline, a throttled tab) the lookback restarts: the old values belong to
  * another market or another moment.
+ * @package
  */
 export function stepShock(
   prev: ShockState,

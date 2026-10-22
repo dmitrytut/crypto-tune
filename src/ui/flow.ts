@@ -5,7 +5,10 @@ const FAST_TAU_MS = 4_000;
 /** Baseline the current activity is compared against. */
 const SLOW_TAU_MS = 120_000;
 
-/** Live order-flow reading; needs no warm-up, so visuals react from the first trade. */
+/**
+ * Live order-flow reading; needs no warm-up, so visuals react from the first trade.
+ * @package
+ */
 export interface FlowState {
   /** Aggressor balance over the last few seconds: +1 all buys, −1 all sells. */
   imbalance: number;
@@ -13,12 +16,14 @@ export interface FlowState {
   activity: number;
 }
 
+/** @package */
 export const QUIET_FLOW: FlowState = { imbalance: 0, activity: 0 };
 
 /**
  * Exponentially decaying notional sums by side. A constant flow `r` decays to
  * r·τ·(1 − e^(−elapsed/τ)); dividing by that window gives `r` exactly, so the
  * first seconds of a session are not mistaken for a burst.
+ * @package
  */
 export class FlowMeter {
   private buy = 0;

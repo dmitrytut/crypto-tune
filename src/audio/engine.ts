@@ -21,6 +21,7 @@ export interface AudioParams {
   eventsVolumeDb: number;
 }
 
+/** @package */
 export type AudioState = 'stopped' | 'starting' | 'running';
 
 interface Graph {

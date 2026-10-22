@@ -20,6 +20,7 @@ const MARKER_GROWTH = 4 / 3;
  * tinted by tension at each moment, buy volume up / sell volume down per
  * VOLUME_BUCKET_MS below it, and event markers on the line. No axes — it is
  * ambience, the exact numbers live in the readout.
+ * @package
  */
 export class Chart {
   private readonly ctx: CanvasRenderingContext2D;

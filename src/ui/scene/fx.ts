@@ -16,7 +16,10 @@ const RING_SEC = 1.8;
 const SHARD_SEC = 1.1;
 const LABEL_SEC = 2.4;
 
-/** Side effects outside the overlay: the aura reacts where the event happened. */
+/**
+ * Side effects outside the overlay: the aura reacts where the event happened.
+ * @package
+ */
 export interface FxHooks {
   bloom(x: number, y: number, color: Rgb, strength: number): void;
   shock(x: number, y: number, strength: number): void;
@@ -121,6 +124,7 @@ const haloSprite = (c: Rgb) =>
  *   floating amount and a light burst in the aura.
  * - Every liquidation bursts at the price: double ring, shards, and (above the
  *   threshold) an aura shock wave, a label and, for huge ones, a screen shake.
+ * @package
  */
 export class Fx {
   private readonly ctx: CanvasRenderingContext2D;
