@@ -102,13 +102,9 @@ export class Chart {
       if (i === 0) ctx.moveTo(x(p.ts), y(p.price));
       else ctx.lineTo(x(p.ts), y(p.price));
     }
-    const glow = tensionColor(last.tension);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = css(glow, 0.9);
-    ctx.shadowBlur = 8;
     ctx.stroke();
-    ctx.shadowBlur = 0;
 
     for (const m of h.markers) {
       if (m.ts < from) continue;
@@ -128,14 +124,11 @@ export class Chart {
       }
     }
 
-    // Head of the line.
+    // Head of the line, in the current tension colour.
     ctx.beginPath();
     ctx.arc(x1, y(last.price), 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = css(glow, 1);
-    ctx.shadowBlur = 12;
+    ctx.fillStyle = css(tensionColor(last.tension));
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
 
   private drawVolume(

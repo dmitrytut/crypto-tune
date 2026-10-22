@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>crypto-tune</title>
+    <title>crypto-tune: the market, played as sound</title>
   </head>
   <body>
     <canvas id="aura" class="layer" aria-hidden="true"></canvas>
@@ -36,10 +36,16 @@
       <small id="symbol-error" class="error" hidden></small>
 
       <section class="hero">
+        <h1 class="title fades" id="title">Market, played as sound</h1>
+        <p class="lede fades">Calm music that tightens when the price jolts.</p>
         <div class="price" id="price">—</div>
         <div class="change" id="change">&nbsp;</div>
 
         <div class="meter fades">
+          <div class="meter-head">
+            <span>Tension</span>
+            <span id="tension-value">—</span>
+          </div>
           <div class="meter-track" id="tension-track">
             <div class="meter-fill" id="tension-fill"></div>
           </div>
@@ -52,9 +58,10 @@
           <span id="last-event"></span>
         </div>
 
-        <button id="audio-toggle" class="play fades" type="button" data-state="stopped" aria-label="Start sound">
+        <button id="audio-toggle" class="play fades" type="button" data-state="stopped">
           <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
           <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z" /></svg>
+          <span id="audio-label">Listen</span>
         </button>
       </section>
 
@@ -65,7 +72,9 @@
       <form method="dialog" class="settings-body">
         <header class="settings-head">
           <h2 id="settings-title">Settings</h2>
-          <button class="icon-btn" type="submit" value="close" aria-label="Close">✕</button>
+          <button class="icon-btn" type="submit" value="close" aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z" /></svg>
+          </button>
         </header>
 
         <h3>Sound</h3>
@@ -86,13 +95,13 @@
           <input id="events-volume" type="range" />
         </label>
 
-        <h3>Sensitivity</h3>
+        <h3>Response</h3>
         <label class="field">
-          <span>Window N: <output id="window-out"></output> s</span>
+          <span>Price-change window: <output id="window-out"></output> s</span>
           <input id="window" type="range" />
         </label>
         <label class="field">
-          <span>Multiplier: ×<output id="sensitivity-out"></output></span>
+          <span>Sensitivity: ×<output id="sensitivity-out"></output></span>
           <input id="sensitivity" type="range" />
         </label>
         <label class="field">
@@ -107,11 +116,11 @@
         <h3>Source</h3>
         <fieldset class="segmented">
           <legend class="visually-hidden">Data source</legend>
-          <label><input type="radio" name="source" value="live" /> LIVE</label>
-          <label><input type="radio" name="source" value="simulator" /> SIMULATOR</label>
+          <label><input type="radio" name="source" value="live" /> Live</label>
+          <label><input type="radio" name="source" value="simulator" /> Simulator</label>
         </fieldset>
 
-        <details class="debug">
+        <details class="debug" id="debug" hidden>
           <summary>Debug</summary>
           <dl class="stats">
             <dt>tension</dt><dd id="tension">—</dd>

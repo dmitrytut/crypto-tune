@@ -1,12 +1,14 @@
 @import "@fontsource-variable/onest";
 
 :root {
-  --bg: #07060d;
-  --glass: rgba(255, 255, 255, 0.08);
-  --glass-strong: rgba(255, 255, 255, 0.14);
+  --bg: #08090b;
+  /* Opaque control surfaces, one tone step apart: no glass, no blur. */
+  --surface: #16171b;
+  --surface-strong: #23252b;
   --line: rgba(255, 255, 255, 0.14);
-  --text: #f4f2fa;
-  --muted: rgba(244, 242, 250, 0.62);
+  --text: #f2f3f5;
+  --muted: rgba(242, 243, 245, 0.66);
+  /* The accent belongs to the one action: the Listen button. */
   --accent: #f4ec5a;
   /* --up and --down are set at mount from palette.ts (UP_COLOR / DOWN_COLOR), the one source. */
   --warn: #e0af68;
@@ -28,7 +30,7 @@ body {
 
 /* Fallback when WebGL is unavailable; the aura canvas covers it otherwise. */
 body {
-  background: radial-gradient(120% 90% at 50% 40%, #2a1a5e 0%, #0d0820 55%, var(--bg) 100%);
+  background: var(--bg);
 }
 
 /* Film grain over everything: kills gradient banding and gives the glow a printed texture. */
@@ -70,14 +72,13 @@ body::after {
   font: inherit;
   font-weight: 700;
   font-size: 15px;
-  color: var(--accent);
-  background: var(--glass);
+  color: var(--text);
+  background: var(--surface);
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 9px 18px;
   width: 15ch;
   text-transform: uppercase;
-  backdrop-filter: blur(12px);
 }
 .chip input:hover,
 .chip input:focus-visible {
@@ -93,7 +94,7 @@ body::after {
   gap: 10px;
 }
 .status {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .status::before {
@@ -116,11 +117,10 @@ body::after {
   height: 40px;
   border-radius: 50%;
   border: none;
-  background: var(--glass);
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   cursor: pointer;
-  backdrop-filter: blur(12px);
 }
 .icon-btn svg {
   width: 20px;
@@ -128,7 +128,7 @@ body::after {
   fill: currentColor;
 }
 .icon-btn:hover {
-  background: var(--glass-strong);
+  background: var(--surface-strong);
 }
 .error {
   color: var(--down);
@@ -156,15 +156,30 @@ body::after {
   pointer-events: none;
   background: radial-gradient(
     closest-side,
-    rgba(5, 3, 14, 0.5),
-    rgba(5, 3, 14, 0.28) 55%,
+    rgba(0, 0, 0, 0.5),
+    rgba(0, 0, 0, 0.28) 55%,
     transparent
   );
+}
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-align: center;
+  text-wrap: balance;
+}
+.lede {
+  margin: -6px 0 4px;
+  font-size: 15px;
+  color: var(--muted);
+  text-align: center;
 }
 /* Thin, tabular, quiet: the number is the hero, not its effects. Separators and
  * the fraction step back so the eye reads the big digits first. */
 .price {
-  font-size: clamp(56px, 10vw, 116px);
+  font-size: clamp(56px, 17vw, 116px);
   font-weight: 250;
   letter-spacing: -0.045em;
   line-height: 1;
@@ -206,11 +221,22 @@ body::after {
   width: 100%;
   margin-top: 8px;
 }
+.meter-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.meter-head span:first-child {
+  color: var(--text);
+}
 .meter-track {
   position: relative;
   height: 6px;
   border-radius: 3px;
-  background: var(--glass-strong);
+  background: var(--surface-strong);
   overflow: hidden;
 }
 /* Grey while calibrating; once ready the view paints it with palette.ts tensionColor. */
@@ -232,13 +258,14 @@ body::after {
 }
 .meter-scale {
   position: relative;
-  height: 16px;
-  font-size: 10px;
+  height: 20px;
+  font-size: 12px;
   color: var(--muted);
 }
+/* Each zone name starts at its threshold mark. */
 .meter-scale span {
   position: absolute;
-  top: 3px;
+  top: 4px;
 }
 
 .info {
@@ -251,24 +278,27 @@ body::after {
 }
 
 .play {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
   margin-top: 6px;
-  border-radius: 50%;
+  padding: 0 28px 0 22px;
+  border-radius: 999px;
   border: none;
   background: var(--accent);
   color: #111;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 8px 40px rgba(244, 236, 90, 0.25);
   transition:
     transform 0.15s,
     background-color 0.3s;
 }
 .play svg {
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
   fill: currentColor;
 }
 .play .icon-stop,
@@ -279,10 +309,9 @@ body::after {
   display: block;
 }
 .play[data-state="running"] {
-  background: var(--glass-strong);
+  background: var(--surface-strong);
   color: var(--text);
   box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(12px);
   animation: breathe 4s ease-in-out infinite;
 }
 /* While playing, the button breathes slowly: a quiet "on air" sign. */
@@ -302,17 +331,15 @@ body::after {
 @keyframes digit-up {
   from {
     color: var(--up);
-    text-shadow: 0 0 18px color-mix(in srgb, var(--up) 45%, transparent);
   }
 }
 @keyframes digit-down {
   from {
     color: var(--down);
-    text-shadow: 0 0 18px color-mix(in srgb, var(--down) 45%, transparent);
   }
 }
 .play:hover {
-  transform: scale(1.05);
+  transform: scale(1.03);
 }
 .play:disabled {
   opacity: 0.6;
@@ -320,7 +347,7 @@ body::after {
 }
 .play:focus-visible,
 .icon-btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--text);
   outline-offset: 3px;
 }
 
@@ -348,9 +375,8 @@ body.idle {
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: rgba(18, 14, 34, 0.86);
+  background: #141519;
   color: var(--text);
-  backdrop-filter: blur(24px);
 }
 .settings::backdrop {
   background: rgba(0, 0, 0, 0.45);
@@ -370,29 +396,26 @@ body.idle {
   margin: 0;
 }
 .settings h3 {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
   margin: 10px 0 0;
 }
 .field {
   display: grid;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 .field select {
   font: inherit;
   color: var(--text);
-  background: var(--glass);
+  background: var(--surface-strong);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 7px 10px;
 }
 .field input[type="range"] {
-  accent-color: var(--accent);
+  accent-color: var(--text);
 }
 
 .segmented {
@@ -405,7 +428,7 @@ body.idle {
 .segmented label {
   flex: 1;
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -423,12 +446,12 @@ body.idle {
   white-space: nowrap;
 }
 .segmented label:has(input:focus-visible) {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--text);
   outline-offset: 2px;
 }
 .segmented label:has(input:checked) {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: rgba(255, 255, 255, 0.5);
+  background: var(--surface-strong);
 }
 
 .debug summary {

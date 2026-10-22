@@ -57,34 +57,43 @@ export interface AppView {
   liquidation(l: Liquidation): void;
 }
 
-function statusText(s: FeedStatus): string {
+function statusText(s: FeedStatus, source: Settings['source']): string {
   switch (s.state) {
+    case 'idle':
+      return 'Idle';
     case 'connecting':
-      return s.attempt > 1 ? `connecting #${s.attempt}` : 'connecting';
+      return s.attempt > 1 ? `Connecting, try ${s.attempt}` : 'Connecting…';
+    case 'open':
+      return source === 'live' ? 'Live' : 'Simulated';
     case 'reconnecting':
-      return `${s.reason}, retry in ${Math.ceil(s.inMs / 1000)}s`;
+      return `${s.reason}, retrying in ${Math.ceil(s.inMs / 1000)}s`;
+    case 'closed':
+      return 'Closed';
     case 'error':
-      return `error: ${s.message}`;
-    default:
-      return s.state;
+      return `Error: ${s.message}`;
   }
 }
 
-/** Threshold marks on the track and value labels under it, positioned from TENSION_LEVELS. */
+/** Named zones under the meter, each label at the level where the zone starts. */
+const METER_ZONES = [
+  [0, 'Calm'],
+  [TENSION_LEVELS.mid, 'Tense'],
+  [TENSION_LEVELS.high, 'Shock'],
+] as const;
+
+/** Threshold marks on the track and zone names under it, positioned from TENSION_LEVELS. */
 function buildMeterScale(track: HTMLElement, scale: HTMLElement): void {
-  for (const v of [0, TENSION_LEVELS.mid, TENSION_LEVELS.high, METER_MAX]) {
+  for (const [v, name] of METER_ZONES) {
     const pct = (v / METER_MAX) * 100;
-    if (v > 0 && v < METER_MAX) {
+    if (v > 0) {
       const mark = document.createElement('span');
       mark.className = 'meter-mark';
       mark.style.left = `${pct}%`;
       track.append(mark);
     }
     const label = document.createElement('span');
-    label.textContent = String(v);
+    label.textContent = name;
     label.style.left = `${pct}%`;
-    // Edge labels align inward so they never overflow the meter.
-    label.style.transform = `translateX(${v === 0 ? 0 : v === METER_MAX ? -100 : -50}%)`;
     scale.append(label);
   }
 }
@@ -111,6 +120,11 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const change = el('change');
   const fill = el('tension-fill');
   buildMeterScale(el('tension-track'), el('tension-scale'));
+  const tensionValue = el('tension-value');
+  const title = el('title');
+  const audioLabel = el('audio-label');
+  // Raw metric readouts are for tuning, not for listeners: shown only with ?debug in the URL.
+  el('debug').hidden = !new URLSearchParams(location.search).has('debug');
   const vol = el('vol');
   const lastEvent = el('last-event');
   const audioToggle = el<HTMLButtonElement>('audio-toggle');
@@ -132,6 +146,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     const live = settings.source === 'live';
     symbol.disabled = !live;
     symbol.value = live ? settings.symbol : 'SIMULATOR';
+    title.textContent = live
+      ? `${settings.symbol} futures, played as sound`
+      : 'A simulated market, played as sound';
     symbolError.hidden = true;
   };
   syncSymbolChip();
@@ -185,7 +202,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     if (s.ts - titleAt < TITLE_EVERY_MS || Number.isNaN(s.price)) return;
     titleAt = s.ts;
     const name = settings.source === 'live' ? settings.symbol : 'SIM';
-    const hot = s.tension >= TENSION_LEVELS.mid ? ` · ⚡${s.tension.toFixed(1)}` : '';
+    const hot = s.tension >= TENSION_LEVELS.mid ? ` · tension ${s.tension.toFixed(1)}` : '';
     const { int, frac } = price.format(s.price);
     document.title = `${arrowOf(s.direction)} ${int}${frac} · ${name}${hot}`;
   };
@@ -202,15 +219,16 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
         ? '\u00a0'
         : `${shown > 0 ? '▲' : shown < 0 ? '▼' : '•'} ${shown >= 0 ? '+' : ''}${shown.toFixed(2)}% · ${settings.windowSec}s`;
       change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
+      vol.textContent = Number.isFinite(s.volPerSec) ? `vol ${volFmt.format(s.volPerSec)}/s` : '—';
       if (s.ready) {
         fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
         fill.style.backgroundColor = css(tensionColor(s.tension));
-        vol.textContent = `vol ${volFmt.format(s.volPerSec)}/s`;
+        tensionValue.textContent = s.tension.toFixed(1);
       } else {
         // Tension needs a few minutes of this market's own statistics before it means anything.
         fill.style.width = `${Math.floor(s.warmup * 100)}%`;
         fill.style.backgroundColor = '';
-        vol.textContent = `calibrating tension · ${clock(s.warmupLeftSec)}`;
+        tensionValue.textContent = `calibrating · ${clock(s.warmupLeftSec)}`;
       }
       aura?.setTarget(auraTarget(s, flow.read(Date.now())));
       updateTitle(s);
@@ -230,7 +248,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       price.reset();
       // A new pair trades on a different notional scale; its pace baseline starts fresh.
       flow = new FlowMeter();
-      for (const node of [vol, ...Object.values(debug)]) node.textContent = '—';
+      for (const node of [vol, tensionValue, ...Object.values(debug)]) node.textContent = '—';
       lastEvent.textContent = '';
       change.textContent = '\u00a0';
       lastEvent.className = '';
@@ -242,14 +260,17 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     },
     setStatus(s) {
       status.dataset.state = s.state;
-      status.textContent = statusText(s);
+      status.textContent = statusText(s, settings.source);
+      // No snapshot yet: say what the empty readout is waiting for.
+      if (!last && s.state === 'connecting') vol.textContent = 'Connecting to the market…';
       // Connected but no snapshot yet: the feed is replaying history before live trades flow.
-      if (s.state === 'open' && !last) vol.textContent = 'loading history…';
+      if (!last && s.state === 'open') vol.textContent = 'Loading recent trades…';
     },
     setPlayback(state) {
       audioToggle.dataset.state = state;
       audioToggle.disabled = state === 'starting';
-      audioToggle.setAttribute('aria-label', state === 'running' ? 'Stop sound' : 'Start sound');
+      audioLabel.textContent =
+        state === 'running' ? 'Stop' : state === 'starting' ? 'Starting…' : 'Listen';
     },
     showEvent(e) {
       chartDirty = true;

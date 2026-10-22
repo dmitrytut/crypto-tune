@@ -8,10 +8,10 @@ import { type FlowState, QUIET_FLOW } from './flow';
  */
 export type Rgb = readonly [number, number, number];
 
-/** Two-tone palettes: [body, highlight]. */
+/** Two-tone palettes: [body, highlight]. Calm is a cold steel blue, deliberately not violet. */
 const CALM: readonly [Rgb, Rgb] = [
-  [0.2, 0.11, 0.5],
-  [0.52, 0.3, 0.92],
+  [0.06, 0.13, 0.24],
+  [0.3, 0.5, 0.74],
 ];
 const RISING: readonly [Rgb, Rgb] = [
   [0.03, 0.4, 0.46],
