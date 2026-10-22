@@ -1,3 +1,6 @@
+import { DEFAULT_METRICS_CONFIG } from './metrics/engine';
+import { DEFAULT_TENSION_PARAMS } from './metrics/tension';
+
 export type SourceKind = 'live' | 'simulator';
 
 /** Tonic choices, index = pitch class (0 = C). */
@@ -28,8 +31,9 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   source: 'live',
   symbol: 'BTCUSDT',
-  windowSec: 5,
-  sensitivity: 1,
+  // The metrics own these defaults; settings only persist the user's override.
+  windowSec: DEFAULT_METRICS_CONFIG.windowSec,
+  sensitivity: DEFAULT_TENSION_PARAMS.sensitivity,
   tonic: 'A',
   baseVolumeDb: -6,
   tensionVolumeDb: -6,
