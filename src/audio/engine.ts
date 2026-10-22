@@ -7,10 +7,8 @@ import { EventsLayer } from './events-layer';
 import { collapse, type EventCue, eventVelocity, type PendingEvent } from './events-map';
 import { Mixer } from './mixer';
 import { TensionLayer } from './tension-layer';
-import { INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from './tension-map';
+import { CALM_BPM, INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from './tension-map';
 
-/** Calm tempo; the tension mix raises it toward 90 BPM. */
-const BASE_BPM = 60;
 const FADE_IN_SEC = 3;
 const FADE_OUT_SEC = 1.5;
 const MASTER_DB = -2;
@@ -59,7 +57,7 @@ export class AudioEngine {
   /** Hysteresis state for double time, carried between ticks. */
   private doubleTime = false;
   /** Last tempo written to the transport, whole BPM. */
-  private bpm = BASE_BPM;
+  private bpm = CALM_BPM;
   private shock: ShockState = INITIAL_SHOCK;
   private pendingLiqs: PendingEvent<LiquidationSide>[] = [];
   private pendingTrades: PendingEvent<TradeSide>[] = [];
@@ -83,8 +81,8 @@ export class AudioEngine {
     const pending = this.stopAt - Tone.now();
     if (pending > 0) await new Promise((resolve) => setTimeout(resolve, pending * 1000));
     const transport = Tone.getTransport();
-    transport.bpm.value = BASE_BPM;
-    this.bpm = BASE_BPM;
+    transport.bpm.value = CALM_BPM;
+    this.bpm = CALM_BPM;
     const t = Tone.now() + 0.05;
     g.base.start(t);
     g.tension.start(t);

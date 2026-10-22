@@ -17,7 +17,7 @@ const DRONE_LEVEL_DB = -9;
  * every root here (Fmaj7/9, Dm11, C6/9, G6sus over A).
  */
 const PROGRESSION = [0, -4, -7, 0, 3, -2] as const;
-/** Bars per chord: ~64 s at 60 BPM, so the full cycle takes ~6.4 min. */
+/** Bars per chord: ~64 s at CALM_BPM, so the full cycle takes ~6.4 min. */
 const CHORD_BARS = 16;
 /** Crossfade between drone voices on a chord change; long enough to never sound like a switch. */
 const CHORD_FADE_SEC = 6;
@@ -36,7 +36,7 @@ interface DroneVoice {
  * Always-on layer: a soft drone on root + fifth breathing through a slowly
  * swept lowpass and drifting through a slow chord cycle (two voices
  * crossfading, never gliding), and a pentatonic arpeggio. Calm: quarters at
- * 60 BPM behind a closed filter with occasional rests, register following the
+ * CALM_BPM behind a closed filter with occasional rests, register following the
  * price vs its hour EMA. Under tension the filter opens, the line fills in,
  * the contour runs with the move from the next note, time doubles on the next
  * beat, the arpeggio wavers and the drone root drifts flat against the fifth.

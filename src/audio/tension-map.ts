@@ -7,7 +7,11 @@ const DOUBLE_TIME_HYSTERESIS = 0.3;
 /** |direction| beyond which the arpeggio runs in the move's direction. */
 const DIRECTION_THRESHOLD = 0.5;
 
-const CALM_BPM = 60;
+/**
+ * Tempo of a calm market; the mix raises it to TENSE_BPM with tension.
+ * @package
+ */
+export const CALM_BPM = 60;
 const TENSE_BPM = 90;
 const CALM_CUTOFF_HZ = 1000;
 const OPEN_CUTOFF_HZ = 6000;

@@ -6,7 +6,7 @@ const BELL_OCTAVE = 4;
 /**
  * Eno-style tape loops: each repeats one pentatonic note on its own period.
  * Periods are coprime, so the combined figure repeats only every
- * 7 · 11 · 13 = 1001 beats (~17 min at 60 BPM). Degrees D, G, A over the A
+ * 7 · 11 · 13 = 1001 beats (~17 min at CALM_BPM). Degrees D, G, A over the A
  * tonic sit consonantly over every drone chord.
  */
 const BELL_LOOPS = [
@@ -23,7 +23,7 @@ const PULSE_ACCENTS = [1, 0.55, 0.75, 0.55] as const;
 /**
  * Always-on secondary voices in the base channel: three soft FM bells on
  * incommensurable loops, so the base never repeats audibly, and a quiet
- * heartbeat on every beat whose tempo carries the tension (60 → 90 BPM).
+ * heartbeat on every beat whose tempo carries the tension (see `tensionMix`).
  * Loops live on the transport timeline: transport start/stop drives them.
  * @package
  */
