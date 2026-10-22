@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mulberry32 } from '../feed/simulator';
-import { RollingStats } from './rolling';
+import { mulberry32 } from '../../feed/simulator';
+import { RollingStats } from '../rolling';
 
 function naive(values: number[]): { mean: number; std: number } {
   const mean = values.reduce((a, b) => a + b, 0) / values.length;

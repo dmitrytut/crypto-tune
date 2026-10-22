@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asymSmooth, zScore } from './stats';
+import { asymSmooth, zScore } from '../stats';
 
 describe('zScore', () => {
   it('standardizes against mean and std', () => {

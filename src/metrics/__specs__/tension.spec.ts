@@ -4,7 +4,7 @@ import {
   DEFAULT_TENSION_PARAMS as P,
   stepTension,
   type TensionInput,
-} from './tension';
+} from '../tension';
 
 const calm: TensionInput = {
   ret: 0,

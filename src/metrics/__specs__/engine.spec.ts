@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Trade } from '../feed/types';
-import { DEFAULT_METRICS_CONFIG, MetricsEngine, type MetricsSnapshot, TICK_MS } from './engine';
+import type { Trade } from '../../feed/types';
+import { DEFAULT_METRICS_CONFIG, MetricsEngine, type MetricsSnapshot, TICK_MS } from '../engine';
 
 const T0 = 1_700_000_000_000;
 const CFG = { ...DEFAULT_METRICS_CONFIG, windowSec: 2, statsWindowMin: 2, warmupMin: 1 };

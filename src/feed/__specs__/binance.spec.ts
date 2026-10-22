@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { binanceStreamUrl, parseAggTrade, parseForceOrder } from './binance';
+import { binanceStreamUrl, parseAggTrade, parseForceOrder } from '../binance';
 
 describe('parseAggTrade', () => {
   // Captured from wss://fstream.binance.com/market/stream (2026-10).

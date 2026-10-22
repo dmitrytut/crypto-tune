@@ -31,7 +31,10 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 
 ## Conventions
 
-- Metrics stay pure and covered by vitest; new metric math goes in `src/metrics/` with tests.
+- Tests live next to the code they cover, in a `__specs__/` folder inside that module's directory,
+  named `<module>.spec.ts` (e.g. `src/metrics/rolling.ts` → `src/metrics/__specs__/rolling.spec.ts`).
+  Never `*.test.ts`, never a top-level `tests/` dir; vitest only picks up `src/**/__specs__/**/*.spec.ts`.
+- Metrics stay pure and covered by specs; new metric math goes in `src/metrics/` with a spec.
 - Metrics run on `feed.now()`, never `Date.now()`, so replay speed-ups and throttled timers do not
   distort statistics.
 - Every audio parameter change goes through `rampTo`/scheduled ramps — no clicks, no volume jumps.

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ReconnectingSocket } from './reconnecting-socket';
-import type { FeedStatus } from './types';
+import { ReconnectingSocket } from '../reconnecting-socket';
+import type { FeedStatus } from '../types';
 
 /** Socket that never completes its handshake unless told to. */
 class FakeWebSocket {
