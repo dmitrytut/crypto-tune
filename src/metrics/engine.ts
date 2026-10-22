@@ -55,7 +55,10 @@ export class MetricsEngine {
   private readonly vols = new Float64Array(TICKS_PER_SEC);
   private readonly retStats: RollingStats;
   private readonly volStats: RollingStats;
+  /** Monotonic tick index; addresses the rings. */
   private tick = 0;
+  /** Ticks processed since start or the last resync; gates `ret` until window N refills. */
+  private sinceResync = 0;
   /** End of the last processed tick; NaN until the first trade. */
   private boundary = Number.NaN;
   private price = Number.NaN;
@@ -75,6 +78,22 @@ export class MetricsEngine {
   /** Change smoothing/sensitivity without losing history. */
   setTensionParams(params: TensionParams): void {
     this.params = params;
+  }
+
+  /**
+   * Data gap (disconnect/reconnect): an absent feed is not a calm market.
+   * Forgets tick-level state — price history, trailing volume, pending trades,
+   * smoothed tension — but keeps the rolling statistics. Ticking resumes on
+   * the next trade; tension stays 0 until window N has refilled with fresh data.
+   */
+  resync(): void {
+    this.boundary = Number.NaN;
+    this.price = Number.NaN;
+    this.pending.length = 0;
+    this.pendingHead = 0;
+    this.vols.fill(0);
+    this.sinceResync = 0;
+    this.state = INITIAL_TENSION;
   }
 
   addTrade(t: Trade): void {
@@ -104,15 +123,18 @@ export class MetricsEngine {
     }
     this.boundary = end;
     const i = this.tick++;
+    const fresh = this.sinceResync++;
     this.prices[i % this.prices.length] = this.price;
     this.vols[i % TICKS_PER_SEC] = vol;
     let volPerSec = 0;
     for (const v of this.vols) volPerSec += v;
 
-    const hasRet = i >= this.lagTicks;
+    const hasRet = fresh >= this.lagTicks;
     const past = this.prices[(i - this.lagTicks) % this.prices.length] as number;
     const ret = hasRet ? Math.log(this.price / past) : 0;
-    const warmup = Math.min(1, i / (this.lagTicks + this.warmupTicks));
+    const warmup =
+      (Math.min(fresh, this.lagTicks) + Math.min(this.retStats.count, this.warmupTicks)) /
+      (this.lagTicks + this.warmupTicks);
     const ready = hasRet && this.retStats.count >= this.warmupTicks;
 
     this.state = stepTension(

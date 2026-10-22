@@ -69,4 +69,32 @@ describe('MetricsEngine', () => {
     expect(s.price).toBe(101);
     expect(s.volPerSec).toBeCloseTo(100 + 202, 9);
   });
+
+  it('does not score the price move across a data gap as a move within window N', () => {
+    const run = (resyncOnGap: boolean) => {
+      const e = new MetricsEngine(CFG);
+      const calmEnd = READY_TICK + 40;
+      feedCalm(e, 0, calmEnd);
+      runTo(e, calmEnd);
+      if (resyncOnGap) e.resync();
+      const resume = calmEnd + 45 * (1000 / TICK_MS);
+      // While disconnected nothing is ticked, so the gap never enters the statistics.
+      if (resyncOnGap) expect(e.advanceTo(T0 + resume * TICK_MS)).toBeNull();
+      // Market moved 0.5% while we were offline.
+      feedCalm(e, resume, resume + 40, 100.5);
+      let peak = 0;
+      let last: MetricsSnapshot | null = null;
+      for (let t = resume + 1; t <= resume + 40; t++) {
+        last = runTo(e, t);
+        peak = Math.max(peak, last.tension);
+      }
+      return { peak, last: last as MetricsSnapshot };
+    };
+
+    expect(run(false).peak).toBeGreaterThan(5);
+    const fixed = run(true);
+    // Same "calm" bound as the impulse spec: the wiggle alone keeps tension ~1.5.
+    expect(fixed.peak).toBeLessThan(2.5);
+    expect(fixed.last.ready).toBe(true);
+  });
 });

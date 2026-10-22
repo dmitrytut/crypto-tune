@@ -87,3 +87,19 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
 
 - Work on branches off `master` (`feat/<stage-or-topic>`); one stage per branch.
 - Update `README.md` at the end of each stage (what's done, how to verify).
+
+## Review feedback
+
+- **Verify every finding first** (reproduce or trace the code). A reviewer can be wrong. A finding
+  that does not reproduce is answered with the evidence, not "fixed".
+- **Fix** real findings whose impact justifies the cost. Fix the root cause rather than the
+  symptom. Add a spec that fails without the fix when the bug is plausible to regress.
+- **Skip with a comment** when either holds:
+  - the fix is hard or invasive **and** the impact is small;
+  - the scenario is an unrealistic or very unlikely corner case for this app.
+
+  The comment states the reason (impact, likelihood, cost) and what would change the decision.
+  Never skip silently.
+- **Partial fixes** say what is covered and what remains, with the reason.
+- Push fixes to the same PR branch, then reply **once** on the PR with a table:
+  finding → decision (fixed / skipped / partially) → commit or reason.

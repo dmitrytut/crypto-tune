@@ -42,8 +42,11 @@ export interface MarketFeed {
   connect(): void;
   disconnect(): void;
   /**
-   * Source clock in ms. Live adapters return local time corrected to exchange
-   * time; replay returns virtual playback time. Metrics tick on this clock.
+   * Source clock in ms; metrics close ticks up to this time. Contract: every
+   * event with `ts` < now() has already been emitted. Generated sources
+   * (simulator, replay) return their emitted horizon. Live adapters return
+   * local time shifted by the observed (event time − receive time) offset,
+   * which already lags by network latency; stragglers land in the next tick.
    */
   now(): number;
   onTrade(cb: (t: Trade) => void): Unsubscribe;

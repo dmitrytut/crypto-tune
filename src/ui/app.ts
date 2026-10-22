@@ -1,7 +1,7 @@
 import type { FeedStatus } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
 import { TENSION_LEVELS } from '../metrics/tension';
-import { LIMITS, type Settings, type SourceKind } from '../settings';
+import { LIMITS, type Settings, type SourceKind, SYMBOL_PATTERN } from '../settings';
 import './styles.css';
 
 /** Tension value at the right edge of the meter. */
@@ -104,7 +104,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   symbol.addEventListener('change', () => {
     const next = symbol.value.trim().toUpperCase();
     // Without a loaded list (REST unreachable) accept any well-formed symbol.
-    const valid = /^[A-Z0-9]{2,30}$/.test(next) && (symbols.size === 0 || symbols.has(next));
+    const valid = SYMBOL_PATTERN.test(next) && (symbols.size === 0 || symbols.has(next));
     symbolError.hidden = valid;
     symbolError.textContent = valid ? '' : `${next || '∅'}: нет такой пары на Binance Futures`;
     if (!valid) return;

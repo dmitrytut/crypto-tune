@@ -21,7 +21,6 @@ const view = mountApp(settings, {
   onSettings(next) {
     const prev = settings;
     settings = next;
-    saveSettings(next);
     if (
       next.source !== prev.source ||
       next.symbol !== prev.symbol ||
@@ -31,6 +30,7 @@ const view = mountApp(settings, {
     } else if (next.sensitivity !== prev.sensitivity) {
       engine?.setTensionParams(tensionParams(next));
     }
+    saveSettings(next);
   },
 });
 
@@ -46,7 +46,15 @@ function startPipeline(): void {
     windowSec: settings.windowSec,
     tension: tensionParams(settings),
   });
-  unsubs = [f.onTrade((t) => e.addTrade(t)), f.onStatus((s) => view.setStatus(s))];
+  unsubs = [
+    f.onTrade((t) => e.addTrade(t)),
+    f.onStatus((s) => {
+      view.setStatus(s);
+      // A data gap is not a calm market: drop tick-level state so the move
+      // across the gap is never scored as a move within window N.
+      if (s.state !== 'open') e.resync();
+    }),
+  ];
   feed = f;
   engine = e;
   view.reset();
@@ -61,18 +69,33 @@ window.setInterval(() => {
 }, TICK_MS);
 
 async function loadSymbols(): Promise<void> {
-  const cached = sessionStorage.getItem(SYMBOLS_CACHE_KEY);
+  const cached = readCachedSymbols();
   if (cached) {
-    view.setSymbols(JSON.parse(cached) as string[]);
+    view.setSymbols(cached);
     return;
   }
+  let list: string[];
   try {
-    const list = await fetchBinanceSymbols();
-    sessionStorage.setItem(SYMBOLS_CACHE_KEY, JSON.stringify(list));
-    view.setSymbols(list);
+    list = await fetchBinanceSymbols();
   } catch (err) {
     // Symbol input still accepts any well-formed ticker without the list.
     console.warn('Binance symbol list unavailable', err);
+    return;
+  }
+  view.setSymbols(list);
+  try {
+    sessionStorage.setItem(SYMBOLS_CACHE_KEY, JSON.stringify(list));
+  } catch {
+    // Cache is optional (storage disabled or full).
+  }
+}
+
+function readCachedSymbols(): string[] | null {
+  try {
+    const raw = sessionStorage.getItem(SYMBOLS_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : null;
+  } catch {
+    return null;
   }
 }
 

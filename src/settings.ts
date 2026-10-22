@@ -24,6 +24,12 @@ export const LIMITS = {
 
 const KEY = 'crypto-tune.settings.v1';
 
+/**
+ * Exchange symbol: letters (any script — Binance lists e.g. `币安人生USDT`) and
+ * digits only, which also rules out URL separators in the stream path.
+ */
+export const SYMBOL_PATTERN = /^[\p{L}\p{N}]{2,30}$/u;
+
 const clamp = (v: number, { min, max }: { min: number; max: number }) =>
   Math.min(max, Math.max(min, v));
 
@@ -34,7 +40,7 @@ export function parseSettings(raw: unknown): Settings {
   return {
     source: o.source === 'live' || o.source === 'simulator' ? o.source : DEFAULT_SETTINGS.source,
     symbol:
-      typeof o.symbol === 'string' && /^[A-Z0-9]{2,30}$/.test(o.symbol)
+      typeof o.symbol === 'string' && SYMBOL_PATTERN.test(o.symbol)
         ? o.symbol
         : DEFAULT_SETTINGS.symbol,
     windowSec: clamp(num(o.windowSec, DEFAULT_SETTINGS.windowSec), LIMITS.windowSec),
@@ -50,6 +56,11 @@ export function loadSettings(): Settings {
   }
 }
 
+/** Best effort: storage may be disabled or full; the app keeps running on in-memory settings. */
 export function saveSettings(s: Settings): void {
-  localStorage.setItem(KEY, JSON.stringify(s));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(s));
+  } catch (err) {
+    console.warn('Settings not persisted', err);
+  }
 }

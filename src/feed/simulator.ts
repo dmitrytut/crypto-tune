@@ -227,6 +227,8 @@ export class SimulatorFeed implements MarketFeed {
   private readonly status = new Emitter<FeedStatus>();
   private sim: MarketSimulator | null = null;
   private timer: number | undefined;
+  /** Wall time up to which all events have been emitted; the feed clock. */
+  private emittedUntil = 0;
 
   constructor(private readonly opts: SimulatorFeedOptions = {}) {}
 
@@ -236,7 +238,7 @@ export class SimulatorFeed implements MarketFeed {
     this.sim = new MarketSimulator(now - (this.opts.historyMs ?? 30 * 60_000), this.opts.params);
     this.status.emit({ state: 'open' });
     this.pump();
-    this.timer = window.setInterval(() => this.pump(), STEP_MS);
+    this.timer = setInterval(() => this.pump(), STEP_MS);
   }
 
   disconnect(): void {
@@ -246,7 +248,9 @@ export class SimulatorFeed implements MarketFeed {
   }
 
   now(): number {
-    return Date.now();
+    // Not Date.now(): the metrics timer may fire before the next pump and would
+    // close ticks whose trades have not been generated yet.
+    return this.emittedUntil;
   }
 
   onTrade(cb: (t: Trade) => void): Unsubscribe {
@@ -262,10 +266,13 @@ export class SimulatorFeed implements MarketFeed {
   }
 
   private pump(): void {
-    this.sim?.advance(
-      Date.now(),
+    if (!this.sim) return;
+    const until = Date.now();
+    this.sim.advance(
+      until,
       (t) => this.trades.emit(t),
       (l) => this.liquidations.emit(l),
     );
+    this.emittedUntil = until;
   }
 }
