@@ -1,0 +1,22 @@
+# deps & build
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# env & local
+.env
+.env.*
+!.env.example
+*.local
+
+# replay recordings (large NDJSON dumps)
+recordings/
+
+# OS / editors / logs
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
