@@ -1,4 +1,4 @@
-import type { FeedStatus } from '../feed/market-feed';
+import type { FeedStatus, LiquidationSide, TradeSide } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { LIMITS, type Settings, type SourceKind, SYMBOL_PATTERN, TONICS } from '../settings';
@@ -25,7 +25,13 @@ export interface AppView {
   setFeedLabel(label: string): void;
   setSymbols(symbols: string[]): void;
   setPlayback(state: PlaybackView): void;
+  /** Last event that crossed its threshold (shown even while audio is stopped). */
+  showEvent(e: EventReadout): void;
 }
+
+export type EventReadout =
+  | { kind: 'liquidation'; side: LiquidationSide; usd: number; count: number }
+  | { kind: 'trade'; side: TradeSide; usd: number; count: number };
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -35,6 +41,15 @@ function el<T extends HTMLElement>(id: string): T {
 
 const priceFmt = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 7 });
 const volFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+const usdFmt = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+/** Threshold slider resolution in decades; values snap to two significant digits. */
+const LOG_STEP = 0.05;
+const snapUsd = (log10: number) => Number((10 ** log10).toPrecision(2));
 
 function statusText(s: FeedStatus): string {
   switch (s.state) {
@@ -102,6 +117,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const baseVolOut = el<HTMLOutputElement>('base-vol-out');
   const tensionVol = el<HTMLInputElement>('tension-volume');
   const tensionVolOut = el<HTMLOutputElement>('tension-vol-out');
+  const eventsVol = el<HTMLInputElement>('events-volume');
+  const eventsVolOut = el<HTMLOutputElement>('events-vol-out');
+  const lastEvent = el('last-event');
 
   audioToggle.addEventListener('click', () => handlers.onToggleAudio());
 
@@ -195,6 +213,37 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     (v) => update({ tensionVolumeDb: v }),
     'input',
   );
+  bindRange(
+    eventsVol,
+    eventsVolOut,
+    LIMITS.layerVolumeDb,
+    settings.eventsVolumeDb,
+    String,
+    (v) => update({ eventsVolumeDb: v }),
+    'input',
+  );
+  // Notional thresholds: the slider moves log10(USD) so each decade gets equal travel.
+  const bindUsdRange = (
+    id: string,
+    limits: { min: number; max: number },
+    value: number,
+    apply: (usd: number) => void,
+  ) =>
+    bindRange(
+      el<HTMLInputElement>(id),
+      el<HTMLOutputElement>(`${id}-out`),
+      { min: Math.log10(limits.min), max: Math.log10(limits.max), step: LOG_STEP },
+      Math.log10(value),
+      (v) => usdFmt.format(snapUsd(v)),
+      (v) => apply(snapUsd(v)),
+      'change',
+    );
+  bindUsdRange('liq-threshold', LIMITS.liqThresholdUsd, settings.liqThresholdUsd, (usd) =>
+    update({ liqThresholdUsd: usd }),
+  );
+  bindUsdRange('trade-threshold', LIMITS.tradeThresholdUsd, settings.tradeThresholdUsd, (usd) =>
+    update({ tradeThresholdUsd: usd }),
+  );
 
   return {
     render(s) {
@@ -213,10 +262,10 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       emaz.textContent = s.ready ? s.emaZ.toFixed(2) : '—';
     },
     reset() {
-      for (const node of [price, tension, direction, z, volz, vol, warmup, emaz]) {
+      for (const node of [price, tension, direction, z, volz, vol, warmup, emaz, lastEvent]) {
         node.textContent = '—';
       }
-      direction.className = '';
+      direction.className = lastEvent.className = '';
       fill.style.width = '0';
       fill.dataset.level = 'low';
     },
@@ -232,6 +281,14 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       audioToggle.disabled = state === 'starting';
       audioToggle.textContent =
         state === 'running' ? '■ Stop' : state === 'starting' ? '…' : '▶ Start';
+    },
+    showEvent(e) {
+      const what =
+        e.kind === 'liquidation' ? `ликв. ${e.side.toUpperCase()}` : e.side.toUpperCase();
+      const times = e.count > 1 ? ` ×${e.count}` : '';
+      lastEvent.textContent = `${what} ${usdFmt.format(e.usd)}${times}`;
+      // A long liquidation and an aggressive sell both push price down.
+      lastEvent.className = e.side === 'long' || e.side === 'sell' ? 'down' : 'up';
     },
     setSymbols(list) {
       symbols = new Set(list);

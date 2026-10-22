@@ -26,8 +26,11 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`.
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
   first user gesture), `mixer.ts` (layers → reverb → compressor → limiter → master),
-  `base-layer.ts` (drone + arpeggio), `tension-layer.ts` (sub, percussion, riser). Pure, spec-covered:
-  `scale.ts`, `arp-pattern.ts`, `tension-map.ts` (tension/direction → every sound parameter).
+  `base-layer.ts` (drone + arpeggio), `tension-layer.ts` (sub, percussion, riser), `events-layer.ts`
+  (liquidation gongs, trade plucks). Pure, spec-covered: `scale.ts`, `arp-pattern.ts`,
+  `tension-map.ts` (tension/direction → every sound parameter), `events-map.ts` (cascade collapse,
+  size → velocity, voice placement). Event flow: `AudioEngine.onTrade/onLiquidation` buffer events
+  above threshold, `flushEvents(feed.now())` plays at most one voice per kind per tick.
   Keep anything testable out of Tone-importing files: Tone needs a browser AudioContext.
   Layers use their own node's context (`this.loop.context.transport`), not `Tone.getTransport()`,
   so they also render in `Tone.Offline`.
