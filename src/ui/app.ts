@@ -248,6 +248,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   };
 
   // ── tab title ──
+  const idleTitle = document.title;
   let titleAt = 0;
   const updateTitle = (s: MetricsSnapshot) => {
     if (s.ts - titleAt < TITLE_EVERY_MS || Number.isNaN(s.price)) return;
@@ -296,6 +297,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     },
     reset(h) {
       history = h;
+      // The old pair's price must not linger in the tab, and its clock must not gate the new one.
+      document.title = idleTitle;
+      titleAt = 0;
       last = null;
       decimals = -1;
       priceText = '';
