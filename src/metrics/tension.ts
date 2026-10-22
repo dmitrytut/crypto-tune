@@ -26,9 +26,10 @@ export const DEFAULT_TENSION_PARAMS: TensionParams = {
 
 /**
  * Tension thresholds shared by UI and audio: `mid` brings in the tension layer
- * (filter, tempo, sub, percussion), `high` adds riser, detune, double tempo.
+ * (filter, tempo, sub, percussion), `high` adds riser, detune, double tempo,
+ * and at `peak` those effects (and the aura's turbulence) reach full depth.
  */
-export const TENSION_LEVELS = { mid: 1, high: 2.5 } as const;
+export const TENSION_LEVELS = { mid: 1, high: 2.5, peak: 4 } as const;
 
 export interface TensionInput {
   /** log(price / price N seconds ago). */

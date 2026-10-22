@@ -21,8 +21,6 @@ const FALLING: readonly [Rgb, Rgb] = [
 const CALM_TINT = 0.35;
 /** Order-flow imbalance alone can carry the colour this far toward a side. */
 const FLOW_TINT = 0.75;
-/** Tension above `high` at which the aura is at full turbulence. */
-const PEAK_SPAN = 1.5;
 /** Fastest vertical drift of the field from one-sided flow, noise units per second. */
 const MAX_DRIFT = 0.18;
 
@@ -61,8 +59,9 @@ export function auraTarget(
   s: { tension: number; direction: number; volZ: number; emaZ: number },
   flow: FlowState = QUIET_FLOW,
 ): AuraTarget {
-  const intensity = clamp01(s.tension / TENSION_LEVELS.high);
-  const peak = clamp01((s.tension - TENSION_LEVELS.high) / PEAK_SPAN);
+  const { high, peak: full } = TENSION_LEVELS;
+  const intensity = clamp01(s.tension / high);
+  const peak = clamp01((s.tension - high) / (full - high));
   const lean = clampSigned(
     s.direction * (CALM_TINT + (1 - CALM_TINT) * intensity) + flow.imbalance * FLOW_TINT,
   );
@@ -87,7 +86,7 @@ export function tensionColor(tension: number): Rgb {
   const { mid, high } = TENSION_LEVELS;
   if (tension <= mid) return mix(blue, amber, clamp01(tension / mid) * 0.4);
   if (tension <= high) return mix(blue, amber, 0.4 + 0.6 * ((tension - mid) / (high - mid)));
-  return mix(amber, red, clamp01((tension - high) / PEAK_SPAN));
+  return mix(amber, red, clamp01((tension - high) / (TENSION_LEVELS.peak - high)));
 }
 
 /** CSS colour string for an Rgb with optional alpha. */

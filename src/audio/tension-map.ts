@@ -2,8 +2,6 @@ import { TICK_MS } from '../metrics/engine';
 import { TENSION_LEVELS } from '../metrics/tension';
 import type { Contour } from './arp-pattern';
 
-/** Tension above `high` at which the peak effects (riser, detune) are at full depth. */
-const PEAK_SPAN = 1.5;
 /** Double time engages at `high` and releases below `high − DOUBLE_TIME_HYSTERESIS`. */
 const DOUBLE_TIME_HYSTERESIS = 0.3;
 /** |direction| beyond which the arpeggio runs in the move's direction. */
@@ -34,7 +32,7 @@ const SHOCK_COOLDOWN_MS = 20_000;
 export interface TensionMix {
   /** 0 below TENSION_LEVELS.mid, 1 at TENSION_LEVELS.high. */
   intensity: number;
-  /** 0 up to TENSION_LEVELS.high, 1 at high + PEAK_SPAN. */
+  /** 0 up to TENSION_LEVELS.high, 1 at TENSION_LEVELS.peak. */
   peak: number;
   bpm: number;
   /** Arpeggio in eighths instead of quarters. */
@@ -61,9 +59,9 @@ const smoothstep = (x: number) => x * x * (3 - 2 * x);
 const easeOut = (x: number) => 1 - (1 - x) ** 2;
 
 export function tensionMix(tension: number, direction: number, wasDoubleTime: boolean): TensionMix {
-  const { mid, high } = TENSION_LEVELS;
+  const { mid, high, peak: full } = TENSION_LEVELS;
   const intensity = clamp01((tension - mid) / (high - mid));
-  const peak = clamp01((tension - high) / PEAK_SPAN);
+  const peak = clamp01((tension - high) / (full - high));
   const rising = Math.max(0, direction) * intensity;
   const falling = Math.max(0, -direction) * intensity;
 
