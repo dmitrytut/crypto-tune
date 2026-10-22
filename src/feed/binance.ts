@@ -71,6 +71,8 @@ const HISTORY_MS = 30 * 60_000;
 /** `aggTrades` weighs 20; 20 pages = 400 of the 2400/min per-IP budget. */
 const HISTORY_MAX_PAGES = 20;
 const HISTORY_PAGE_SIZE = 1000;
+/** Whole history load gives up after this and falls back to the live warm-up, ms. */
+const HISTORY_TIMEOUT_MS = 15_000;
 
 /**
  * Recent aggregate trades, oldest first, back to `sinceMs` or HISTORY_MAX_PAGES
@@ -130,6 +132,7 @@ export class BinanceFuturesFeed implements MarketFeed {
     this.socket.start();
   }
 
+  /** Final: a feed is single-use (`main.ts` builds a new one per pipeline), so the abort is not reset. */
   disconnect(): void {
     this.abort.abort();
     this.socket.stop();
@@ -174,9 +177,15 @@ export class BinanceFuturesFeed implements MarketFeed {
   }
 
   private async loadHistory(liveTs: number): Promise<void> {
+    // skipped: a reconnect during this load (a few seconds) is not replayed as a
+    // resync between history and held trades, so the move across that gap can
+    // count within window N once. Unlikely and self-healing within N; queue
+    // statuses with the held trades if it ever shows up.
     let rows: AggTradeRow[] = [];
+    // A stalled request must not hold live trades back forever: time out into the fallback.
+    const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(HISTORY_TIMEOUT_MS)]);
     try {
-      rows = await fetchAggTradesSince(this.symbol, liveTs - HISTORY_MS, this.abort.signal);
+      rows = await fetchAggTradesSince(this.symbol, liveTs - HISTORY_MS, signal);
     } catch (err) {
       if (this.abort.signal.aborted) return;
       console.warn('Trade history unavailable; metrics warm up live', err);

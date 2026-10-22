@@ -43,7 +43,11 @@ export class TensionLayer {
   private readonly riser = new Tone.Noise('pink');
   private readonly riserFilter = new Tone.Filter({ type: 'bandpass', frequency: 400, Q: 1.2 });
   private readonly riserLevel = new Tone.Gain(0);
-  private readonly shockFilter = new Tone.Filter({ type: 'bandpass', frequency: 300, Q: 1 });
+  private readonly shockFilter = new Tone.Filter({
+    type: 'bandpass',
+    frequency: SHOCK_LOW_HZ,
+    Q: 1,
+  });
   private readonly shockLevel = new Tone.Gain(0);
   private readonly subLoop: Tone.Loop;
   private readonly percLoop: Tone.Loop;

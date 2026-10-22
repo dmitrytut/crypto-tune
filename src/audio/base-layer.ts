@@ -168,12 +168,15 @@ export class BaseLayer {
     if (mix.doubleTime !== this.doubleTime) {
       this.doubleTime = mix.doubleTime;
       const interval = mix.doubleTime ? '8n' : '4n';
-      // Switch on the next beat so the pulse never stumbles. The loop's own
-      // context, not the global one, so the layer also works in offline renders.
+      // Switch on the next beat so the pulse never stumbles. nextSubdivision
+      // returns context time but scheduleOnce reads transport time, so convert
+      // through ticks. The loop's own context, not the global one, so the layer
+      // also works in offline renders.
       const transport = this.loop.context.transport;
+      const beat = Math.round(transport.getTicksAtTime(transport.nextSubdivision('4n')));
       transport.scheduleOnce(() => {
         this.loop.interval = interval;
-      }, transport.nextSubdivision('4n'));
+      }, `${beat}i`);
     }
   }
 
@@ -187,6 +190,9 @@ export class BaseLayer {
     this.active = this.active === 0 ? 1 : 0;
     const rootMidi = this.droneRootMidi();
     const v = this.voices[this.active];
+    // Drop a pending tonic glide: its end point would pull the voice back to the old chord.
+    v.root.frequency.cancelAndHoldAtTime(time);
+    v.fifth.frequency.cancelAndHoldAtTime(time);
     v.root.frequency.setValueAtTime(midiToHz(rootMidi), time);
     v.fifth.frequency.setValueAtTime(midiToHz(rootMidi + FIFTH), time);
     this.droneBlend.fade.rampTo(this.active, CHORD_FADE_SEC, time);

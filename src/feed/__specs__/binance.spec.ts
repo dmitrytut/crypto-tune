@@ -79,7 +79,7 @@ describe('BinanceFuturesFeed history', () => {
   }
 
   /** REST stub over ids [0, latest]: no fromId → newest page, fromId → page from there. */
-  function stubRest(latest: number): void {
+  function stubRest(latest: number) {
     const fetchMock = vi.fn(async (url: string) => {
       const from = new URL(url).searchParams.get('fromId');
       const lo = from === null ? Math.max(0, latest - 999) : Number(from);
@@ -88,6 +88,7 @@ describe('BinanceFuturesFeed history', () => {
       return { ok: true, status: 200, json: async () => rows };
     });
     vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
   }
 
   function connect() {
@@ -115,6 +116,19 @@ describe('BinanceFuturesFeed history', () => {
     expect(ids[0]).toBeLessThanOrEqual(5001 - 1800);
     expect(ids).toEqual(Array.from({ length: ids.length }, (_, i) => (ids[0] as number) + i));
     expect(ids.at(-1)).toBe(5004);
+    feed.disconnect();
+  });
+
+  it('stops at id 0 on a young symbol without repeating the clamped page overlap', async () => {
+    const rest = stubRest(1500);
+    const { feed, ids, ws } = connect();
+    ws.live(1501);
+    ws.live(1502);
+    await vi.waitFor(() => expect(ids.at(-1)).toBe(1502));
+
+    expect(ids).toEqual(Array.from({ length: 1503 }, (_, i) => i));
+    expect(rest).toHaveBeenCalledTimes(2);
+    expect(rest.mock.calls[1]?.[0]).toContain('fromId=0');
     feed.disconnect();
   });
 

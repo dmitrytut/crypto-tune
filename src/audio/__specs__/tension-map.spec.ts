@@ -126,4 +126,10 @@ describe('stepShock', () => {
     const later = run(jump, soon.state, 60_000);
     expect(later.fired).toEqual([2]);
   });
+
+  it('does not compare across a gap in updates, e.g. a switch to another pair', () => {
+    // Calm old pair, then the new pair's first snapshot is already tense (history prefill).
+    const calm = run([0.2, 0.2, 0.2]);
+    expect(run([4], calm.state, 60_000).fired).toEqual([]);
+  });
 });

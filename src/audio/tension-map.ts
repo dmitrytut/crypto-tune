@@ -1,3 +1,4 @@
+import { TICK_MS } from '../metrics/engine';
 import { TENSION_LEVELS } from '../metrics/tension';
 import type { Contour } from './arp-pattern';
 
@@ -98,26 +99,36 @@ export function tensionMix(tension: number, direction: number, wasDoubleTime: bo
 export interface ShockState {
   /** Tension over the last SHOCK_WINDOW_TICKS − 1 ticks, oldest first. */
   recent: readonly number[];
+  /** Feed time of the last update. */
+  lastTs: number;
   lastFireTs: number;
 }
 
-export const INITIAL_SHOCK: ShockState = { recent: [], lastFireTs: Number.NEGATIVE_INFINITY };
+export const INITIAL_SHOCK: ShockState = {
+  recent: [],
+  lastTs: Number.NEGATIVE_INFINITY,
+  lastFireTs: Number.NEGATIVE_INFINITY,
+};
 
 /**
  * Detects a sudden move: tension climbing by SHOCK_RISE within about a second.
  * Slow climbs never fire; a cooldown keeps a choppy market from turning the
- * accent into a pattern. `ts` is the feed clock.
+ * accent into a pattern. `ts` is the feed clock. After a gap in updates (a new
+ * pipeline, a throttled tab) the lookback restarts: the old values belong to
+ * another market or another moment.
  */
 export function stepShock(
   prev: ShockState,
   tension: number,
   ts: number,
 ): { state: ShockState; fired: boolean } {
-  const low = Math.min(tension, ...prev.recent);
+  const recent = ts - prev.lastTs <= SHOCK_WINDOW_TICKS * TICK_MS ? prev.recent : [];
+  const low = Math.min(tension, ...recent);
   const fired = tension - low >= SHOCK_RISE && ts - prev.lastFireTs >= SHOCK_COOLDOWN_MS;
   return {
     state: {
-      recent: [...prev.recent, tension].slice(1 - SHOCK_WINDOW_TICKS),
+      recent: [...recent, tension].slice(1 - SHOCK_WINDOW_TICKS),
+      lastTs: ts,
       lastFireTs: fired ? ts : prev.lastFireTs,
     },
     fired,

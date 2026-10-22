@@ -63,6 +63,8 @@ export class AudioEngine {
   private shock: ShockState = INITIAL_SHOCK;
   private pendingLiqs: PendingEvent<LiquidationSide>[] = [];
   private pendingTrades: PendingEvent<TradeSide>[] = [];
+  /** Context time at which the last stop's scheduled teardown (sources, transport) runs. */
+  private stopAt = 0;
 
   constructor(private params: AudioParams) {}
 
@@ -76,6 +78,10 @@ export class AudioEngine {
     await Tone.start();
     const g = this.graph ?? this.build();
     await g.mixer.ready;
+    // A restart before the last stop's teardown would be undone by it: Tone ignores
+    // transport.start while the pending stop still reads "started", then stops.
+    const pending = this.stopAt - Tone.now();
+    if (pending > 0) await new Promise((resolve) => setTimeout(resolve, pending * 1000));
     const transport = Tone.getTransport();
     transport.bpm.value = BASE_BPM;
     this.bpm = BASE_BPM;
@@ -92,6 +98,7 @@ export class AudioEngine {
     if (this.state !== 'running' || !g) return;
     g.mixer.fadeMaster(Number.NEGATIVE_INFINITY, FADE_OUT_SEC);
     const end = Tone.now() + FADE_OUT_SEC + 0.1;
+    this.stopAt = end;
     g.base.stop(end);
     g.tension.stop(end);
     Tone.getTransport().stop(end);
