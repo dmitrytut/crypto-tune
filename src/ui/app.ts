@@ -46,8 +46,6 @@ export interface AppView {
   setStatus(s: FeedStatus): void;
   setSymbols(symbols: string[]): void;
   setPlayback(state: PlaybackView): void;
-  /** Recent trades are being restored/fetched; metrics start warm once this ends. */
-  setHistoryLoading(loading: boolean): void;
   /** Last event that crossed its threshold (shown even while audio is stopped). */
   showEvent(e: EventReadout): void;
   /** Every trade, for the particle stream. */
@@ -313,10 +311,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     setStatus(s) {
       status.dataset.state = s.state;
       status.textContent = statusText(s);
-    },
-    setHistoryLoading(loading) {
-      // No snapshot renders before history arrives, so this line is not overwritten meanwhile.
-      if (loading) vol.textContent = 'loading history…';
+      // Connected but no snapshot yet: the feed is replaying history before live trades flow.
+      if (s.state === 'open' && !last) vol.textContent = 'loading history…';
     },
     setPlayback(state) {
       audioToggle.dataset.state = state;

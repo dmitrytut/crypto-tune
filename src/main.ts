@@ -2,6 +2,7 @@ import { AudioEngine, type AudioParams } from './audio/engine';
 import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
 import type { MarketFeed, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
+import { indexedDbTradeStore } from './feed/trade-cache';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
 import { MarketHistory } from './metrics/history';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
@@ -73,7 +74,9 @@ function startPipeline(): void {
   feed?.disconnect();
 
   const f: MarketFeed =
-    settings.source === 'simulator' ? new SimulatorFeed() : new BinanceFuturesFeed(settings.symbol);
+    settings.source === 'simulator'
+      ? new SimulatorFeed()
+      : new BinanceFuturesFeed(settings.symbol, indexedDbTradeStore(`binance:${settings.symbol}`));
   const e = new MetricsEngine({
     ...DEFAULT_METRICS_CONFIG,
     windowSec: settings.windowSec,

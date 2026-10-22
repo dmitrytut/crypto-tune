@@ -21,9 +21,10 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 
 - `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: the Binance adapter
   (`binance.ts`, which also loads 30 min of REST `aggTrades` on connect so metrics start warm) and
-  `simulator.ts`. `reconnecting-socket.ts` owns backoff and the silence/connect watchdog. History is
-  emitted before live events, trades always in `ts` order. Any history failure degrades to a plain
-  live start, never blocks the stream.
+  `simulator.ts`. `reconnecting-socket.ts` owns backoff and the silence/connect watchdog.
+  `trade-cache.ts` is the injected `TradeStore`: recent trades with ids per pair in IndexedDB, so a
+  reload fetches only the gap after the cache. History is emitted before live events, trades always
+  in `ts` order. Any history or storage failure degrades to a plain live start, never blocks the stream.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`.
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the

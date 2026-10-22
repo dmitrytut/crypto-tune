@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BinanceFuturesFeed, binanceStreamUrl, parseAggTrade, parseForceOrder } from '../binance';
 import type { Trade } from '../market-feed';
+import type { CachedTrade, TradeStore } from '../trade-cache';
 
 describe('parseAggTrade', () => {
   // Captured from wss://fstream.binance.com/market/stream (2026-10).
@@ -91,13 +92,23 @@ describe('BinanceFuturesFeed history', () => {
     return fetchMock;
   }
 
-  function connect() {
-    const feed = new BinanceFuturesFeed('BTCUSDT');
+  function connect(store?: TradeStore) {
+    const feed = new BinanceFuturesFeed('BTCUSDT', store);
     const ids: number[] = [];
     feed.onTrade((t) => ids.push(idOf(t)));
     feed.connect();
     return { feed, ids, ws: FakeWebSocket.last as FakeWebSocket };
   }
+
+  const cachedRow = (a: number): CachedTrade => ({
+    id: a,
+    ts: at(a),
+    price: 100,
+    qty: 1,
+    side: 'buy',
+  });
+  const contiguous = (ids: number[]) =>
+    expect(ids).toEqual(Array.from({ length: ids.length }, (_, i) => (ids[0] as number) + i));
 
   beforeEach(() => vi.stubGlobal('WebSocket', FakeWebSocket));
   afterEach(() => vi.unstubAllGlobals());
@@ -161,5 +172,56 @@ describe('BinanceFuturesFeed history', () => {
     await vi.waitFor(() => expect(ids.length).toBeGreaterThan(1));
     expect(busy).toHaveBeenCalledTimes(20);
     feed.disconnect();
+  });
+
+  it('restores the cache and fetches only the gap after it', async () => {
+    const rest = stubRest(5002);
+    const cache = Array.from({ length: 991 }, (_, i) => cachedRow(4000 + i));
+    const { feed, ids, ws } = connect({ load: async () => cache, save: async () => {} });
+    ws.live(5001);
+    ws.live(5002);
+    await vi.waitFor(() => expect(ids.at(-1)).toBe(5002));
+    expect(rest).toHaveBeenCalledTimes(1);
+    expect(ids[0]).toBe(4000);
+    contiguous(ids);
+    feed.disconnect();
+  });
+
+  it('drops a cache the fetch could not reach, rather than leave a hole', async () => {
+    stubRest(5000);
+    // Inside the 30-min window by time, but its id is far below where the walk back stops.
+    const stale = [{ ...cachedRow(10), ts: at(4500) }];
+    const { feed, ids, ws } = connect({ load: async () => stale, save: async () => {} });
+    ws.live(5001);
+    await vi.waitFor(() => expect(ids.at(-1)).toBe(5001));
+    contiguous(ids);
+    feed.disconnect();
+  });
+
+  it('does not let a cache that never answers hold the stream back', async () => {
+    stubRest(5000);
+    const { feed, ids, ws } = connect({ load: () => new Promise(() => {}), save: async () => {} });
+    ws.live(5001);
+    await vi.waitFor(() => expect(ids.at(-1)).toBe(5001), { timeout: 3_000 });
+    expect(ids[0]).toBeLessThanOrEqual(5001 - 1800);
+    feed.disconnect();
+  });
+
+  it('saves the trailing 30 min with ids on disconnect', async () => {
+    stubRest(5000);
+    let saved: readonly CachedTrade[] = [];
+    const { feed, ids, ws } = connect({
+      load: async () => [],
+      save: async (rows) => {
+        saved = rows;
+      },
+    });
+    ws.live(5001);
+    await vi.waitFor(() => expect(ids.at(-1)).toBe(5001));
+    ws.live(5002);
+    feed.disconnect();
+    await vi.waitFor(() => expect(saved.at(-1)?.id).toBe(5002));
+    expect((saved.at(-1)?.ts ?? 0) - (saved[0]?.ts ?? 0)).toBeLessThanOrEqual(30 * 60_000);
+    expect(saved.map((r) => r.id)).toEqual(saved.map((r) => idOf(r)));
   });
 });
