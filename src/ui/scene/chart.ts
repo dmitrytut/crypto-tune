@@ -1,5 +1,6 @@
 import { HISTORY_WINDOW_MS, type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
 import { css, DOWN_COLOR, sideColor, tensionColor, UP_COLOR } from '../palette';
+import { sizeDecades } from './spawn';
 
 const MAX_DPR = 2;
 /** Share of the height for the price line; the rest is the volume band. */
@@ -10,12 +11,15 @@ const PRICE_PAD = 0.12;
 const GRADIENT_EVERY = 6;
 /** Shortest span drawn: a fresh live session fills the width instead of hugging the right edge. */
 const MIN_SPAN_MS = 30_000;
+/** Marker radius at the smallest size; each decade of `sizeDecades` adds MARKER_GROWTH px. */
+const MARKER_BASE_R = 2;
+const MARKER_GROWTH = 4 / 3;
 
 /**
- * Bottom strip: up to the last 15 minutes of price with the area under the line
+ * Bottom strip: up to HISTORY_WINDOW_MS of price with the area under the line
  * tinted by tension at each moment, buy volume up / sell volume down per
- * 10 s below it, and event markers on the line. No axes — it is ambience,
- * the exact numbers live in the readout.
+ * VOLUME_BUCKET_MS below it, and event markers on the line. No axes — it is
+ * ambience, the exact numbers live in the readout.
  */
 export class Chart {
   private readonly ctx: CanvasRenderingContext2D;
@@ -24,6 +28,10 @@ export class Chart {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas unavailable');
     this.ctx = ctx;
+    canvas.setAttribute(
+      'aria-label',
+      `Price and volume, last ${HISTORY_WINDOW_MS / 60_000} minutes`,
+    );
   }
 
   draw(h: HistorySeries, now: number): void {
@@ -110,7 +118,7 @@ export class Chart {
       const price = h.priceAt(m.ts);
       if (Number.isNaN(price)) continue;
       const color = css(sideColor(m.side), 0.95);
-      const r = 2 + Math.min(4, Math.max(0, Math.log10(m.usd / 10_000)) * 1.5);
+      const r = MARKER_BASE_R + sizeDecades(m.usd) * MARKER_GROWTH;
       ctx.beginPath();
       ctx.arc(x(m.ts), y(price), r, 0, Math.PI * 2);
       if (m.kind === 'liquidation') {
