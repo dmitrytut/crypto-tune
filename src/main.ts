@@ -67,6 +67,8 @@ const view = mountApp(settings, {
 
 /** Visual events older than this (wall clock) are history replays, not news: no sparks. */
 const VISUAL_MAX_AGE_MS = 2_000;
+/** Feeds replay this much history on connect: exactly the window the tension statistics need. */
+const HISTORY_MS = DEFAULT_METRICS_CONFIG.statsWindowMin * 60_000;
 
 /** (Re)create feed, metrics and chart history from current settings; history is discarded. */
 function startPipeline(): void {
@@ -75,8 +77,11 @@ function startPipeline(): void {
 
   const f: MarketFeed =
     settings.source === 'simulator'
-      ? new SimulatorFeed()
-      : new BinanceFuturesFeed(settings.symbol, indexedDbTradeStore(`binance:${settings.symbol}`));
+      ? new SimulatorFeed({ historyMs: HISTORY_MS })
+      : new BinanceFuturesFeed(settings.symbol, {
+          historyMs: HISTORY_MS,
+          store: indexedDbTradeStore(`binance:${settings.symbol}`),
+        });
   const e = new MetricsEngine({
     ...DEFAULT_METRICS_CONFIG,
     windowSec: settings.windowSec,

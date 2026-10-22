@@ -67,8 +67,14 @@ export function binanceStreamUrl(symbol: string): string {
 
 /** Weight of each new clock-offset observation. */
 const CLOCK_ALPHA = 0.05;
-/** Trade history loaded on connect, so metrics start warm instead of after a 5-minute warm-up. */
-const HISTORY_MS = 30 * 60_000;
+
+export interface BinanceFeedOptions {
+  /** History replayed on connect so metrics start warm: the metrics stats window. */
+  historyMs: number;
+  /** Keeps recent trades across reloads so a restart only fetches what it missed. */
+  store?: TradeStore;
+}
+
 /** `aggTrades` weighs 20; 20 pages = 400 of the 2400/min per-IP budget. */
 const HISTORY_MAX_PAGES = 20;
 const HISTORY_PAGE_SIZE = 1000;
@@ -76,7 +82,7 @@ const HISTORY_PAGE_SIZE = 1000;
 const HISTORY_TIMEOUT_MS = 15_000;
 /** Longest wait for the trade cache; a stuck store must never hold the live stream back. */
 const CACHE_TIMEOUT_MS = 1_500;
-/** How often the trailing HISTORY_MS of trades is written to the store. */
+/** How often the trailing history window of trades is written to the store. */
 const SAVE_EVERY_MS = 30_000;
 
 /**
@@ -124,18 +130,19 @@ export class BinanceFuturesFeed implements MarketFeed {
   /** Newest id emitted from history; live trades up to it are duplicates. */
   private lastHistoryId = -1;
   private readonly abort = new AbortController();
-  /** The newest unbroken run of emitted trades (by id) within HISTORY_MS, for the store. */
+  /** The newest unbroken run of emitted trades (by id) within the history window, for the store. */
   private recent: CachedTrade[] = [];
   private saveTimer: number | undefined;
   private readonly saveWhenHidden = () => {
     if (document.visibilityState === 'hidden') void this.persist();
   };
 
-  /** `store` keeps recent trades across reloads so a restart only fetches what it missed. */
-  constructor(
-    symbol: string,
-    private readonly store: TradeStore = NO_STORE,
-  ) {
+  private readonly historyMs: number;
+  private readonly store: TradeStore;
+
+  constructor(symbol: string, opts: BinanceFeedOptions) {
+    this.historyMs = opts.historyMs;
+    this.store = opts.store ?? NO_STORE;
     this.symbol = symbol.toUpperCase();
     this.label = `Binance ${this.symbol}`;
     this.socket = new ReconnectingSocket(
@@ -214,7 +221,7 @@ export class BinanceFuturesFeed implements MarketFeed {
     // resync between history and held trades, so the move across that gap can
     // count within window N once. Unlikely and self-healing within N; queue
     // statuses with the held trades if it ever shows up.
-    const sinceMs = liveTs - HISTORY_MS;
+    const sinceMs = liveTs - this.historyMs;
     const cached = (await this.loadCache()).filter((t) => t.ts > sinceMs && t.ts < liveTs);
     const cachedLastId = cached.at(-1)?.id ?? -1;
     let rows: AggTradeRow[] = [];
@@ -255,7 +262,7 @@ export class BinanceFuturesFeed implements MarketFeed {
   private async persist(): Promise<void> {
     const last = this.recent.at(-1);
     if (!last) return;
-    const cutoff = last.ts - HISTORY_MS;
+    const cutoff = last.ts - this.historyMs;
     let drop = 0;
     while (drop < this.recent.length && (this.recent[drop] as CachedTrade).ts < cutoff) drop++;
     if (drop > 0) this.recent.splice(0, drop);

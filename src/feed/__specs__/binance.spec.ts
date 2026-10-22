@@ -93,7 +93,7 @@ describe('BinanceFuturesFeed history', () => {
   }
 
   function connect(store?: TradeStore) {
-    const feed = new BinanceFuturesFeed('BTCUSDT', store);
+    const feed = new BinanceFuturesFeed('BTCUSDT', { historyMs: 30 * 60_000, store });
     const ids: number[] = [];
     feed.onTrade((t) => ids.push(idOf(t)));
     feed.connect();

@@ -213,8 +213,8 @@ export class MarketSimulator {
 
 export interface SimulatorFeedOptions {
   params?: SimulatorParams;
-  /** Pre-generated history so metrics are warm immediately. */
-  historyMs?: number;
+  /** Pre-generated history so metrics are warm immediately: the metrics stats window. */
+  historyMs: number;
 }
 
 const STEP_MS = 100;
@@ -230,12 +230,12 @@ export class SimulatorFeed implements MarketFeed {
   /** Wall time up to which all events have been emitted; the feed clock. */
   private emittedUntil = 0;
 
-  constructor(private readonly opts: SimulatorFeedOptions = {}) {}
+  constructor(private readonly opts: SimulatorFeedOptions) {}
 
   connect(): void {
     if (this.sim) return;
     const now = Date.now();
-    this.sim = new MarketSimulator(now - (this.opts.historyMs ?? 30 * 60_000), this.opts.params);
+    this.sim = new MarketSimulator(now - this.opts.historyMs, this.opts.params);
     this.status.emit({ state: 'open' });
     this.pump();
     this.timer = setInterval(() => this.pump(), STEP_MS);
