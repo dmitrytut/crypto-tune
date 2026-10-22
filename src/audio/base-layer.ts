@@ -75,6 +75,8 @@ export class BaseLayer {
   private contour: Contour = 'calm';
   private nextContour: Contour = 'calm';
   private doubleTime = false;
+  /** Transport event of the pending quarter↔eighth switch, if one is queued. */
+  private pendingSwitch: number | undefined;
   private restProb = MAX_REST_PROB;
 
   constructor(output: Tone.InputNode, tonicPc: number) {
@@ -142,6 +144,10 @@ export class BaseLayer {
       v.fifth.stop(time);
     }
     this.droneSweep.stop(time);
+    // A queued switch would otherwise fire at its tick after the next start, which
+    // replays the timeline from 0; apply it now so the next start begins in step.
+    this.clearPendingSwitch();
+    this.loop.interval = this.doubleTime ? '8n' : '4n';
   }
 
   setTonic(pc: number): void {
@@ -174,10 +180,18 @@ export class BaseLayer {
       // also works in offline renders.
       const transport = this.loop.context.transport;
       const beat = Math.round(transport.getTicksAtTime(transport.nextSubdivision('4n')));
-      transport.scheduleOnce(() => {
+      this.clearPendingSwitch();
+      this.pendingSwitch = transport.scheduleOnce(() => {
+        this.pendingSwitch = undefined;
         this.loop.interval = interval;
       }, `${beat}i`);
     }
+  }
+
+  private clearPendingSwitch(): void {
+    if (this.pendingSwitch === undefined) return;
+    this.loop.context.transport.clear(this.pendingSwitch);
+    this.pendingSwitch = undefined;
   }
 
   private droneRootMidi(): number {
