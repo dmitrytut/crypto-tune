@@ -1,12 +1,13 @@
 import * as Tone from 'tone';
 import type { Liquidation, LiquidationSide, Trade, TradeSide } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
+import { AmbienceLayer } from './ambience-layer';
 import { BaseLayer } from './base-layer';
 import { EventsLayer } from './events-layer';
 import { collapse, type EventCue, eventVelocity, type PendingEvent } from './events-map';
 import { Mixer } from './mixer';
 import { TensionLayer } from './tension-layer';
-import { tensionMix } from './tension-map';
+import { INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from './tension-map';
 
 /** Calm tempo; the tension mix raises it toward 90 BPM. */
 const BASE_BPM = 60;
@@ -39,6 +40,7 @@ export interface EventCues {
 interface Graph {
   mixer: Mixer;
   base: BaseLayer;
+  ambience: AmbienceLayer;
   baseChannel: Tone.Volume;
   tension: TensionLayer;
   tensionChannel: Tone.Volume;
@@ -58,8 +60,11 @@ export class AudioEngine {
   private doubleTime = false;
   /** Last tempo written to the transport, whole BPM. */
   private bpm = BASE_BPM;
+  private shock: ShockState = INITIAL_SHOCK;
   private pendingLiqs: PendingEvent<LiquidationSide>[] = [];
   private pendingTrades: PendingEvent<TradeSide>[] = [];
+  /** Context time at which the last stop's scheduled teardown (sources, transport) runs. */
+  private stopAt = 0;
 
   constructor(private params: AudioParams) {}
 
@@ -73,6 +78,10 @@ export class AudioEngine {
     await Tone.start();
     const g = this.graph ?? this.build();
     await g.mixer.ready;
+    // A restart before the last stop's teardown would be undone by it: Tone ignores
+    // transport.start while the pending stop still reads "started", then stops.
+    const pending = this.stopAt - Tone.now();
+    if (pending > 0) await new Promise((resolve) => setTimeout(resolve, pending * 1000));
     const transport = Tone.getTransport();
     transport.bpm.value = BASE_BPM;
     this.bpm = BASE_BPM;
@@ -89,6 +98,7 @@ export class AudioEngine {
     if (this.state !== 'running' || !g) return;
     g.mixer.fadeMaster(Number.NEGATIVE_INFINITY, FADE_OUT_SEC);
     const end = Tone.now() + FADE_OUT_SEC + 0.1;
+    this.stopAt = end;
     g.base.stop(end);
     g.tension.stop(end);
     Tone.getTransport().stop(end);
@@ -102,6 +112,9 @@ export class AudioEngine {
     this.doubleTime = mix.doubleTime;
     g.base.setTrend(s.emaZ);
     g.base.applyMix(mix);
+    const shock = stepShock(this.shock, s.tension, s.ts);
+    this.shock = shock.state;
+    if (shock.fired && this.state === 'running') g.tension.shock(s.ret >= 0, Tone.now());
     g.tension.applyMix(mix);
     // Tempo moves in whole-BPM steps, written only on change. Re-issuing
     // bpm.rampTo every tick crashes Tone 15's transport clock after ~1 min of
@@ -159,6 +172,7 @@ export class AudioEngine {
     if (!g) return;
     if (next.tonicPc !== prev.tonicPc) {
       g.base.setTonic(next.tonicPc);
+      g.ambience.setTonic(next.tonicPc);
       g.tension.setTonic(next.tonicPc);
       g.events.setTonic(next.tonicPc);
     }
@@ -184,6 +198,7 @@ export class AudioEngine {
       tensionChannel,
       eventsChannel,
       base: new BaseLayer(baseChannel, this.params.tonicPc),
+      ambience: new AmbienceLayer(baseChannel, this.params.tonicPc),
       tension: new TensionLayer(tensionChannel, this.params.tonicPc),
       events: new EventsLayer(eventsChannel, this.params.tonicPc),
     };

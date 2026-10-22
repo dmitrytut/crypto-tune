@@ -28,7 +28,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   source: 'live',
   symbol: 'BTCUSDT',
-  windowSec: 10,
+  windowSec: 5,
   sensitivity: 1,
   tonic: 'A',
   baseVolumeDb: -6,
