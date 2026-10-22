@@ -31,3 +31,23 @@ export function clock(seconds: number): string {
   const s = Math.max(0, Math.ceil(seconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/**
+ * Compact USD, e.g. $766.3K.
+ * @package
+ */
+export const usdFmt = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
+/**
+ * Compact plain number, e.g. 12.4K (base-asset volume).
+ * @package
+ */
+export const volFmt = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});

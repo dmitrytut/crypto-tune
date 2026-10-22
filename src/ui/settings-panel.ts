@@ -1,5 +1,6 @@
 import { LIMITS, type Settings, type SourceKind, TONICS } from '../settings';
-import { el, usdFmt } from './dom';
+import { el } from './dom';
+import { usdFmt } from './format';
 
 /** Threshold slider resolution in decades; values snap to two significant digits. */
 const LOG_STEP = 0.05;

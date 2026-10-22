@@ -87,6 +87,12 @@ export function auraTarget(
 }
 
 /**
+ * The aura of a flat, quiet market: before the first snapshot and after a pair switch.
+ * @package
+ */
+export const CALM_AURA: AuraTarget = auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 });
+
+/**
  * Meter/chart colour for a tension value: blue calm → amber mid → red high.
  * @package
  */

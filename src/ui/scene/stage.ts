@@ -1,5 +1,5 @@
 import { el } from '../dom';
-import { auraTarget } from '../palette';
+import { CALM_AURA } from '../palette';
 import { Aura } from './aura';
 import { Chart } from './chart';
 import { Fx } from './fx';
@@ -29,7 +29,7 @@ export interface Stage {
  */
 export function mountStage(o: StageOptions): Stage {
   const { reducedMotion } = o;
-  const aura = Aura.create(el('aura'), auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 }));
+  const aura = Aura.create(el('aura'), CALM_AURA);
   const stage = el('stage');
   const fx = new Fx(el('fx'), {
     bloom: (x, y, color, strength) => aura?.bloom(x, y, color, strength),

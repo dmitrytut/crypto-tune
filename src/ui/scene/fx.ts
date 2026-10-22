@@ -1,5 +1,5 @@
 import type { LiquidationSide, TradeSide } from '../../feed/market-feed';
-import { usdFmt } from '../dom';
+import { usdFmt } from '../format';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
 import { bubbleStart, planSpawns, sizeDecades } from './spawn';

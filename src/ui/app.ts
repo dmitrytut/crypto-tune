@@ -10,10 +10,10 @@ import type { EventCue } from '../metrics/events';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
-import { el, usdFmt } from './dom';
+import { el } from './dom';
 import { FlowMeter } from './flow';
-import { clock } from './format';
-import { auraTarget, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
+import { clock, usdFmt, volFmt } from './format';
+import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
 import { PriceReadout } from './price-readout';
 import { mountStage } from './scene/stage';
 import { mountSettingsPanel } from './settings-panel';
@@ -56,8 +56,6 @@ export interface AppView {
   /** Every liquidation, for the shock waves; replayed history is ignored. */
   liquidation(l: Liquidation): void;
 }
-
-const volFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
 
 function statusText(s: FeedStatus): string {
   switch (s.state) {
@@ -240,7 +238,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       fill.style.backgroundColor = '';
       fx.clear();
       chart.draw(h, Date.now());
-      aura?.setTarget(auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 }));
+      aura?.setTarget(CALM_AURA);
     },
     setStatus(s) {
       status.dataset.state = s.state;
