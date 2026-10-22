@@ -32,7 +32,6 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 ## Code organization
 
 Enforced by Biome (`biome.json`): violations fail `pnpm check`.
-
 - **Dependency direction** (`noRestrictedImports` overrides per folder; specs exempt):
 
   ```
