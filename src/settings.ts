@@ -17,6 +17,12 @@ export interface Settings {
   baseVolumeDb: number;
   /** Tension layer (sub, percussion, riser) level, dB. */
   tensionVolumeDb: number;
+  /** Event voices (liquidation gongs, trade accents) level, dB. */
+  eventsVolumeDb: number;
+  /** Liquidations at or above this quote notional sound, USD. */
+  liqThresholdUsd: number;
+  /** Aggressive trades at or above this quote notional sound, USD. */
+  tradeThresholdUsd: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,12 +33,18 @@ export const DEFAULT_SETTINGS: Settings = {
   tonic: 'A',
   baseVolumeDb: -6,
   tensionVolumeDb: -6,
+  eventsVolumeDb: -6,
+  liqThresholdUsd: 20_000,
+  tradeThresholdUsd: 200_000,
 };
 
 export const LIMITS = {
   windowSec: { min: 2, max: 60, step: 1 },
   sensitivity: { min: 0.25, max: 3, step: 0.05 },
   layerVolumeDb: { min: -40, max: 0, step: 1 },
+  /** Notional thresholds span orders of magnitude; the UI slides them on a log scale. */
+  liqThresholdUsd: { min: 1_000, max: 1_000_000 },
+  tradeThresholdUsd: { min: 10_000, max: 10_000_000 },
 } as const;
 
 const KEY = 'crypto-tune.settings.v1';
@@ -63,6 +75,18 @@ export function parseSettings(raw: unknown): Settings {
     tensionVolumeDb: clamp(
       num(o.tensionVolumeDb, DEFAULT_SETTINGS.tensionVolumeDb),
       LIMITS.layerVolumeDb,
+    ),
+    eventsVolumeDb: clamp(
+      num(o.eventsVolumeDb, DEFAULT_SETTINGS.eventsVolumeDb),
+      LIMITS.layerVolumeDb,
+    ),
+    liqThresholdUsd: clamp(
+      num(o.liqThresholdUsd, DEFAULT_SETTINGS.liqThresholdUsd),
+      LIMITS.liqThresholdUsd,
+    ),
+    tradeThresholdUsd: clamp(
+      num(o.tradeThresholdUsd, DEFAULT_SETTINGS.tradeThresholdUsd),
+      LIMITS.tradeThresholdUsd,
     ),
   };
 }

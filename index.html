@@ -32,6 +32,7 @@
           <dt>vol/s</dt><dd id="vol">—</dd>
           <dt>warm-up</dt><dd id="warmup">—</dd>
           <dt>vs EMA 1h</dt><dd id="emaz">—</dd>
+          <dt>событие</dt><dd id="last-event">—</dd>
         </dl>
       </section>
 
@@ -72,6 +73,21 @@
         <label class="field">
           <span>Громкость напряжения: <output id="tension-vol-out"></output> dB</span>
           <input id="tension-volume" type="range" />
+        </label>
+
+        <label class="field">
+          <span>Громкость событий: <output id="events-vol-out"></output> dB</span>
+          <input id="events-volume" type="range" />
+        </label>
+
+        <label class="field">
+          <span>Порог ликвидации: <output id="liq-threshold-out"></output></span>
+          <input id="liq-threshold" type="range" />
+        </label>
+
+        <label class="field">
+          <span>Порог крупной сделки: <output id="trade-threshold-out"></output></span>
+          <input id="trade-threshold" type="range" />
         </label>
       </section>
     </main>

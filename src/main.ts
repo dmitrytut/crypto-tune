@@ -22,6 +22,9 @@ const audioParams = (s: Settings): AudioParams => ({
   tonicPc: TONICS.indexOf(s.tonic),
   baseVolumeDb: s.baseVolumeDb,
   tensionVolumeDb: s.tensionVolumeDb,
+  eventsVolumeDb: s.eventsVolumeDb,
+  liqThresholdUsd: s.liqThresholdUsd,
+  tradeThresholdUsd: s.tradeThresholdUsd,
 });
 
 const audio = new AudioEngine(audioParams(settings));
@@ -72,7 +75,11 @@ function startPipeline(): void {
     tension: tensionParams(settings),
   });
   unsubs = [
-    f.onTrade((t) => e.addTrade(t)),
+    f.onTrade((t) => {
+      e.addTrade(t);
+      audio.onTrade(t);
+    }),
+    f.onLiquidation((l) => audio.onLiquidation(l)),
     f.onStatus((s) => {
       view.setStatus(s);
       // A data gap is not a calm market: drop tick-level state so the move
@@ -89,10 +96,17 @@ function startPipeline(): void {
 
 window.setInterval(() => {
   if (!feed || !engine) return;
-  const snap = engine.advanceTo(feed.now());
-  if (!snap) return;
-  view.render(snap);
-  audio.update(snap);
+  const now = feed.now();
+  const snap = engine.advanceTo(now);
+  if (snap) {
+    view.render(snap);
+    audio.update(snap);
+  }
+  // Events flush every tick, with or without new trades (a liquidation can arrive alone).
+  const { liquidation, trade } = audio.flushEvents(now);
+  if (trade) view.showEvent({ kind: 'trade', ...trade });
+  // Liquidation last: it is rarer and more important, so it wins the readout.
+  if (liquidation) view.showEvent({ kind: 'liquidation', ...liquidation });
 }, TICK_MS);
 
 async function loadSymbols(): Promise<void> {
