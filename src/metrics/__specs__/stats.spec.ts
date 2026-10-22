@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asymSmooth, zScore } from '../stats';
+import { asymSmooth, type Ewm, ewmAlpha, ewmStep, zScore } from '../stats';
 
 describe('zScore', () => {
   it('standardizes against mean and std', () => {
@@ -38,5 +38,26 @@ describe('asymSmooth', () => {
 
   it('holds steady at the target', () => {
     expect(asymSmooth(3, 3, 0.4, 0.03)).toBe(3);
+  });
+});
+
+describe('ewmStep', () => {
+  it('seeds with the first sample and zero variance', () => {
+    expect(ewmStep(null, 5, 0.1)).toEqual({ mean: 5, variance: 0 });
+  });
+
+  it('reaches 1 − 1/e of a level step after one time constant', () => {
+    const alpha = ewmAlpha(250, 60_000);
+    let s: Ewm = ewmStep(null, 0, alpha);
+    for (let i = 0; i < 60_000 / 250; i++) s = ewmStep(s, 1, alpha);
+    expect(s.mean).toBeCloseTo(1 - Math.exp(-1), 9);
+  });
+
+  it('estimates the variance of a stationary series', () => {
+    // Alternating ±1: mean 0, variance 1.
+    let s: Ewm | null = null;
+    for (let i = 0; i < 5_000; i++) s = ewmStep(s, i % 2 ? 1 : -1, 0.01);
+    expect(s?.mean ?? Number.NaN).toBeCloseTo(0, 1);
+    expect(s?.variance ?? Number.NaN).toBeCloseTo(1, 1);
   });
 });
