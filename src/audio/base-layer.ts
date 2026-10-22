@@ -1,14 +1,13 @@
 import * as Tone from 'tone';
 import { arpDegree, type Contour, entryStep, stickyShift } from './arp-pattern';
-import { degreeToMidi, midiToHz, pitchClassMidi } from './scale';
-import type { TensionMix } from './tension-map';
+import { degreeToMidi, midiToHz, pitchClassMidi, TONIC_GLIDE_SEC } from './scale';
+import { MIX_RAMP_SEC, type TensionMix } from './tension-map';
 
 /** Drone sits in octave 2 (A2 = 110 Hz), arpeggio starts an octave higher. */
 const DRONE_OCTAVE = 2;
 const ARP_OCTAVE = 3;
 /** Perfect fifth above the drone root. */
 const FIFTH = 7;
-const TONIC_GLIDE_SEC = 3;
 const DRONE_FADE_SEC = 4;
 const DRONE_LEVEL_DB = -9;
 /**
@@ -23,8 +22,6 @@ const CHORD_BARS = 16;
 const CHORD_FADE_SEC = 6;
 /** Chance a weak-beat note rests in a calm market; tension fills the line back in. */
 const MAX_REST_PROB = 0.25;
-/** Glide for every tension-driven parameter; mixes arrive every 250 ms. */
-const MIX_RAMP_SEC = 0.5;
 const VIBRATO_HZ = 5;
 
 interface DroneVoice {

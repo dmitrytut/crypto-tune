@@ -32,6 +32,12 @@ const SHOCK_WINDOW_TICKS = 5;
 /** Minimum feed-clock gap between two shocks, ms. */
 const SHOCK_COOLDOWN_MS = 20_000;
 
+/**
+ * Glide for every tension-driven parameter; mixes arrive every 250 ms.
+ * @package
+ */
+export const MIX_RAMP_SEC = 0.5;
+
 /** Everything the layers need for one tick, derived from tension and direction only. */
 export interface TensionMix {
   /** 0 below TENSION_LEVELS.mid, 1 at TENSION_LEVELS.high. */

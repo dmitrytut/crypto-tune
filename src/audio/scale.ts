@@ -22,3 +22,9 @@ export function pitchClassMidi(pc: number, octave: number): number {
 export function midiToHz(midi: number): number {
   return 440 * 2 ** ((midi - 69) / SEMITONES_PER_OCTAVE);
 }
+
+/**
+ * Glide of sustained voices to a new tonic, so a settings change never jumps.
+ * @package
+ */
+export const TONIC_GLIDE_SEC = 3;

@@ -72,7 +72,7 @@ export const LIQUIDATION_VOICES: Record<LiquidationSide, VoicePlacement> = {
   short: { octave: 3, degree: 3, pan: 0 },
 };
 
-/** Aggressive buys pluck above the arpeggio on the right, sells below it on the left. */
+/** Aggressive buys pluck high on the right, sells lower on the left; both sit above the arpeggio. */
 export const TRADE_VOICES: Record<TradeSide, VoicePlacement> = {
   buy: { octave: 4, degree: 2, pan: 0.35 },
   sell: { octave: 4, degree: -2, pan: -0.35 },
