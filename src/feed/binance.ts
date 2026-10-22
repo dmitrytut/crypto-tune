@@ -213,19 +213,21 @@ export class BinanceFuturesFeed implements MarketFeed {
     const cached = (await this.loadCache()).filter((t) => t.ts > sinceMs && t.ts < liveTs);
     const cachedLastId = cached.at(-1)?.id ?? -1;
     let rows: AggTradeRow[] = [];
+    let fetched = false;
     // A stalled request must not hold live trades back forever: time out into the fallback.
     const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(HISTORY_TIMEOUT_MS)]);
     try {
       rows = await fetchAggTradesSince(this.symbol, sinceMs, cachedLastId, signal);
+      fetched = true;
     } catch (err) {
       if (this.abort.signal.aborted) return;
       console.warn('Trade history unavailable; metrics warm up live', err);
     }
     if (this.abort.signal.aborted) return;
-    // The cache is used only if the fetch reached back to it; a hole between
-    // them would read as a flat market and then a jump.
+    // The cache is used only if a fetch reached back to it: a failed fetch, or one
+    // that stopped short, would leave a hole that reads as a flat market and then a jump.
     const first = rows[0];
-    const contiguous = !first || first.a === cachedLastId + 1;
+    const contiguous = fetched && (!first || first.a === cachedLastId + 1);
     if (contiguous) {
       for (const t of cached) {
         this.recent.push(t);

@@ -198,6 +198,20 @@ describe('BinanceFuturesFeed history', () => {
     feed.disconnect();
   });
 
+  it('ignores the cache when history cannot be fetched: live only, no hole', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 429, json: async () => [] })),
+    );
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const old = Array.from({ length: 10 }, (_, i) => cachedRow(3500 + i));
+    const { feed, ids, ws } = connect({ load: async () => old, save: async () => {} });
+    ws.live(5001);
+    ws.live(5002);
+    await vi.waitFor(() => expect(ids).toEqual([5001, 5002]));
+    feed.disconnect();
+  });
+
   it('does not let a cache that never answers hold the stream back', async () => {
     stubRest(5000);
     const { feed, ids, ws } = connect({ load: () => new Promise(() => {}), save: async () => {} });
