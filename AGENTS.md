@@ -19,9 +19,9 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 
 ## Layout
 
-- `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: exchange adapters
-  (`binance.ts`), `simulator.ts`, later `replay.ts`, `mexc.ts`. `reconnecting-socket.ts` owns
-  backoff and the silence/connect watchdog.
+- `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: the Binance adapter
+  (`binance.ts`) and `simulator.ts`. `reconnecting-socket.ts` owns backoff and the silence/connect
+  watchdog.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`.
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
@@ -62,7 +62,7 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
 - **Types live with their owner.** Declare a type in the file that produces or accepts it
   (params, results, options, state); consumers import it from there.
 - **A shared contract file only for a real seam**: an interface with two or more implementations
-  plus the data they exchange (`feed/market-feed.ts`: Binance, simulator, replay, MEXC). Name it by
+  plus the data they exchange (`feed/market-feed.ts`: Binance, simulator). Name it by
   purpose, not by kind. No `types.ts`, no `src/types/`, no "types" folder inside a module.
 - **Internal types stay unexported**: wire formats (`AggTradeMsg`), internal state (`Regime`).
   Exchange DTOs never leave their adapter; the rest of the app sees only `Trade`/`Liquidation`.
