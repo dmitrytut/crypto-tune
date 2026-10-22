@@ -1,11 +1,27 @@
-import type { FeedStatus, LiquidationSide, TradeSide } from '../feed/market-feed';
+import type {
+  FeedStatus,
+  Liquidation,
+  LiquidationSide,
+  Trade,
+  TradeSide,
+} from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
+import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
-import { LIMITS, type Settings, type SourceKind, SYMBOL_PATTERN, TONICS } from '../settings';
+import { type Settings, SYMBOL_PATTERN } from '../settings';
+import { el, usdFmt } from './dom';
+import { auraTarget } from './palette';
+import { Aura } from './scene/aura';
+import { Chart } from './scene/chart';
+import { Fx } from './scene/fx';
+import { mountSettingsPanel } from './settings-panel';
 import './styles.css';
 
 /** Tension value at the right edge of the meter. */
 const METER_MAX = 5;
+/** Chrome fades after this long without pointer or keyboard input. */
+const IDLE_MS = 10_000;
+const TITLE_EVERY_MS = 1_000;
 
 export interface AppHandlers {
   /** Called with the full updated settings after any control change. */
@@ -17,39 +33,27 @@ export interface AppHandlers {
 /** What the Start/Stop button shows. */
 export type PlaybackView = 'stopped' | 'starting' | 'running';
 
-export interface AppView {
-  render(s: MetricsSnapshot): void;
-  /** Clear readouts when the pipeline restarts so stale numbers never show under a new label. */
-  reset(): void;
-  setStatus(s: FeedStatus): void;
-  setFeedLabel(label: string): void;
-  setSymbols(symbols: string[]): void;
-  setPlayback(state: PlaybackView): void;
-  /** Last event that crossed its threshold (shown even while audio is stopped). */
-  showEvent(e: EventReadout): void;
-}
-
 export type EventReadout =
   | { kind: 'liquidation'; side: LiquidationSide; usd: number; count: number }
   | { kind: 'trade'; side: TradeSide; usd: number; count: number };
 
-function el<T extends HTMLElement>(id: string): T {
-  const node = document.getElementById(id);
-  if (!node) throw new Error(`#${id} missing in index.html`);
-  return node as T;
+export interface AppView {
+  render(s: MetricsSnapshot): void;
+  /** Clear readouts and visuals when the pipeline restarts. */
+  reset(history: HistorySeries): void;
+  setStatus(s: FeedStatus): void;
+  setSymbols(symbols: string[]): void;
+  setPlayback(state: PlaybackView): void;
+  /** Last event that crossed its threshold (shown even while audio is stopped). */
+  showEvent(e: EventReadout): void;
+  /** Every trade, for the particle stream. */
+  trade(t: Trade): void;
+  /** Every liquidation, for the shock waves. */
+  liquidation(l: Liquidation): void;
 }
 
 const priceFmt = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 7 });
 const volFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
-const usdFmt = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  notation: 'compact',
-  maximumFractionDigits: 1,
-});
-/** Threshold slider resolution in decades; values snap to two significant digits. */
-const LOG_STEP = 0.05;
-const snapUsd = (log10: number) => Number((10 ** log10).toPrecision(2));
 
 function statusText(s: FeedStatus): string {
   switch (s.state) {
@@ -66,8 +70,7 @@ function statusText(s: FeedStatus): string {
 
 /** Threshold marks on the track and value labels under it, positioned from TENSION_LEVELS. */
 function buildMeterScale(track: HTMLElement, scale: HTMLElement): void {
-  const stops = [0, TENSION_LEVELS.mid, TENSION_LEVELS.high, METER_MAX];
-  for (const v of stops) {
+  for (const v of [0, TENSION_LEVELS.mid, TENSION_LEVELS.high, METER_MAX]) {
     const pct = (v / METER_MAX) * 100;
     if (v > 0 && v < METER_MAX) {
       const mark = document.createElement('span');
@@ -84,68 +87,47 @@ function buildMeterScale(track: HTMLElement, scale: HTMLElement): void {
   }
 }
 
+const arrowOf = (d: number) => (d > 0.2 ? '▲' : d < -0.2 ? '▼' : '•');
+
 export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let settings = initial;
   let symbols = new Set<string>();
   const update = (patch: Partial<Settings>) => {
     settings = { ...settings, ...patch };
+    if ('source' in patch) syncSymbolChip();
     handlers.onSettings(settings);
   };
+  mountSettingsPanel(initial, update);
 
   const status = el('status');
-  const label = el('feed-label');
   const price = el('price');
+  const change = el('change');
   const fill = el('tension-fill');
   buildMeterScale(el('tension-track'), el('tension-scale'));
-  const tension = el('tension');
-  const direction = el('direction');
-  const z = el('z');
-  const volz = el('volz');
   const vol = el('vol');
-  const warmup = el('warmup');
+  const lastEvent = el('last-event');
+  const audioToggle = el<HTMLButtonElement>('audio-toggle');
   const symbol = el<HTMLInputElement>('symbol');
   const symbolList = el<HTMLDataListElement>('symbols');
   const symbolError = el('symbol-error');
-  const windowIn = el<HTMLInputElement>('window');
-  const windowOut = el<HTMLOutputElement>('window-out');
-  const sens = el<HTMLInputElement>('sensitivity');
-  const sensOut = el<HTMLOutputElement>('sens-out');
-  const emaz = el('emaz');
-  const audioToggle = el<HTMLButtonElement>('audio-toggle');
-  const tonic = el<HTMLSelectElement>('tonic');
-  const baseVol = el<HTMLInputElement>('base-volume');
-  const baseVolOut = el<HTMLOutputElement>('base-vol-out');
-  const tensionVol = el<HTMLInputElement>('tension-volume');
-  const tensionVolOut = el<HTMLOutputElement>('tension-vol-out');
-  const eventsVol = el<HTMLInputElement>('events-volume');
-  const eventsVolOut = el<HTMLOutputElement>('events-vol-out');
-  const lastEvent = el('last-event');
+  const debug = {
+    tension: el('tension'),
+    direction: el('direction'),
+    z: el('z'),
+    volz: el('volz'),
+    emaz: el('emaz'),
+    warmup: el('warmup'),
+  };
 
   audioToggle.addEventListener('click', () => handlers.onToggleAudio());
 
-  tonic.replaceChildren(
-    ...TONICS.map((t) => {
-      const opt = document.createElement('option');
-      opt.value = opt.textContent = t;
-      return opt;
-    }),
-  );
-  tonic.value = settings.tonic;
-  tonic.addEventListener('change', () => {
-    update({ tonic: TONICS.find((t) => t === tonic.value) ?? settings.tonic });
-  });
-
-  for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="source"]')) {
-    radio.checked = radio.value === settings.source;
-    radio.addEventListener('change', () => {
-      if (!radio.checked) return;
-      symbol.disabled = radio.value !== 'live';
-      update({ source: radio.value as SourceKind });
-    });
-  }
-
-  symbol.value = settings.symbol;
-  symbol.disabled = settings.source !== 'live';
+  const syncSymbolChip = () => {
+    const live = settings.source === 'live';
+    symbol.disabled = !live;
+    symbol.value = live ? settings.symbol : 'SIMULATOR';
+    symbolError.hidden = true;
+  };
+  syncSymbolChip();
   symbol.addEventListener('change', () => {
     const next = symbol.value.trim().toUpperCase();
     // Without a loaded list (REST unreachable) accept any well-formed symbol.
@@ -154,141 +136,144 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     symbolError.textContent = valid ? '' : `${next || '∅'}: нет такой пары на Binance Futures`;
     if (!valid) return;
     symbol.value = next;
+    symbol.blur();
     if (next !== settings.symbol) update({ symbol: next });
   });
 
-  const bindRange = (
-    input: HTMLInputElement,
-    out: HTMLOutputElement,
-    limits: { min: number; max: number; step: number },
-    value: number,
-    format: (v: number) => string,
-    apply: (v: number) => void,
-    commitOn: 'input' | 'change',
-  ) => {
-    input.min = String(limits.min);
-    input.max = String(limits.max);
-    input.step = String(limits.step);
-    input.value = String(value);
-    out.value = format(value);
-    input.addEventListener('input', () => {
-      out.value = format(Number(input.value));
-    });
-    input.addEventListener(commitOn, () => apply(Number(input.value)));
+  // ── scene ──
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const aura = Aura.create(el('aura'), auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 }));
+  const fx = new Fx(el('fx'));
+  const chart = new Chart(el('chart'));
+  let history: HistorySeries | null = null;
+  let last: MetricsSnapshot | null = null;
+  let chartDirty = false;
+
+  const placeOrigin = () => {
+    const r = price.getBoundingClientRect();
+    fx.setOrigin(r.left + r.width / 2, r.top + r.height / 2);
   };
-  // Window change resets metrics, so commit only on release.
-  bindRange(
-    windowIn,
-    windowOut,
-    LIMITS.windowSec,
-    settings.windowSec,
-    String,
-    (v) => update({ windowSec: v }),
-    'change',
-  );
-  bindRange(
-    sens,
-    sensOut,
-    LIMITS.sensitivity,
-    settings.sensitivity,
-    (v) => v.toFixed(2),
-    (v) => update({ sensitivity: v }),
-    'input',
-  );
-  bindRange(
-    baseVol,
-    baseVolOut,
-    LIMITS.layerVolumeDb,
-    settings.baseVolumeDb,
-    String,
-    (v) => update({ baseVolumeDb: v }),
-    'input',
-  );
-  bindRange(
-    tensionVol,
-    tensionVolOut,
-    LIMITS.layerVolumeDb,
-    settings.tensionVolumeDb,
-    String,
-    (v) => update({ tensionVolumeDb: v }),
-    'input',
-  );
-  bindRange(
-    eventsVol,
-    eventsVolOut,
-    LIMITS.layerVolumeDb,
-    settings.eventsVolumeDb,
-    String,
-    (v) => update({ eventsVolumeDb: v }),
-    'input',
-  );
-  // Notional thresholds: the slider moves log10(USD) so each decade gets equal travel.
-  const bindUsdRange = (
-    id: string,
-    limits: { min: number; max: number },
-    value: number,
-    apply: (usd: number) => void,
-  ) =>
-    bindRange(
-      el<HTMLInputElement>(id),
-      el<HTMLOutputElement>(`${id}-out`),
-      { min: Math.log10(limits.min), max: Math.log10(limits.max), step: LOG_STEP },
-      Math.log10(value),
-      (v) => usdFmt.format(snapUsd(v)),
-      (v) => apply(snapUsd(v)),
-      'change',
-    );
-  bindUsdRange('liq-threshold', LIMITS.liqThresholdUsd, settings.liqThresholdUsd, (usd) =>
-    update({ liqThresholdUsd: usd }),
-  );
-  bindUsdRange('trade-threshold', LIMITS.tradeThresholdUsd, settings.tradeThresholdUsd, (usd) =>
-    update({ tradeThresholdUsd: usd }),
-  );
+  new ResizeObserver(placeOrigin).observe(price);
+  window.addEventListener('resize', placeOrigin);
+  document.addEventListener('visibilitychange', () => {
+    // Events received while hidden were not queued; nothing stale to burst on return.
+    if (!document.hidden) fx.clear();
+  });
+
+  let prevFrame = performance.now();
+  const frame = (t: number) => {
+    const dt = (t - prevFrame) / 1000;
+    prevFrame = t;
+    // Reduced motion: the aura barely drifts and no particles fly.
+    aura?.frame(reducedMotion.matches ? dt * 0.1 : dt);
+    if (!reducedMotion.matches) fx.frame(dt, settings.tradeThresholdUsd);
+    if (chartDirty && history && last) {
+      chart.draw(history, last.ts);
+      chartDirty = false;
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  // ── immersive mode ──
+  let idleTimer = 0;
+  const wake = () => {
+    document.body.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(() => {
+      if (!el<HTMLDialogElement>('settings').open) document.body.classList.add('idle');
+    }, IDLE_MS);
+  };
+  for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const) {
+    window.addEventListener(ev, wake, { passive: true });
+  }
+  wake();
+
+  // ── tab title ──
+  let titleAt = 0;
+  const updateTitle = (s: MetricsSnapshot) => {
+    if (s.ts - titleAt < TITLE_EVERY_MS || Number.isNaN(s.price)) return;
+    titleAt = s.ts;
+    const name = settings.source === 'live' ? settings.symbol : 'SIM';
+    const hot = s.tension >= TENSION_LEVELS.mid ? ` · ⚡${s.tension.toFixed(1)}` : '';
+    document.title = `${arrowOf(s.direction)} ${priceFmt.format(s.price)} · ${name}${hot}`;
+  };
 
   return {
     render(s) {
+      last = s;
+      chartDirty = true;
       price.textContent = Number.isNaN(s.price) ? '—' : priceFmt.format(s.price);
-      fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
-      fill.dataset.level =
-        s.tension >= TENSION_LEVELS.high ? 'high' : s.tension >= TENSION_LEVELS.mid ? 'mid' : 'low';
-      tension.textContent = s.tension.toFixed(2);
-      const arrow = s.direction > 0.2 ? '▲' : s.direction < -0.2 ? '▼' : '•';
-      direction.textContent = `${arrow} ${s.direction.toFixed(2)}`;
-      direction.className = s.direction > 0.2 ? 'up' : s.direction < -0.2 ? 'down' : '';
-      z.textContent = s.z.toFixed(2);
-      volz.textContent = s.volZ.toFixed(2);
-      vol.textContent = volFmt.format(s.volPerSec);
-      warmup.textContent = s.ready ? 'готово' : `${Math.floor(s.warmup * 100)}%`;
-      emaz.textContent = s.ready ? s.emaZ.toFixed(2) : '—';
-    },
-    reset() {
-      for (const node of [price, tension, direction, z, volz, vol, warmup, emaz, lastEvent]) {
-        node.textContent = '—';
+      const pct = (Math.exp(s.ret) - 1) * 100;
+      // Arrow and colour follow the number shown, not the smoothed direction.
+      const shown = Math.abs(pct) < 0.005 ? 0 : pct;
+      change.textContent = Number.isNaN(s.price)
+        ? '\u00a0'
+        : `${shown > 0 ? '▲' : shown < 0 ? '▼' : '•'} ${shown >= 0 ? '+' : ''}${shown.toFixed(2)}% за ${settings.windowSec} с`;
+      change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
+      if (s.ready) {
+        fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
+        fill.dataset.level =
+          s.tension >= TENSION_LEVELS.high
+            ? 'high'
+            : s.tension >= TENSION_LEVELS.mid
+              ? 'mid'
+              : 'low';
+        vol.textContent = `vol ${volFmt.format(s.volPerSec)}/s`;
+      } else {
+        fill.style.width = `${Math.floor(s.warmup * 100)}%`;
+        fill.dataset.level = 'warmup';
+        vol.textContent = `разогрев ${Math.floor(s.warmup * 100)}%`;
       }
-      direction.className = lastEvent.className = '';
+      aura?.setTarget(auraTarget(s));
+      updateTitle(s);
+      debug.tension.textContent = s.tension.toFixed(2);
+      debug.direction.textContent = `${arrowOf(s.direction)} ${s.direction.toFixed(2)}`;
+      debug.z.textContent = s.z.toFixed(2);
+      debug.volz.textContent = s.volZ.toFixed(2);
+      debug.emaz.textContent = s.ready ? s.emaZ.toFixed(2) : '—';
+      debug.warmup.textContent = s.ready ? 'готово' : `${Math.floor(s.warmup * 100)}%`;
+    },
+    reset(h) {
+      history = h;
+      last = null;
+      for (const node of [price, vol, lastEvent, ...Object.values(debug)]) node.textContent = '—';
+      change.textContent = '\u00a0';
+      lastEvent.className = '';
       fill.style.width = '0';
       fill.dataset.level = 'low';
+      fx.clear();
+      chart.draw(h, Date.now());
+      aura?.setTarget(auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 }));
     },
     setStatus(s) {
       status.dataset.state = s.state;
       status.textContent = statusText(s);
     },
-    setFeedLabel(text) {
-      label.textContent = text;
-    },
     setPlayback(state) {
       audioToggle.dataset.state = state;
       audioToggle.disabled = state === 'starting';
-      audioToggle.textContent =
-        state === 'running' ? '■ Stop' : state === 'starting' ? '…' : '▶ Start';
+      audioToggle.setAttribute(
+        'aria-label',
+        state === 'running' ? 'Выключить звук' : 'Включить звук',
+      );
     },
     showEvent(e) {
+      chartDirty = true;
       const what =
         e.kind === 'liquidation' ? `ликв. ${e.side.toUpperCase()}` : e.side.toUpperCase();
       const times = e.count > 1 ? ` ×${e.count}` : '';
       lastEvent.textContent = `${what} ${usdFmt.format(e.usd)}${times}`;
       // A long liquidation and an aggressive sell both push price down.
       lastEvent.className = e.side === 'long' || e.side === 'sell' ? 'down' : 'up';
+    },
+    trade(t) {
+      if (!document.hidden) fx.trade(t.side, t.price * t.qty);
+    },
+    liquidation(l) {
+      if (document.hidden) return;
+      fx.liquidation(l.side, l.usd, settings.liqThresholdUsd);
+      if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(0.35);
     },
     setSymbols(list) {
       symbols = new Set(list);

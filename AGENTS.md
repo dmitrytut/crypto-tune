@@ -36,7 +36,11 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   so they also render in `Tone.Offline`.
   Never automate `transport.bpm` with `rampTo` per tick: it crashes Tone 15's clock after about a
   minute. Write whole-BPM steps with `setValueAtTime` only when the value changes.
-- `src/ui/` — DOM view; `index.html` holds the static markup.
+- `src/ui/` — DOM view; `index.html` holds the static markup. `app.ts` (main screen, render loop,
+  immersive mode, tab title), `settings-panel.ts` (settings `<dialog>`), `scene/` (`aura.ts` WebGL
+  background, `fx.ts` trade sparks and liquidation waves, `chart.ts` price/volume strip). Pure,
+  spec-covered: `palette.ts` (market → aura colours/motion), `scene/spawn.ts` (spark merging).
+  Visuals are wall-clock animation; anything older than 2 s is not animated (history replays).
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 

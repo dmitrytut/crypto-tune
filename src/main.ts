@@ -3,6 +3,7 @@ import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
 import type { MarketFeed, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
+import { MarketHistory } from './metrics/history';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { mountApp } from './ui/app';
 
@@ -11,6 +12,7 @@ const SYMBOLS_CACHE_KEY = 'crypto-tune.binance-symbols';
 let settings = loadSettings();
 let feed: MarketFeed | null = null;
 let engine: MetricsEngine | null = null;
+let history: MarketHistory | null = null;
 let unsubs: Unsubscribe[] = [];
 
 const tensionParams = (s: Settings) => ({
@@ -62,7 +64,10 @@ const view = mountApp(settings, {
   },
 });
 
-/** (Re)create feed and metrics from current settings; history is discarded. */
+/** Visual events older than this (wall clock) are history replays, not news: no sparks. */
+const VISUAL_MAX_AGE_MS = 2_000;
+
+/** (Re)create feed, metrics and chart history from current settings; history is discarded. */
 function startPipeline(): void {
   for (const u of unsubs) u();
   feed?.disconnect();
@@ -74,12 +79,19 @@ function startPipeline(): void {
     windowSec: settings.windowSec,
     tension: tensionParams(settings),
   });
+  const h = new MarketHistory();
+  const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
   unsubs = [
     f.onTrade((t) => {
       e.addTrade(t);
+      h.addTrade(t);
       audio.onTrade(t);
+      if (fresh(t.ts)) view.trade(t);
     }),
-    f.onLiquidation((l) => audio.onLiquidation(l)),
+    f.onLiquidation((l) => {
+      audio.onLiquidation(l);
+      if (fresh(l.ts)) view.liquidation(l);
+    }),
     f.onStatus((s) => {
       view.setStatus(s);
       // A data gap is not a calm market: drop tick-level state so the move
@@ -89,24 +101,35 @@ function startPipeline(): void {
   ];
   feed = f;
   engine = e;
-  view.reset();
-  view.setFeedLabel(f.label);
+  history = h;
+  view.reset(h);
   f.connect();
 }
 
 window.setInterval(() => {
   if (!feed || !engine) return;
   const now = feed.now();
-  const snap = engine.advanceTo(now);
+  const snap = engine.advanceTo(now, (s) => history?.addSnapshot(s));
   if (snap) {
     view.render(snap);
     audio.update(snap);
   }
   // Events flush every tick, with or without new trades (a liquidation can arrive alone).
   const { liquidation, trade } = audio.flushEvents(now);
-  if (trade) view.showEvent({ kind: 'trade', ...trade });
+  if (trade) {
+    view.showEvent({ kind: 'trade', ...trade });
+    history?.addMarker({ ts: now, kind: 'trade', side: trade.side, usd: trade.usd });
+  }
   // Liquidation last: it is rarer and more important, so it wins the readout.
-  if (liquidation) view.showEvent({ kind: 'liquidation', ...liquidation });
+  if (liquidation) {
+    view.showEvent({ kind: 'liquidation', ...liquidation });
+    history?.addMarker({
+      ts: now,
+      kind: 'liquidation',
+      side: liquidation.side,
+      usd: liquidation.usd,
+    });
+  }
 }, TICK_MS);
 
 async function loadSymbols(): Promise<void> {
