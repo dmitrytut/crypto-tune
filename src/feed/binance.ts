@@ -1,6 +1,6 @@
 import { Emitter } from './emitter';
+import type { FeedStatus, Liquidation, MarketFeed, Trade, Unsubscribe } from './market-feed';
 import { ReconnectingSocket } from './reconnecting-socket';
-import type { FeedStatus, Liquidation, MarketFeed, Trade, Unsubscribe } from './types';
 
 /**
  * USDⓈ-M Futures routed endpoint. Legacy `wss://fstream.binance.com/ws/...`
@@ -37,10 +37,12 @@ interface CombinedMsg {
   data: { e?: string; E?: number };
 }
 
+/** @package */
 export function parseAggTrade(d: AggTradeMsg): Trade {
   return { ts: d.T, price: Number(d.p), qty: Number(d.q), side: d.m ? 'sell' : 'buy' };
 }
 
+/** @package */
 export function parseForceOrder(d: ForceOrderMsg): Liquidation {
   const price = Number(d.o.ap);
   const qty = Number(d.o.z);
@@ -48,6 +50,7 @@ export function parseForceOrder(d: ForceOrderMsg): Liquidation {
   return { ts: d.o.T, price, qty, usd: price * qty, side: d.o.S === 'SELL' ? 'long' : 'short' };
 }
 
+/** @package */
 export function binanceStreamUrl(symbol: string): string {
   const s = symbol.toLowerCase();
   // markPrice@1s is a guaranteed 1 Hz heartbeat so the silence watchdog

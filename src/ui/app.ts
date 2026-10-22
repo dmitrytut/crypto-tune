@@ -1,4 +1,4 @@
-import type { FeedStatus } from '../feed/types';
+import type { FeedStatus } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
 import { LIMITS, type Settings, type SourceKind } from '../settings';
 import './styles.css';

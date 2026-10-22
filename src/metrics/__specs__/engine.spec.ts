@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Trade } from '../../feed/types';
+import type { Trade } from '../../feed/market-feed';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, type MetricsSnapshot, TICK_MS } from '../engine';
 
 const T0 = 1_700_000_000_000;

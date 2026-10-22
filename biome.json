@@ -18,9 +18,128 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "correctness": {
+        "noPrivateImports": "error"
+      },
+      "suspicious": {
+        "noImportCycles": "error"
+      }
     }
   },
+  "overrides": [
+    {
+      "includes": ["src/feed/**", "!src/feed/__specs__/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/metrics",
+                      "**/metrics/**",
+                      "**/audio",
+                      "**/audio/**",
+                      "**/ui",
+                      "**/ui/**",
+                      "**/settings",
+                      "**/main"
+                    ],
+                    "message": "feed/ is the bottom layer and imports nothing from other src/ modules. See AGENTS.md › Code organization."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/metrics/**", "!src/metrics/__specs__/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/audio",
+                      "**/audio/**",
+                      "**/ui",
+                      "**/ui/**",
+                      "**/settings",
+                      "**/main",
+                      "**/feed/**",
+                      "!**/feed/market-feed"
+                    ],
+                    "message": "metrics/ may import only feed/market-feed (the data contract). See AGENTS.md › Code organization."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/audio/**", "!src/audio/__specs__/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/ui",
+                      "**/ui/**",
+                      "**/settings",
+                      "**/main",
+                      "**/feed/**",
+                      "!**/feed/market-feed"
+                    ],
+                    "message": "audio/ may import metrics/ and feed/market-feed only; settings arrive as params from main.ts. See AGENTS.md › Code organization."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/ui/**", "!src/ui/__specs__/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/audio",
+                      "**/audio/**",
+                      "**/main",
+                      "**/feed/**",
+                      "!**/feed/market-feed"
+                    ],
+                    "message": "ui/ renders; it must not reach into audio/ or feed implementations. Wiring lives in main.ts. See AGENTS.md › Code organization."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

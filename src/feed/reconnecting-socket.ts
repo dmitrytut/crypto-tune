@@ -1,5 +1,6 @@
-import type { FeedStatus } from './types';
+import type { FeedStatus } from './market-feed';
 
+/** @package */
 export interface ReconnectOptions {
   /** First retry delay. */
   baseDelayMs?: number;
@@ -9,7 +10,7 @@ export interface ReconnectOptions {
 }
 
 /** Exponential backoff with jitter in [0.5, 1] × capped delay. `attempt` starts at 1. */
-export function backoffDelay(
+function backoffDelay(
   attempt: number,
   baseMs: number,
   maxMs: number,
@@ -22,6 +23,7 @@ export function backoffDelay(
 /**
  * WebSocket that reconnects with backoff and treats prolonged silence as a
  * dead connection. Backoff resets on the first message after (re)connect.
+ * @package
  */
 export class ReconnectingSocket {
   private ws: WebSocket | null = null;

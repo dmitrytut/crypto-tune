@@ -2,6 +2,7 @@
  * Mean and population std over the last `capacity` samples, O(1) per push.
  * Uses windowed Welford updates; a full recompute every `capacity` pushes
  * bounds floating-point drift over long sessions.
+ * @package
  */
 export class RollingStats {
   private readonly buf: Float64Array;

@@ -1,5 +1,5 @@
 import { Emitter } from './emitter';
-import type { FeedStatus, Liquidation, MarketFeed, Trade, Unsubscribe } from './types';
+import type { FeedStatus, Liquidation, MarketFeed, Trade, Unsubscribe } from './market-feed';
 
 /** Deterministic 32-bit PRNG in [0, 1). */
 export function mulberry32(seed: number): () => number {

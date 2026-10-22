@@ -1,4 +1,4 @@
-import type { Trade } from '../feed/types';
+import type { Trade } from '../feed/market-feed';
 import { RollingStats } from './rolling';
 import {
   DEFAULT_TENSION_PARAMS,

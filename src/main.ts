@@ -1,6 +1,6 @@
 import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
+import type { MarketFeed, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
-import type { MarketFeed, Unsubscribe } from './feed/types';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
 import { loadSettings, type Settings, saveSettings } from './settings';
 import { mountApp } from './ui/app';

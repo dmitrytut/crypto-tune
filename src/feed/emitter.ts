@@ -1,6 +1,9 @@
-import type { Unsubscribe } from './types';
+import type { Unsubscribe } from './market-feed';
 
-/** Minimal typed listener set shared by feed implementations. */
+/**
+ * Minimal typed listener set shared by feed implementations.
+ * @package
+ */
 export class Emitter<T> {
   private readonly listeners = new Set<(v: T) => void>();
 
