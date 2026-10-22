@@ -12,11 +12,10 @@ import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { el, usdFmt } from './dom';
 import { FlowMeter } from './flow';
-import { clock, priceDecimals, splitPrice } from './format';
+import { clock } from './format';
 import { auraTarget, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
-import { Aura } from './scene/aura';
-import { Chart } from './scene/chart';
-import { Fx } from './scene/fx';
+import { PriceReadout } from './price-readout';
+import { mountStage } from './scene/stage';
 import { mountSettingsPanel } from './settings-panel';
 import './styles.css';
 
@@ -102,13 +101,15 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     if ('source' in patch) syncSymbolChip();
     handlers.onSettings(settings);
   };
-  mountSettingsPanel(initial, update);
+  const panel = mountSettingsPanel(initial, update);
   // CSS reads the side colours from the palette, so text and canvas never drift apart.
   document.documentElement.style.setProperty('--up', css(UP_COLOR));
   document.documentElement.style.setProperty('--down', css(DOWN_COLOR));
 
   const status = el('status');
-  const price = el('price');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const priceNode = el('price');
+  const price = new PriceReadout(priceNode, reducedMotion);
   const change = el('change');
   const fill = el('tension-fill');
   buildMeterScale(el('tension-track'), el('tension-scale'));
@@ -149,60 +150,21 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   });
 
   // ── scene ──
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const aura = Aura.create(el('aura'), auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 }));
-  const stage = document.querySelector<HTMLElement>('.stage');
-  const fx = new Fx(el('fx'), {
-    bloom: (x, y, color, strength) => aura?.bloom(x, y, color, strength),
-    shock: (x, y, strength) => aura?.shock(x, y, strength),
-    shake: (strength) => {
-      const a = 3 + 5 * strength;
-      stage?.animate(
-        [
-          { transform: 'translate(0, 0)' },
-          { transform: `translate(${a}px, ${-a * 0.6}px)` },
-          { transform: `translate(${-a * 0.8}px, ${a * 0.5}px)` },
-          { transform: `translate(${a * 0.4}px, ${a * 0.3}px)` },
-          { transform: 'translate(0, 0)' },
-        ],
-        { duration: 420, easing: 'ease-out' },
-      );
-    },
-  });
-  const chart = new Chart(el('chart'));
   let flow = new FlowMeter();
   let history: HistorySeries | null = null;
   let last: MetricsSnapshot | null = null;
   let chartDirty = false;
-
-  const placeOrigin = () => {
-    const r = price.getBoundingClientRect();
-    fx.setOrigin(r.left + r.width / 2, r.top + r.height / 2);
-  };
-  new ResizeObserver(placeOrigin).observe(price);
-  window.addEventListener('resize', placeOrigin);
-  document.addEventListener('visibilitychange', () => {
-    // Events received while hidden were not queued; nothing stale to burst on return.
-    if (!document.hidden) fx.clear();
+  const { aura, fx, chart } = mountStage({
+    origin: priceNode,
+    reducedMotion,
+    bigTradeUsd: () => settings.tradeThresholdUsd,
+    onFrame() {
+      if (chartDirty && history && last) {
+        chart.draw(history, last.ts);
+        chartDirty = false;
+      }
+    },
   });
-
-  let prevFrame = performance.now();
-  const frame = (t: number) => {
-    const dt = (t - prevFrame) / 1000;
-    prevFrame = t;
-    // Reduced motion: the aura barely drifts and no particles fly.
-    aura?.frame(reducedMotion.matches ? dt * 0.1 : dt);
-    // Reduced motion: no new events are queued; clearing also wipes anything already
-    // flying when the preference flips mid-session, so nothing freezes on screen.
-    if (reducedMotion.matches) fx.clear();
-    fx.frame(dt, settings.tradeThresholdUsd);
-    if (chartDirty && history && last) {
-      chart.draw(history, last.ts);
-      chartDirty = false;
-    }
-    requestAnimationFrame(frame);
-  };
-  requestAnimationFrame(frame);
 
   // ── immersive mode ──
   let idleTimer = 0;
@@ -210,45 +172,13 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     document.body.classList.remove('idle');
     clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => {
-      if (!el<HTMLDialogElement>('settings').open) document.body.classList.add('idle');
+      if (!panel.isOpen()) document.body.classList.add('idle');
     }, IDLE_MS);
   };
   for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const) {
     window.addEventListener(ev, wake, { passive: true });
   }
   wake();
-
-  // ── price: per-pair fixed decimals; only the digits that changed flash ──
-  let decimals = -1;
-  let priceText = '';
-  const formatPrice = (p: number) => {
-    if (decimals < 0) decimals = priceDecimals(p);
-    return splitPrice(p, decimals);
-  };
-  const renderPrice = (p: number) => {
-    if (Number.isNaN(p)) return;
-    const { int, frac } = formatPrice(p);
-    const text = int + frac;
-    if (text === priceText) return;
-    const prev = priceText;
-    const up = Number(text.replaceAll(',', '')) > Number(prev.replaceAll(',', ''));
-    // Only compare digit by digit when the layout is the same; otherwise nothing flashes.
-    const flash = prev.length === text.length && !reducedMotion.matches;
-    priceText = text;
-    const part = (chars: string, offset: number, cls: string) => {
-      const box = document.createElement('span');
-      box.className = cls;
-      for (const [i, ch] of [...chars].entries()) {
-        const c = document.createElement('span');
-        if (ch === ',' || ch === '.') c.className = 'sep';
-        else if (flash && prev[offset + i] !== ch) c.className = up ? 'chg up' : 'chg down';
-        c.textContent = ch;
-        box.append(c);
-      }
-      return box;
-    };
-    price.replaceChildren(part(int, 0, 'int'), part(frac, int.length, 'frac'));
-  };
 
   // ── tab title ──
   const idleTitle = document.title;
@@ -258,7 +188,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     titleAt = s.ts;
     const name = settings.source === 'live' ? settings.symbol : 'SIM';
     const hot = s.tension >= TENSION_LEVELS.mid ? ` · ⚡${s.tension.toFixed(1)}` : '';
-    const { int, frac } = formatPrice(s.price);
+    const { int, frac } = price.format(s.price);
     document.title = `${arrowOf(s.direction)} ${int}${frac} · ${name}${hot}`;
   };
 
@@ -266,7 +196,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     render(s) {
       last = s;
       chartDirty = true;
-      renderPrice(s.price);
+      price.render(s.price);
       const pct = (Math.exp(s.ret) - 1) * 100;
       // Arrow and colour follow the number shown, not the smoothed direction.
       const shown = Math.abs(pct) < 0.005 ? 0 : pct;
@@ -299,11 +229,10 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       document.title = idleTitle;
       titleAt = 0;
       last = null;
-      decimals = -1;
-      priceText = '';
+      price.reset();
       // A new pair trades on a different notional scale; its pace baseline starts fresh.
       flow = new FlowMeter();
-      for (const node of [price, vol, ...Object.values(debug)]) node.textContent = '—';
+      for (const node of [vol, ...Object.values(debug)]) node.textContent = '—';
       lastEvent.textContent = '';
       change.textContent = '\u00a0';
       lastEvent.className = '';

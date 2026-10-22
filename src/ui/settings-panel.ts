@@ -5,6 +5,11 @@ import { el, usdFmt } from './dom';
 const LOG_STEP = 0.05;
 const snapUsd = (log10: number) => Number((10 ** log10).toPrecision(2));
 
+/** What the rest of the view may ask the settings dialog. */
+export interface SettingsPanel {
+  isOpen(): boolean;
+}
+
 /**
  * Binds every control in the settings dialog to `update`. The dialog opens
  * from the gear button, closes on ✕, Esc, or a click on the backdrop.
@@ -13,7 +18,7 @@ const snapUsd = (log10: number) => Number((10 ** log10).toPrecision(2));
 export function mountSettingsPanel(
   initial: Settings,
   update: (patch: Partial<Settings>) => void,
-): void {
+): SettingsPanel {
   const dialog = el<HTMLDialogElement>('settings');
   el('settings-open').addEventListener('click', () => dialog.showModal());
   dialog.addEventListener('click', (e) => {
@@ -109,4 +114,5 @@ export function mountSettingsPanel(
   usdRange('trade-threshold', LIMITS.tradeThresholdUsd, initial.tradeThresholdUsd, (usd) =>
     update({ tradeThresholdUsd: usd }),
   );
+  return { isOpen: () => dialog.open };
 }

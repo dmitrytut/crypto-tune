@@ -46,13 +46,16 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   with `start(0)` (or tick strings like `` `${n}i` ``) and let transport start/stop drive them;
   never pass `Tone.now()`. `transport.nextSubdivision` returns context time: convert with
   `getTicksAtTime` before scheduling on the transport.
-- `src/ui/` — DOM view; `index.html` holds the static markup. `app.ts` (main screen, render loop,
-  immersive mode, tab title), `settings-panel.ts` (settings `<dialog>`), `scene/` (`aura.ts` WebGL
-  background with drift/shock/bloom uniforms, `fx.ts` trade bubbles/drops and liquidation bursts,
-  `chart.ts` price/volume strip). Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no
-  warm-up), `palette.ts` (market + flow → aura colours/motion), `scene/spawn.ts` (merging, bubble
-  start state). Visuals are wall-clock animation; anything older than 2 s is not animated (history
-  replays). Every motion effect respects `prefers-reduced-motion`.
+- `src/ui/` — DOM view; `index.html` holds the static markup. `app.ts` (readouts, meter, immersive
+  mode, tab title; implements `AppView`), `price-readout.ts` (fixed-decimal price with per-digit
+  flash), `settings-panel.ts` (settings `<dialog>`), `scene/` (`stage.ts` creates the layers and
+  runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
+  trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
+  Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no warm-up), `palette.ts` (market +
+  flow → aura colours/motion; the one source of side and tension colours, CSS included),
+  `scene/spawn.ts` (merging, bubble start state). Visuals are wall-clock animation; anything older
+  than 2 s is not animated (history replays, filtered in the view). Every motion effect respects
+  `prefers-reduced-motion`.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 
