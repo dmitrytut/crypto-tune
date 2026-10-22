@@ -1,5 +1,9 @@
 export type SourceKind = 'live' | 'simulator';
 
+/** Tonic choices, index = pitch class (0 = C). */
+export const TONICS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
+export type Tonic = (typeof TONICS)[number];
+
 export interface Settings {
   source: SourceKind;
   /** Exchange symbol, upper case, e.g. BTCUSDT. */
@@ -8,6 +12,9 @@ export interface Settings {
   windowSec: number;
   /** Multiplier on raw tension. */
   sensitivity: number;
+  tonic: Tonic;
+  /** Base layer (drone + arpeggio) level, dB. */
+  baseVolumeDb: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -15,11 +22,14 @@ export const DEFAULT_SETTINGS: Settings = {
   symbol: 'BTCUSDT',
   windowSec: 10,
   sensitivity: 1,
+  tonic: 'A',
+  baseVolumeDb: -6,
 };
 
 export const LIMITS = {
   windowSec: { min: 2, max: 60, step: 1 },
   sensitivity: { min: 0.25, max: 3, step: 0.05 },
+  baseVolumeDb: { min: -40, max: 0, step: 1 },
 } as const;
 
 const KEY = 'crypto-tune.settings.v1';
@@ -45,6 +55,8 @@ export function parseSettings(raw: unknown): Settings {
         : DEFAULT_SETTINGS.symbol,
     windowSec: clamp(num(o.windowSec, DEFAULT_SETTINGS.windowSec), LIMITS.windowSec),
     sensitivity: clamp(num(o.sensitivity, DEFAULT_SETTINGS.sensitivity), LIMITS.sensitivity),
+    tonic: TONICS.find((t) => t === o.tonic) ?? DEFAULT_SETTINGS.tonic,
+    baseVolumeDb: clamp(num(o.baseVolumeDb, DEFAULT_SETTINGS.baseVolumeDb), LIMITS.baseVolumeDb),
   };
 }
 

@@ -24,7 +24,10 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   backoff and the silence/connect watchdog.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`.
-- `src/audio/` — Tone.js layers, events, mixer (stage 2+).
+- `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
+  first user gesture), `mixer.ts` (layers → reverb → compressor → limiter → master),
+  `base-layer.ts` (drone + arpeggio). Pure music math with specs: `scale.ts`, `arp-pattern.ts`.
+  Keep anything testable out of Tone-importing files: Tone needs a browser AudioContext.
 - `src/ui/` — DOM view; `index.html` holds the static markup.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
