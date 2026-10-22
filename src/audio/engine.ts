@@ -56,7 +56,7 @@ export class AudioEngine {
   private state: AudioState = 'stopped';
   /** Hysteresis state for double time, carried between ticks. */
   private doubleTime = false;
-  /** Last tempo written to the transport, whole BPM. */
+  /** Last tempo written to the transport, whole BPM; tracks the market while stopped too. */
   private bpm = CALM_BPM;
   private shock: ShockState = INITIAL_SHOCK;
   private pendingLiqs: PendingEvent<LiquidationSide>[] = [];
@@ -81,8 +81,9 @@ export class AudioEngine {
     const pending = this.stopAt - Tone.now();
     if (pending > 0) await new Promise((resolve) => setTimeout(resolve, pending * 1000));
     const transport = Tone.getTransport();
-    transport.bpm.value = CALM_BPM;
-    this.bpm = CALM_BPM;
+    // Resume at the market's current tempo: update() keeps tracking it while stopped,
+    // so restarting mid-move does not drop to calm and jump back on the next tick.
+    transport.bpm.value = this.bpm;
     const t = Tone.now() + 0.05;
     g.base.start(t);
     g.tension.start(t);
@@ -104,26 +105,25 @@ export class AudioEngine {
   }
 
   update(s: MetricsSnapshot): void {
-    const g = this.graph;
-    if (!g) return;
     const mix = tensionMix(s.tension, s.direction, this.doubleTime);
     this.doubleTime = mix.doubleTime;
+    // Tempo moves in whole-BPM steps, written only on change. Re-issuing
+    // bpm.rampTo every tick crashes Tone 15's transport clock after ~1 min of
+    // live tension (TickSource.getTicksAtTime: "reading 'time'"). 1-BPM steps
+    // are inaudible, and the smoothed tension already makes them gradual.
+    // Tracked even before the graph exists, so the first start() lands on it.
+    const bpm = Math.round(mix.bpm);
+    const bpmChanged = bpm !== this.bpm;
+    this.bpm = bpm;
+    const g = this.graph;
+    if (!g) return;
     g.base.setTrend(s.emaZ);
     g.base.applyMix(mix);
     const shock = stepShock(this.shock, s.tension, s.ts);
     this.shock = shock.state;
     if (shock.fired && this.state === 'running') g.tension.shock(s.ret >= 0, Tone.now());
     g.tension.applyMix(mix);
-    // Tempo moves in whole-BPM steps, written only on change. Re-issuing
-    // bpm.rampTo every tick crashes Tone 15's transport clock after ~1 min of
-    // live tension (TickSource.getTicksAtTime: "reading 'time'"). 1-BPM steps
-    // are inaudible, and the smoothed tension already makes them gradual.
-    const bpm = Math.round(mix.bpm);
-    if (bpm !== this.bpm) {
-      this.bpm = bpm;
-      const transport = Tone.getTransport();
-      transport.bpm.setValueAtTime(bpm, Tone.now());
-    }
+    if (bpmChanged) Tone.getTransport().bpm.setValueAtTime(bpm, Tone.now());
   }
 
   /** Called for every trade; only those above the threshold are kept. */
