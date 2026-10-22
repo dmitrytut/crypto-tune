@@ -15,6 +15,8 @@ export interface Settings {
   tonic: Tonic;
   /** Base layer (drone + arpeggio) level, dB. */
   baseVolumeDb: number;
+  /** Tension layer (sub, percussion, riser) level, dB. */
+  tensionVolumeDb: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -24,12 +26,13 @@ export const DEFAULT_SETTINGS: Settings = {
   sensitivity: 1,
   tonic: 'A',
   baseVolumeDb: -6,
+  tensionVolumeDb: -6,
 };
 
 export const LIMITS = {
   windowSec: { min: 2, max: 60, step: 1 },
   sensitivity: { min: 0.25, max: 3, step: 0.05 },
-  baseVolumeDb: { min: -40, max: 0, step: 1 },
+  layerVolumeDb: { min: -40, max: 0, step: 1 },
 } as const;
 
 const KEY = 'crypto-tune.settings.v1';
@@ -56,7 +59,11 @@ export function parseSettings(raw: unknown): Settings {
     windowSec: clamp(num(o.windowSec, DEFAULT_SETTINGS.windowSec), LIMITS.windowSec),
     sensitivity: clamp(num(o.sensitivity, DEFAULT_SETTINGS.sensitivity), LIMITS.sensitivity),
     tonic: TONICS.find((t) => t === o.tonic) ?? DEFAULT_SETTINGS.tonic,
-    baseVolumeDb: clamp(num(o.baseVolumeDb, DEFAULT_SETTINGS.baseVolumeDb), LIMITS.baseVolumeDb),
+    baseVolumeDb: clamp(num(o.baseVolumeDb, DEFAULT_SETTINGS.baseVolumeDb), LIMITS.layerVolumeDb),
+    tensionVolumeDb: clamp(
+      num(o.tensionVolumeDb, DEFAULT_SETTINGS.tensionVolumeDb),
+      LIMITS.layerVolumeDb,
+    ),
   };
 }
 

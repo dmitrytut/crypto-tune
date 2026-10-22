@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { degreeToMidi, pitchClassMidi } from '../scale';
+import { degreeToMidi, midiToHz, pitchClassMidi } from '../scale';
 
 describe('degreeToMidi', () => {
   const A3 = 57;
@@ -23,5 +23,13 @@ describe('pitchClassMidi', () => {
     expect(pitchClassMidi(0, 4)).toBe(60);
     expect(pitchClassMidi(9, 3)).toBe(57);
     expect(pitchClassMidi(11, 2)).toBe(47);
+  });
+});
+
+describe('midiToHz', () => {
+  it('is 440 Hz at A4 and doubles per octave', () => {
+    expect(midiToHz(69)).toBe(440);
+    expect(midiToHz(57)).toBeCloseTo(220, 9);
+    expect(midiToHz(60)).toBeCloseTo(261.6256, 3);
   });
 });

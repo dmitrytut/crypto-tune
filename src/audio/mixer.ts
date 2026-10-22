@@ -12,7 +12,7 @@ const LEVEL_RAMP_SEC = 0.8;
 export class Mixer {
   private readonly reverb = new Tone.Reverb({ decay: 9, preDelay: 0.04, wet: 0.35 });
   private readonly compressor = new Tone.Compressor({
-    threshold: -22,
+    threshold: -18,
     ratio: 2.5,
     attack: 0.08,
     release: 0.4,

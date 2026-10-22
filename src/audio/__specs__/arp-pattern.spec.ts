@@ -7,6 +7,15 @@ describe('arpDegree', () => {
     expect(Array.from({ length: 8 }, (_, i) => arpDegree(i + 8, 0))).toEqual(base);
     expect(Array.from({ length: 8 }, (_, i) => arpDegree(i, 2))).toEqual(base.map((d) => d + 2));
   });
+
+  it('runs stepwise upward or downward through the same span for directional contours', () => {
+    const phrase = (c: 'up' | 'down') => Array.from({ length: 8 }, (_, i) => arpDegree(i, 0, c));
+    const up = phrase('up');
+    const down = phrase('down');
+    expect(up.every((d, i) => i === 0 || d === (up[i - 1] as number) + 1)).toBe(true);
+    expect(down).toEqual([...up].reverse());
+    expect(arpDegree(0, 1, 'down')).toBe((down[0] as number) + 1);
+  });
 });
 
 describe('stickyShift', () => {

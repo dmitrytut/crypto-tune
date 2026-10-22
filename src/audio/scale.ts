@@ -17,3 +17,8 @@ export function degreeToMidi(tonicMidi: number, degree: number): number {
 export function pitchClassMidi(pc: number, octave: number): number {
   return (octave + 1) * SEMITONES_PER_OCTAVE + pc;
 }
+
+/** Equal-tempered frequency of a MIDI note, A4 (69) = 440 Hz. */
+export function midiToHz(midi: number): number {
+  return 440 * 2 ** ((midi - 69) / SEMITONES_PER_OCTAVE);
+}

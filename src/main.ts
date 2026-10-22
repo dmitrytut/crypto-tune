@@ -21,6 +21,7 @@ const tensionParams = (s: Settings) => ({
 const audioParams = (s: Settings): AudioParams => ({
   tonicPc: TONICS.indexOf(s.tonic),
   baseVolumeDb: s.baseVolumeDb,
+  tensionVolumeDb: s.tensionVolumeDb,
 });
 
 const audio = new AudioEngine(audioParams(settings));
