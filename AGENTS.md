@@ -86,6 +86,8 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
 
 ## Conventions
 
+- All user-facing text is English: markup, aria labels, tab title, canvas labels, error messages.
+  Docs, PRs and chat may be Russian.
 - Tests live next to the code they cover, in a `__specs__/` folder inside that module's directory,
   named `<module>.spec.ts` (e.g. `src/metrics/rolling.ts` → `src/metrics/__specs__/rolling.spec.ts`).
   Never `*.test.ts`, never a top-level `tests/` dir; vitest only picks up `src/**/__specs__/**/*.spec.ts`.

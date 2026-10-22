@@ -5,12 +5,13 @@ import type {
   Trade,
   TradeSide,
 } from '../feed/market-feed';
-import type { MetricsSnapshot } from '../metrics/engine';
+import { DEFAULT_METRICS_CONFIG, type MetricsSnapshot } from '../metrics/engine';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { el, usdFmt } from './dom';
 import { FlowMeter } from './flow';
+import { clock, priceDecimals, splitPrice } from './format';
 import { auraTarget } from './palette';
 import { Aura } from './scene/aura';
 import { Chart } from './scene/chart';
@@ -53,7 +54,6 @@ export interface AppView {
   liquidation(l: Liquidation): void;
 }
 
-const priceFmt = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 7 });
 const volFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
 
 function statusText(s: FeedStatus): string {
@@ -134,7 +134,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     // Without a loaded list (REST unreachable) accept any well-formed symbol.
     const valid = SYMBOL_PATTERN.test(next) && (symbols.size === 0 || symbols.has(next));
     symbolError.hidden = valid;
-    symbolError.textContent = valid ? '' : `${next || '∅'}: нет такой пары на Binance Futures`;
+    symbolError.textContent = valid ? '' : `${next || '∅'}: no such pair on Binance Futures`;
     if (!valid) return;
     symbol.value = next;
     symbol.blur();
@@ -167,7 +167,6 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let history: HistorySeries | null = null;
   let last: MetricsSnapshot | null = null;
   let chartDirty = false;
-  let shownPrice = Number.NaN;
 
   const placeOrigin = () => {
     const r = price.getBoundingClientRect();
@@ -212,6 +211,38 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   }
   wake();
 
+  // ── price: per-pair fixed decimals; only the digits that changed flash ──
+  let decimals = -1;
+  let priceText = '';
+  const formatPrice = (p: number) => {
+    if (decimals < 0) decimals = priceDecimals(p);
+    return splitPrice(p, decimals);
+  };
+  const renderPrice = (p: number) => {
+    if (Number.isNaN(p)) return;
+    const { int, frac } = formatPrice(p);
+    const text = int + frac;
+    if (text === priceText) return;
+    const prev = priceText;
+    const up = Number(text.replaceAll(',', '')) > Number(prev.replaceAll(',', ''));
+    // Only compare digit by digit when the layout is the same; otherwise nothing flashes.
+    const flash = prev.length === text.length && !reducedMotion.matches;
+    priceText = text;
+    const part = (chars: string, offset: number, cls: string) => {
+      const box = document.createElement('span');
+      box.className = cls;
+      for (const [i, ch] of [...chars].entries()) {
+        const c = document.createElement('span');
+        if (ch === ',' || ch === '.') c.className = 'sep';
+        else if (flash && prev[offset + i] !== ch) c.className = up ? 'chg up' : 'chg down';
+        c.textContent = ch;
+        box.append(c);
+      }
+      return box;
+    };
+    price.replaceChildren(part(int, 0, 'int'), part(frac, int.length, 'frac'));
+  };
+
   // ── tab title ──
   let titleAt = 0;
   const updateTitle = (s: MetricsSnapshot) => {
@@ -219,27 +250,21 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     titleAt = s.ts;
     const name = settings.source === 'live' ? settings.symbol : 'SIM';
     const hot = s.tension >= TENSION_LEVELS.mid ? ` · ⚡${s.tension.toFixed(1)}` : '';
-    document.title = `${arrowOf(s.direction)} ${priceFmt.format(s.price)} · ${name}${hot}`;
+    const { int, frac } = formatPrice(s.price);
+    document.title = `${arrowOf(s.direction)} ${int}${frac} · ${name}${hot}`;
   };
 
   return {
     render(s) {
       last = s;
       chartDirty = true;
-      price.textContent = Number.isNaN(s.price) ? '—' : priceFmt.format(s.price);
-      if (!Number.isNaN(shownPrice) && s.price !== shownPrice && !reducedMotion.matches) {
-        // Restart the flash animation: drop the class, force a style flush, add it back.
-        price.classList.remove('tick-up', 'tick-down');
-        void price.offsetWidth;
-        price.classList.add(s.price > shownPrice ? 'tick-up' : 'tick-down');
-      }
-      shownPrice = s.price;
+      renderPrice(s.price);
       const pct = (Math.exp(s.ret) - 1) * 100;
       // Arrow and colour follow the number shown, not the smoothed direction.
       const shown = Math.abs(pct) < 0.005 ? 0 : pct;
       change.textContent = Number.isNaN(s.price)
         ? '\u00a0'
-        : `${shown > 0 ? '▲' : shown < 0 ? '▼' : '•'} ${shown >= 0 ? '+' : ''}${shown.toFixed(2)}% за ${settings.windowSec} с`;
+        : `${shown > 0 ? '▲' : shown < 0 ? '▼' : '•'} ${shown >= 0 ? '+' : ''}${shown.toFixed(2)}% · ${settings.windowSec}s`;
       change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
       if (s.ready) {
         fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
@@ -251,9 +276,11 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
               : 'low';
         vol.textContent = `vol ${volFmt.format(s.volPerSec)}/s`;
       } else {
+        // Tension needs a few minutes of this market's own statistics before it means anything.
+        const total = settings.windowSec + DEFAULT_METRICS_CONFIG.warmupMin * 60;
         fill.style.width = `${Math.floor(s.warmup * 100)}%`;
         fill.dataset.level = 'warmup';
-        vol.textContent = `разогрев ${Math.floor(s.warmup * 100)}%`;
+        vol.textContent = `calibrating tension · ${clock((1 - s.warmup) * total)}`;
       }
       aura?.setTarget(auraTarget(s, flow.read(Date.now())));
       updateTitle(s);
@@ -262,15 +289,17 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       debug.z.textContent = s.z.toFixed(2);
       debug.volz.textContent = s.volZ.toFixed(2);
       debug.emaz.textContent = s.ready ? s.emaZ.toFixed(2) : '—';
-      debug.warmup.textContent = s.ready ? 'готово' : `${Math.floor(s.warmup * 100)}%`;
+      debug.warmup.textContent = s.ready ? 'ready' : `${Math.floor(s.warmup * 100)}%`;
     },
     reset(h) {
       history = h;
       last = null;
-      shownPrice = Number.NaN;
+      decimals = -1;
+      priceText = '';
       // A new pair trades on a different notional scale; its pace baseline starts fresh.
       flow = new FlowMeter();
-      for (const node of [price, vol, lastEvent, ...Object.values(debug)]) node.textContent = '—';
+      for (const node of [price, vol, ...Object.values(debug)]) node.textContent = '—';
+      lastEvent.textContent = '';
       change.textContent = '\u00a0';
       lastEvent.className = '';
       fill.style.width = '0';
@@ -286,15 +315,11 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     setPlayback(state) {
       audioToggle.dataset.state = state;
       audioToggle.disabled = state === 'starting';
-      audioToggle.setAttribute(
-        'aria-label',
-        state === 'running' ? 'Выключить звук' : 'Включить звук',
-      );
+      audioToggle.setAttribute('aria-label', state === 'running' ? 'Stop sound' : 'Start sound');
     },
     showEvent(e) {
       chartDirty = true;
-      const what =
-        e.kind === 'liquidation' ? `ликв. ${e.side.toUpperCase()}` : e.side.toUpperCase();
+      const what = e.kind === 'liquidation' ? `LIQ ${e.side.toUpperCase()}` : e.side.toUpperCase();
       const times = e.count > 1 ? ` ×${e.count}` : '';
       lastEvent.textContent = `${what} ${usdFmt.format(e.usd)}${times}`;
       // A long liquidation and an aggressive sell both push price down.

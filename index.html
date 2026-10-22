@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -18,13 +18,13 @@
             list="symbols"
             autocomplete="off"
             spellcheck="false"
-            aria-label="Пара Binance USDⓈ-M"
+            aria-label="Binance USDⓈ-M pair"
           />
           <datalist id="symbols"></datalist>
         </div>
         <div class="top-right">
           <span id="status" class="status" data-state="idle">idle</span>
-          <button id="settings-open" class="icon-btn" type="button" aria-label="Настройки">
+          <button id="settings-open" class="icon-btn" type="button" aria-label="Settings">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-2.5a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6Z"
@@ -49,70 +49,70 @@
         <div class="info fades">
           <span id="vol">—</span>
           <span class="dot" aria-hidden="true">·</span>
-          <span id="last-event">—</span>
+          <span id="last-event"></span>
         </div>
 
-        <button id="audio-toggle" class="play fades" type="button" data-state="stopped" aria-label="Включить звук">
+        <button id="audio-toggle" class="play fades" type="button" data-state="stopped" aria-label="Start sound">
           <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
           <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z" /></svg>
         </button>
       </section>
 
-      <canvas id="chart" class="chart" aria-label="Цена и объём за 15 минут" role="img"></canvas>
+      <canvas id="chart" class="chart" aria-label="Price and volume, last 15 minutes" role="img"></canvas>
     </main>
 
     <dialog id="settings" class="settings" aria-labelledby="settings-title">
       <form method="dialog" class="settings-body">
         <header class="settings-head">
-          <h2 id="settings-title">Настройки</h2>
-          <button class="icon-btn" type="submit" value="close" aria-label="Закрыть">✕</button>
+          <h2 id="settings-title">Settings</h2>
+          <button class="icon-btn" type="submit" value="close" aria-label="Close">✕</button>
         </header>
 
-        <h3>Звук</h3>
+        <h3>Sound</h3>
         <label class="field">
-          <span>Тоника</span>
+          <span>Tonic</span>
           <select id="tonic"></select>
         </label>
         <label class="field">
-          <span>База: <output id="base-volume-out"></output> dB</span>
+          <span>Base: <output id="base-volume-out"></output> dB</span>
           <input id="base-volume" type="range" />
         </label>
         <label class="field">
-          <span>Напряжение: <output id="tension-volume-out"></output> dB</span>
+          <span>Tension: <output id="tension-volume-out"></output> dB</span>
           <input id="tension-volume" type="range" />
         </label>
         <label class="field">
-          <span>События: <output id="events-volume-out"></output> dB</span>
+          <span>Events: <output id="events-volume-out"></output> dB</span>
           <input id="events-volume" type="range" />
         </label>
 
-        <h3>Чувствительность</h3>
+        <h3>Sensitivity</h3>
         <label class="field">
-          <span>Окно N: <output id="window-out"></output> с</span>
+          <span>Window N: <output id="window-out"></output> s</span>
           <input id="window" type="range" />
         </label>
         <label class="field">
-          <span>Множитель: ×<output id="sensitivity-out"></output></span>
+          <span>Multiplier: ×<output id="sensitivity-out"></output></span>
           <input id="sensitivity" type="range" />
         </label>
         <label class="field">
-          <span>Порог ликвидации: <output id="liq-threshold-out"></output></span>
+          <span>Liquidation threshold: <output id="liq-threshold-out"></output></span>
           <input id="liq-threshold" type="range" />
         </label>
         <label class="field">
-          <span>Порог крупной сделки: <output id="trade-threshold-out"></output></span>
+          <span>Large trade threshold: <output id="trade-threshold-out"></output></span>
           <input id="trade-threshold" type="range" />
         </label>
 
-        <h3>Источник</h3>
+        <h3>Source</h3>
         <fieldset class="segmented">
-          <legend class="visually-hidden">Источник данных</legend>
+          <legend class="visually-hidden">Data source</legend>
           <label><input type="radio" name="source" value="live" /> LIVE</label>
           <label><input type="radio" name="source" value="simulator" /> SIMULATOR</label>
         </fieldset>
 
         <details class="debug">
-          <summary>Отладка</summary>
+          <summary>Debug</summary>
           <dl class="stats">
             <dt>tension</dt><dd id="tension">—</dd>
             <dt>direction</dt><dd id="direction">—</dd>

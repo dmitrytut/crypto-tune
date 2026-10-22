@@ -182,7 +182,7 @@ export class Fx {
       x,
       y: y - 90,
       age: 0,
-      text: `ЛИКВИДАЦИЯ ${side.toUpperCase()} ${usdFmt.format(usd)}`,
+      text: `LIQUIDATION ${side.toUpperCase()} ${usdFmt.format(usd)}`,
       color,
       size: 15,
     });

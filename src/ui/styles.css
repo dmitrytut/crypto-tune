@@ -162,19 +162,36 @@ body::after {
     transparent
   );
 }
+/* Thin, tabular, quiet: the number is the hero, not its effects. Separators and
+ * the fraction step back so the eye reads the big digits first. */
 .price {
-  font-size: clamp(56px, 11vw, 120px);
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-size: clamp(56px, 10vw, 116px);
+  font-weight: 250;
+  letter-spacing: -0.045em;
   line-height: 1;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  text-shadow:
-    0 2px 24px rgba(0, 0, 0, 0.45),
-    0 0 2px rgba(0, 0, 0, 0.3);
+  color: #fbfaff;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.35);
+}
+/* Thousands separators step back; the decimal point stays visible (it is inside the dimmed fraction). */
+.price .int .sep {
+  opacity: 0.38;
+}
+.price .frac {
+  font-size: 0.44em;
+  font-weight: 350;
+  letter-spacing: -0.01em;
+  opacity: 0.55;
+  margin-left: 0.04em;
+}
+.info:has(#last-event:empty) .dot {
+  display: none;
 }
 .change {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
@@ -284,27 +301,23 @@ body::after {
   }
 }
 
-/* Each price tick flashes the digits in its direction's colour, then settles. */
-.price.tick-up {
-  animation: tick-up 0.9s ease-out;
+/* Only the digits that changed take the move's colour, then fade back to white. */
+.price .chg.up {
+  animation: digit-up 1.1s ease-out;
 }
-.price.tick-down {
-  animation: tick-down 0.9s ease-out;
+.price .chg.down {
+  animation: digit-down 1.1s ease-out;
 }
-@keyframes tick-up {
+@keyframes digit-up {
   from {
-    color: #c9fff6;
-    text-shadow:
-      0 0 24px rgba(77, 230, 209, 0.9),
-      0 0 60px rgba(77, 230, 209, 0.5);
+    color: var(--up);
+    text-shadow: 0 0 18px rgba(77, 230, 209, 0.45);
   }
 }
-@keyframes tick-down {
+@keyframes digit-down {
   from {
-    color: #ffd6e6;
-    text-shadow:
-      0 0 24px rgba(242, 80, 140, 0.9),
-      0 0 60px rgba(242, 80, 140, 0.5);
+    color: var(--down);
+    text-shadow: 0 0 18px rgba(242, 80, 140, 0.45);
   }
 }
 .play:hover {
