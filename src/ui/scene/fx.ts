@@ -1,13 +1,13 @@
 import type { LiquidationSide, TradeSide } from '../../feed/market-feed';
 import { usdFmt } from '../dom';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
+import { fitCanvas } from './canvas';
 import { bubbleStart, planSpawns, sizeDecades } from './spawn';
 
 /** Live bubbles cap; above it the oldest are recycled. */
 const MAX_BUBBLES = 1_500;
 /** Bubbles created per frame; a burst beyond this merges into larger ones. */
 const SPAWN_BUDGET = 120;
-const MAX_DPR = 2;
 const SPRITE_PX = 128;
 const FADE_IN_SEC = 0.35;
 /** Last share of a bubble's life spent fading out. */
@@ -64,21 +64,32 @@ interface Label {
   size: number;
 }
 
-/** Soap bubble: clear centre, bright rim, specular glint. Reads as "rising, light". */
-function bubbleSprite(c: Rgb): HTMLCanvasElement {
+/** A sprite square filled with a radial gradient through `stops` (offset, CSS colour). */
+function radialSprite(stops: readonly (readonly [number, string])[]): HTMLCanvasElement {
   const s = document.createElement('canvas');
   s.width = s.height = SPRITE_PX;
   const g = s.getContext('2d');
   if (!g) return s;
   const h = SPRITE_PX / 2;
   const grad = g.createRadialGradient(h, h, 0, h, h, h);
-  grad.addColorStop(0, css(c, 0.16));
-  grad.addColorStop(0.62, css(c, 0.22));
-  grad.addColorStop(0.84, css(c, 0.95));
-  grad.addColorStop(0.92, css(c, 0.4));
-  grad.addColorStop(1, css(c, 0));
+  for (const [at, color] of stops) grad.addColorStop(at, color);
   g.fillStyle = grad;
   g.fillRect(0, 0, SPRITE_PX, SPRITE_PX);
+  return s;
+}
+
+/** Soap bubble: clear centre, bright rim, specular glint. Reads as "rising, light". */
+function bubbleSprite(c: Rgb): HTMLCanvasElement {
+  const s = radialSprite([
+    [0, css(c, 0.16)],
+    [0.62, css(c, 0.22)],
+    [0.84, css(c, 0.95)],
+    [0.92, css(c, 0.4)],
+    [1, css(c, 0)],
+  ]);
+  const g = s.getContext('2d');
+  if (!g) return s;
+  const h = SPRITE_PX / 2;
   const glint = g.createRadialGradient(h * 0.68, h * 0.62, 0, h * 0.68, h * 0.62, h * 0.24);
   glint.addColorStop(0, 'rgba(255,255,255,0.9)');
   glint.addColorStop(1, 'rgba(255,255,255,0)');
@@ -88,36 +99,20 @@ function bubbleSprite(c: Rgb): HTMLCanvasElement {
 }
 
 /** Ember drop: hot white core in a coloured glow. Reads as "falling, heavy". */
-function dropSprite(c: Rgb): HTMLCanvasElement {
-  const s = document.createElement('canvas');
-  s.width = s.height = SPRITE_PX;
-  const g = s.getContext('2d');
-  if (!g) return s;
-  const h = SPRITE_PX / 2;
-  const grad = g.createRadialGradient(h, h, 0, h, h, h);
-  grad.addColorStop(0, 'rgba(255,255,255,0.95)');
-  grad.addColorStop(0.22, css(c, 0.95));
-  grad.addColorStop(0.55, css(c, 0.35));
-  grad.addColorStop(1, css(c, 0));
-  g.fillStyle = grad;
-  g.fillRect(0, 0, SPRITE_PX, SPRITE_PX);
-  return s;
-}
+const dropSprite = (c: Rgb) =>
+  radialSprite([
+    [0, 'rgba(255,255,255,0.95)'],
+    [0.22, css(c, 0.95)],
+    [0.55, css(c, 0.35)],
+    [1, css(c, 0)],
+  ]);
 
-function haloSprite(c: Rgb): HTMLCanvasElement {
-  const s = document.createElement('canvas');
-  s.width = s.height = SPRITE_PX;
-  const g = s.getContext('2d');
-  if (!g) return s;
-  const h = SPRITE_PX / 2;
-  const grad = g.createRadialGradient(h, h, 0, h, h, h);
-  grad.addColorStop(0, css(c, 0.5));
-  grad.addColorStop(0.4, css(c, 0.16));
-  grad.addColorStop(1, css(c, 0));
-  g.fillStyle = grad;
-  g.fillRect(0, 0, SPRITE_PX, SPRITE_PX);
-  return s;
-}
+const haloSprite = (c: Rgb) =>
+  radialSprite([
+    [0, css(c, 0.5)],
+    [0.4, css(c, 0.16)],
+    [1, css(c, 0)],
+  ]);
 
 /**
  * Overlay canvas for market events.
@@ -137,7 +132,6 @@ export class Fx {
   private labels: Label[] = [];
   private queued: { side: TradeSide; usd: number }[] = [];
   private origin = { x: 0, y: 0 };
-  private dpr = 1;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -201,9 +195,9 @@ export class Fx {
 
   frame(dtSec: number, bigTradeUsd: number): void {
     const dt = Math.min(dtSec, 0.1);
-    this.resize();
+    const dpr = fitCanvas(this.canvas);
     this.spawn(bigTradeUsd);
-    const { ctx, dpr } = this;
+    const { ctx } = this;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -341,16 +335,5 @@ export class Fx {
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
     this.labels.length = alive;
-  }
-
-  private resize(): void {
-    const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
-    const w = Math.round(this.canvas.clientWidth * dpr);
-    const h = Math.round(this.canvas.clientHeight * dpr);
-    if (this.canvas.width !== w || this.canvas.height !== h) {
-      this.canvas.width = w;
-      this.canvas.height = h;
-    }
-    this.dpr = dpr;
   }
 }

@@ -1,8 +1,8 @@
 import { HISTORY_WINDOW_MS, type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
 import { css, DOWN_COLOR, sideColor, tensionColor, UP_COLOR } from '../palette';
+import { fitCanvas } from './canvas';
 import { sizeDecades } from './spawn';
 
-const MAX_DPR = 2;
 /** Share of the height for the price line; the rest is the volume band. */
 const PRICE_SHARE = 0.66;
 /** Vertical padding of the price range so the line never touches the edges. */
@@ -36,13 +36,9 @@ export class Chart {
 
   draw(h: HistorySeries, now: number): void {
     const { ctx, canvas } = this;
-    const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
+    const dpr = fitCanvas(canvas);
     const w = canvas.clientWidth;
     const ht = canvas.clientHeight;
-    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(ht * dpr)) {
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(ht * dpr);
-    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, ht);
     // Grow with the history until it covers the full window.
