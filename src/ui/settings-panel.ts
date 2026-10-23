@@ -1,6 +1,7 @@
+import { HISTORY_PERIODS_MIN } from '../metrics/history';
 import { LIMITS, type Settings, type SourceKind, TONICS } from '../settings';
 import { el } from './dom';
-import { usdFmt } from './format';
+import { durationLabel, usdFmt } from './format';
 import { mountPicker } from './picker';
 
 /** Threshold slider resolution in decades; values snap to two significant digits. */
@@ -44,6 +45,23 @@ export function mountSettingsPanel(
       if (radio.checked) update({ source: radio.value as SourceKind });
     });
   }
+
+  // Period of the change, volume and chart: one radio per HISTORY_PERIODS_MIN, labelled 1m … 1h.
+  el('period').replaceChildren(
+    ...HISTORY_PERIODS_MIN.map((periodMin) => {
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'period';
+      radio.value = String(periodMin);
+      radio.checked = periodMin === initial.periodMin;
+      radio.addEventListener('change', () => {
+        if (radio.checked) update({ periodMin });
+      });
+      const label = document.createElement('label');
+      label.append(radio, durationLabel(periodMin * 60_000));
+      return label;
+    }),
+  );
 
   const range = (
     id: string,

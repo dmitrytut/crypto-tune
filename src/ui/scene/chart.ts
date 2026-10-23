@@ -1,4 +1,5 @@
-import { HISTORY_WINDOW_MS, type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
+import { type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
+import { durationLabel } from '../format';
 import { css, DOWN_COLOR, sideColor, tensionColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
 import { sizeDecades } from './spawn';
@@ -16,35 +17,37 @@ const MARKER_BASE_R = 2;
 const MARKER_GROWTH = 4 / 3;
 
 /**
- * Bottom strip: up to HISTORY_WINDOW_MS of price with the area under the line
- * tinted by tension at each moment, buy volume up / sell volume down per
+ * Bottom strip: the chosen period of price with the area under the line tinted
+ * by tension at each moment, buy volume up / sell volume down per
  * VOLUME_BUCKET_MS below it, and event markers on the line. No axes — it is
  * ambience, the exact numbers live in the readout.
  * @package
  */
 export class Chart {
   private readonly ctx: CanvasRenderingContext2D;
+  private labelledMs = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas unavailable');
     this.ctx = ctx;
-    canvas.setAttribute(
-      'aria-label',
-      `Price and volume, last ${HISTORY_WINDOW_MS / 60_000} minutes`,
-    );
   }
 
-  draw(h: HistorySeries, now: number): void {
+  /** Draws up to `periodMs` of history ending at `now`; a shorter history fills the width. */
+  draw(h: HistorySeries, now: number, periodMs: number): void {
     const { ctx, canvas } = this;
+    if (periodMs !== this.labelledMs) {
+      this.labelledMs = periodMs;
+      canvas.setAttribute('aria-label', `Price and volume, last ${durationLabel(periodMs)}`);
+    }
     const dpr = fitCanvas(canvas);
     const w = canvas.clientWidth;
     const ht = canvas.clientHeight;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, ht);
-    // Grow with the history until it covers the full window.
+    // Grow with the history until it covers the full period.
     const oldest = Math.min(h.prices[0]?.ts ?? now, h.volumes[0]?.ts ?? now);
-    const span = Math.min(HISTORY_WINDOW_MS, Math.max(MIN_SPAN_MS, now - oldest));
+    const span = Math.min(periodMs, Math.max(MIN_SPAN_MS, now - oldest));
     const from = now - span;
     const x = (ts: number) => ((ts - from) / span) * w;
     this.drawVolume(h, x, (VOLUME_BUCKET_MS / span) * w, ht, from);

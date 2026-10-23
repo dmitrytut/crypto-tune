@@ -1,4 +1,5 @@
 import { DEFAULT_METRICS_CONFIG } from './metrics/engine';
+import { HISTORY_PERIODS_MIN, type HistoryPeriodMin } from './metrics/history';
 import { DEFAULT_TENSION_PARAMS } from './metrics/tension';
 
 export type SourceKind = 'live' | 'simulator';
@@ -26,6 +27,8 @@ export interface Settings {
   liqThresholdUsd: number;
   /** Aggressive trades at or above this quote notional sound, USD. */
   tradeThresholdUsd: number;
+  /** Span of the price change, volume readout and chart, minutes. */
+  periodMin: HistoryPeriodMin;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -40,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   eventsVolumeDb: -6,
   liqThresholdUsd: 20_000,
   tradeThresholdUsd: 200_000,
+  periodMin: 15,
 };
 
 export const LIMITS = {
@@ -92,6 +96,7 @@ export function parseSettings(raw: unknown): Settings {
       num(o.tradeThresholdUsd, DEFAULT_SETTINGS.tradeThresholdUsd),
       LIMITS.tradeThresholdUsd,
     ),
+    periodMin: HISTORY_PERIODS_MIN.find((p) => p === o.periodMin) ?? DEFAULT_SETTINGS.periodMin,
   };
 }
 

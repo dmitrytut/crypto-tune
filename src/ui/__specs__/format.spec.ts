@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clock, priceDecimals, splitPrice } from '../format';
+import { clock, durationLabel, priceDecimals, splitPrice } from '../format';
 
 describe('priceDecimals', () => {
   it('keeps about six significant digits across price scales', () => {
@@ -32,5 +32,15 @@ describe('clock', () => {
     expect(clock(292.2)).toBe('4:53');
     expect(clock(9)).toBe('0:09');
     expect(clock(-3)).toBe('0:00');
+  });
+});
+
+describe('durationLabel', () => {
+  it('rounds down to the largest unit, so a partial period never reads as the full one', () => {
+    expect(durationLabel(3_600_000)).toBe('1h');
+    expect(durationLabel(3_599_000)).toBe('59m');
+    expect(durationLabel(15 * 60_000)).toBe('15m');
+    expect(durationLabel(59_999)).toBe('59s');
+    expect(durationLabel(200)).toBe('1s');
   });
 });

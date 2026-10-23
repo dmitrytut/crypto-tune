@@ -12,7 +12,7 @@ import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { el } from './dom';
 import { FlowMeter } from './flow';
-import { clock, usdFmt } from './format';
+import { clock, durationLabel, usdFmt } from './format';
 import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
 import { mountPicker } from './picker';
 import { PriceReadout } from './price-readout';
@@ -28,8 +28,6 @@ const TITLE_EVERY_MS = 1_000;
 /** Events older than this (wall clock) are history replays, not news: no sparks, no flow. */
 const VISUAL_MAX_AGE_MS = 2_000;
 const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
-/** The volume readout is USD traded over about this long (whole 10 s buckets). */
-const VOLUME_SPAN_MS = 60_000;
 /** The last big trade or liquidation stays readable this long, then fades out. */
 const EVENT_SHOW_MS = 60_000;
 
@@ -149,6 +147,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     settings = { ...settings, ...patch };
     if ('source' in patch || 'symbol' in patch) syncPair();
     if ('windowSec' in patch) fillTensionHelp(tensionHelp, settings.windowSec);
+    if ('periodMin' in patch) chartDirty = true;
     handlers.onSettings(settings);
   };
   const panel = mountSettingsPanel(initial, update);
@@ -243,7 +242,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     bigTradeUsd: () => settings.tradeThresholdUsd,
     onFrame() {
       if (chartDirty && history && last) {
-        chart.draw(history, last.ts);
+        chart.draw(history, last.ts, settings.periodMin * 60_000);
         chartDirty = false;
       }
     },
@@ -280,26 +279,21 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       last = s;
       chartDirty = true;
       price.render(s.price);
-      // Change over the chart's span, so the number describes the line below it.
+      // Change, volume and chart cover the same period: the chosen one, or all the history
+      // there is while it is shorter.
       const first = history?.prices[0];
-      if (!first || Number.isNaN(s.price)) {
+      if (!history || !first || Number.isNaN(s.price)) {
         change.textContent = '\u00a0';
         change.className = 'change';
       } else {
-        const pct = (s.price / first.price - 1) * 100;
+        const spanMs = Math.min(settings.periodMin * 60_000, s.ts - first.ts);
+        const span = durationLabel(spanMs);
+        const pct = (s.price / history.priceAt(s.ts - spanMs) - 1) * 100;
         const shown = Math.abs(pct) < 0.005 ? 0 : pct;
         const arrow = shown > 0 ? '▲ ' : shown < 0 ? '▼ ' : '';
-        const spanMs = s.ts - first.ts;
-        const span =
-          spanMs >= 60_000
-            ? `${Math.round(spanMs / 60_000)} min`
-            : `${Math.max(1, Math.round(spanMs / 1000))} s`;
         change.textContent = `${arrow}${Math.abs(shown).toFixed(2)}% in ${span}`;
         change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
-      }
-      if (history) {
-        const usd = history.volumeUsdSince(s.ts - VOLUME_SPAN_MS);
-        vol.textContent = `vol ${usdFmt.format(usd)}/m`;
+        vol.textContent = `vol ${usdFmt.format(history.volumeUsdSince(s.ts - spanMs))}/${span}`;
       }
       paintEvent();
       if (s.ready) {
@@ -338,7 +332,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       fill.style.width = '0';
       fill.style.backgroundColor = '';
       fx.clear();
-      chart.draw(h, Date.now());
+      chart.draw(h, Date.now(), settings.periodMin * 60_000);
       aura?.setTarget(CALM_AURA);
     },
     setStatus(s) {
