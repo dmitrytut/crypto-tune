@@ -156,8 +156,8 @@ list. Pair and tonic share one dropdown component (`ui/components/picker/`): arr
 click outside closes. There is no visible title; the `h1` is for screen readers only. Style: opaque
 surfaces without blur or glow, the yellow accent only on the sound button, Lucide icons, one white
 focus ring on every control. Plain CSS: design tokens (palette, type scale, spacing, radii,
-shadows, motion, stacking) in `src/ui/tokens.css`, cascade layers `base → page → components →
-utilities`, each component's stylesheet next to its code.
+shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
+`base → page → components → utilities`, each component's stylesheet next to its code.
 - **Aura** (WebGL shader) reacts from the first trade, with no warm-up:
   - **order flow** (last ~4 s): buying pressure turns the field teal and lifts it; selling pressure
     turns it magenta and amber and pushes it down. The busier trading is relative to the last 2 min,

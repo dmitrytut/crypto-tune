@@ -5,9 +5,10 @@
 **Goal:** один источник для цветов, типографики, отступов, радиусов, теней, движения и z-слоёв;
 каскад, который не зависит от порядка файлов; ноль дублей значений между CSS-файлами.
 
-**Architecture:** нативный CSS без препроцессора. `src/ui/tokens.css`: дизайн-токены на `:root`.
-`src/ui/styles.css`: порядок `@layer`, base, разметка страницы, утилиты. Каждый
-`components/<name>/<name>.css` лежит в `@layer components` и использует нативный nesting и токены.
+**Architecture:** нативный CSS без препроцессора. Глобальные стили в `src/ui/styles/`:
+`tokens.css` (дизайн-токены на `:root`) и `styles.css` (порядок `@layer`, base, разметка страницы,
+утилиты). Каждый `components/<name>/<name>.css` лежит в `@layer components` и использует нативный
+nesting и токены.
 Литерал остаётся в правиле, только если его использует одно правило и он не является шагом шкалы.
 
 **Tech Stack:** Vite 8 (Lightning CSS minify, PostCSS `@import` inline), Biome 2 (CSS lint + format),
@@ -35,7 +36,7 @@ Chromium-baseline: `:has()` уже обязателен, значит nesting, `
 | ---------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SCSS / Tailwind        | нет                                                                                  | Всё нужное есть в CSS; переменные Sass не видят рантайм `--up/--down`; Tailwind размазал бы стили по TS-строкам                                                               |
 | Порядок каскада        | `@layer base, page, components, utilities;` первой строкой `styles.css`              | `app.ts` импортирует `styles.css` до компонентов, так что порядок объявлен раньше любого слоя. Утилиты (`.up`, `.down`, `.visually-hidden`) побеждают без гонки специфичности |
-| Где токены             | `src/ui/tokens.css`, `@import` из `styles.css`                                       | Один файл, который читают при правке палитры; правило AGENTS.md «живёт с владельцем»: токены принадлежат UI                                                                   |
+| Где токены             | `src/ui/styles/tokens.css`, `@import` из `styles/styles.css`                         | Один файл, который читают при правке палитры; правило AGENTS.md «живёт с владельцем»: токены принадлежат UI; оба глобальных файла в одной папке, как компоненты               |
 | Что становится токеном | значение, которое делят 2+ правила, или шаг шкалы (палитра, кегли, отступы, радиусы) | То же правило, что для констант в AGENTS.md; одноразовые оптические значения (`padding: 9px 14px 9px 18px`) остаются литералами                                               |
 | Кольцо фокуса          | одно правило в base: `:where(button, input, summary, [tabindex]):focus-visible`      | Было 5 копий `outline: 2px solid var(--text)`; range-инпуты и `summary` получали синее UA-кольцо                                                                              |
 | Шрифт на canvas        | `fx.ts` читает `getComputedStyle(canvas).fontFamily`                                 | Стек `"Onest Variable", …` был продублирован строкой в TS                                                                                                                     |
@@ -71,8 +72,9 @@ Chromium-baseline: `:has()` уже обязателен, значит nesting, `
 
 ```
 src/ui/
-├── tokens.css                 # NEW: все токены
-├── styles.css                 # порядок слоёв, base, page, utilities
+├── styles/
+│   ├── tokens.css             # NEW: все токены
+│   └── styles.css             # перенесён из src/ui/: порядок слоёв, base, page, utilities
 ├── scene/fx.ts                # шрифт подписей из CSS
 └── components/
     ├── chart-tip/chart-tip.css
@@ -100,7 +102,8 @@ src/ui/
 
 ### Task 2: Токены и глобальные стили
 
-**Files:** Create `src/ui/tokens.css`; Modify `src/ui/styles.css` (весь файл).
+**Files:** Create `src/ui/styles/tokens.css`; Move + rewrite `src/ui/styles.css` → `src/ui/styles/styles.css`;
+Modify `src/ui/app.ts:1` (импорт `./styles/styles.css`).
 
 **Interfaces:** Produces: все токены из таблицы «Токены», слои `base, page, components, utilities`.
 - [x] Создать `tokens.css` со всеми токенами из таблицы.
