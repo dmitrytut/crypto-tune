@@ -1,6 +1,8 @@
+import { HISTORY_PERIODS_MIN } from '../metrics/history';
 import { LIMITS, type Settings, type SourceKind, TONICS } from '../settings';
 import { el } from './dom';
-import { usdFmt } from './format';
+import { durationLabel, usdFmt } from './format';
+import { mountPicker } from './picker';
 
 /** Threshold slider resolution in decades; values snap to two significant digits. */
 const LOG_STEP = 0.05;
@@ -27,19 +29,15 @@ export function mountSettingsPanel(
     if (e.target === dialog) dialog.close();
   });
 
-  const tonic = el<HTMLSelectElement>('tonic');
-  tonic.replaceChildren(
-    ...TONICS.map((t) => {
-      const opt = document.createElement('option');
-      opt.value = opt.textContent = t;
-      return opt;
-    }),
-  );
-  tonic.value = initial.tonic;
-  tonic.addEventListener('change', () => {
-    const t = TONICS.find((x) => x === tonic.value);
-    if (t) update({ tonic: t });
+  const tonic = mountPicker(el('tonic'), {
+    label: 'Tonic',
+    onPick: (value) => {
+      const t = TONICS.find((x) => x === value);
+      if (t) update({ tonic: t });
+    },
   });
+  tonic.setOptions(TONICS);
+  tonic.set(initial.tonic);
 
   for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="source"]')) {
     radio.checked = radio.value === initial.source;
@@ -47,6 +45,23 @@ export function mountSettingsPanel(
       if (radio.checked) update({ source: radio.value as SourceKind });
     });
   }
+
+  // Period of the change, volume and chart: one radio per HISTORY_PERIODS_MIN, labelled 1m … 1h.
+  el('period').replaceChildren(
+    ...HISTORY_PERIODS_MIN.map((periodMin) => {
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'period';
+      radio.value = String(periodMin);
+      radio.checked = periodMin === initial.periodMin;
+      radio.addEventListener('change', () => {
+        if (radio.checked) update({ periodMin });
+      });
+      const label = document.createElement('label');
+      label.append(radio, durationLabel(periodMin * 60_000));
+      return label;
+    }),
+  );
 
   const range = (
     id: string,

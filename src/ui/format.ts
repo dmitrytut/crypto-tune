@@ -33,21 +33,22 @@ export function clock(seconds: number): string {
 }
 
 /**
- * Compact USD, e.g. $766.3K.
+ * Short span label rounded down to its largest unit: 1h, 15m, 7m, 40s.
+ * @package
+ */
+export function durationLabel(ms: number): string {
+  if (ms >= 3_600_000) return `${Math.floor(ms / 3_600_000)}h`;
+  if (ms >= 60_000) return `${Math.floor(ms / 60_000)}m`;
+  return `${Math.max(1, Math.floor(ms / 1000))}s`;
+}
+
+/**
+ * Compact USD to three significant digits, e.g. $221K, $5.5M, $1.23M.
  * @package
  */
 export const usdFmt = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
   notation: 'compact',
-  maximumFractionDigits: 1,
-});
-
-/**
- * Compact plain number, e.g. 12.4K (base-asset volume).
- * @package
- */
-export const volFmt = new Intl.NumberFormat('en-US', {
-  notation: 'compact',
-  maximumFractionDigits: 1,
+  maximumSignificantDigits: 3,
 });

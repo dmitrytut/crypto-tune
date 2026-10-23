@@ -43,23 +43,23 @@ looked at the chart.
 - **Every whale and every wipe-out.** Liquidations sound as FM gongs, big market trades as plucks.
   Each sits where it belongs in the stereo field: buys to the right, sells to the left.
 - **A living picture.** A WebGL aura takes its colour from order flow. Buys float up as bubbles, sells
-  sink as drops, and liquidations send shockwaves out of the price. A 15-minute price and volume strip
-  runs along the bottom.
+  sink as drops, and liquidations send shockwaves out of the price. A price and volume strip runs
+  along the bottom, over the period you pick: 1m, 5m, 15m or 1h.
 - **Ready in seconds.** The last 30 minutes of trades load on connect and are cached in IndexedDB,
   so tension is calibrated almost at once instead of after a five-minute warm-up.
-- **Glanceable.** The tab title reads `▲ 81,305.2 · BTCUSDT · ⚡2.6`. After 10 s without input the UI
-  fades out, leaving only the aura, the price and the chart.
+- **Glanceable.** The tab title reads `▲ 81,305.2 · BTCUSDT · tension 2.6`. After 10 s without input
+  the UI fades out, leaving only the aura, the price and the chart.
 - **Any Binance USDⓈ-M perpetual.** You can also switch to the built-in simulator to hear a sell-off
   on demand.
 
-| Live BTCUSDT, sellers in control                    | Simulator, liquidation cascade                                 |
-| --------------------------------------------------- | -------------------------------------------------------------- |
-| ![Live BTCUSDT with sell flow](docs/media/live.jpg) | ![Simulated cascade with liquidations](docs/media/selloff.jpg) |
+| Live BTCUSDT, buyers in control                    | Simulator, liquidation cascade                                 |
+| -------------------------------------------------- | -------------------------------------------------------------- |
+| ![Live BTCUSDT with buy flow](docs/media/live.jpg) | ![Simulated cascade with liquidations](docs/media/selloff.jpg) |
 
 ## Quick start
 
-Open **<https://dmitrytut.github.io/crypto-tune/>** and press the yellow play button. Browsers only
-start audio after a click.
+Open **<https://dmitrytut.github.io/crypto-tune/>** and press **Listen**. Browsers only start audio
+after a click.
 
 To run it locally:
 
@@ -103,7 +103,7 @@ Recomputed every 250 ms on the feed clock, never wall time:
   release 0.03.
 - `direction` is the smoothed `sign(ret)`. The window N defaults to 5 s.
 - Without history, the warm-up lasts N + 5 min and the UI counts it down
-  (`calibrating tension · m:ss`).
+  (`calibrating · m:ss`).
 
 Design notes and decisions: [`docs/plan.md`](docs/plan.md).
 
@@ -134,7 +134,8 @@ Design notes and decisions: [`docs/plan.md`](docs/plan.md).
     and left;
   - loudness grows with log size, from quiet at the threshold to full at 100× the threshold;
   - cascades collapse to at most one hit per kind per 250 ms tick; the side with more volume wins.
-    The latest event is shown under the meter (`LIQ LONG $766K`) even with sound off;
+    The latest event is shown under the meter with its age (`LIQ LONG $766K (12s ago)`), even with
+    sound off, and fades out after a minute;
   - thresholds are shared by all pairs, so lower them for small pairs.
 - Every change is smooth: levels and filters ramp over 0.5 s, tempo moves in 1 BPM steps, double time
   lands on the beat and chord changes on bar lines. Tonic, the three layer volumes and both
@@ -142,13 +143,25 @@ Design notes and decisions: [`docs/plan.md`](docs/plan.md).
 
 ### Visuals
 
+The main screen works like "now playing" (the whole UI is in English): a large price, its change over
+the chosen period below it (`▼ 0.11% in 15m`), the **Tension** meter with Calm / Tense / Shock zones
+(`calibrating · 4:52` on the right during warm-up), dollar volume over the same period
+(`vol $90.9M/15m`), the latest event, and the **Listen** / **Stop** button. The tooltip on `Tension`
+(hover, focus or tap) explains what the meter measures and how each zone sounds. Until data arrives,
+the line under the meter says what it is waiting for (`Connecting to the market…`,
+`Loading recent trades…`), and the status in the top right is in words (`Live`, `Connecting…`).
+Sound, sensitivity and source live in settings (⚙); debug metrics show only with `?debug` in the
+URL. The pair chip in the top left always shows its border and arrow; a click opens a searchable
+list. Pair and tonic share one dropdown component (`ui/picker.ts`): arrows and Enter pick, Esc or a
+click outside closes. There is no visible title; the `h1` is for screen readers only. Style: opaque
+surfaces without blur or glow, the yellow accent only on the sound button, Lucide icons.
 - **Aura** (WebGL shader) reacts from the first trade, with no warm-up:
   - **order flow** (last ~4 s): buying pressure turns the field teal and lifts it; selling pressure
     turns it magenta and amber and pushes it down. The busier trading is relative to the last 2 min,
     the faster and brighter it flows;
   - **tension** (after warm-up): a sustained move tears the field into turbulence and saturates it;
   - a volume spike brightens it, and price above the hourly EMA lifts the glow;
-  - at rest: deep indigo breathing in time with the drone.
+  - at rest: a cool steel blue breathing in time with the drone.
 - **Every buy is a bubble** rising from the chart, **every sell a drop** falling from the top. Buys sit
   slightly right and sells left, as in the stereo mix. Size grows with log notional, from 4 px at $1K
   to 22 px at $1M. Trades above the threshold get a halo, a floating amount (`+$864K`) and a flash in
@@ -159,8 +172,16 @@ Design notes and decisions: [`docs/plan.md`](docs/plan.md).
   cascade build.
 - **Price** uses thin tabular digits with fixed precision per pair, so the width never jumps. Only the
   digits that changed flash. Film grain sits over everything.
-- **Chart**: up to 15 min of price, a glow under the line coloured by tension, buy volume up and sell
-  volume down per 10 s, and event dots.
+- **Chart** over the same period: a glow under the line coloured by tension, buy volume up and sell
+  volume down per 10 s, and event dots. While history is shorter, the chart stretches over what there
+  is (at least 30 s).
+- **Period** (settings → Period): 1m, 5m, 15m or 1h, one for price change, volume and chart; it is
+  remembered. While history is shorter than the period, everything uses what there is and the label
+  shows the real span (`in 26m`). History is kept for up to an hour; on LIVE about 30 min are loaded
+  on connect, and it grows from there.
+- **Tab title**: `▲ 81,305.2 · BTCUSDT · tension 2.6`, so the state is visible without switching tabs.
+- **Immersive mode**: after 10 s without mouse or keyboard the UI fades out, leaving the aura, the
+  price and the chart.
 - `prefers-reduced-motion`: the aura is nearly still, and there are no bubbles, rings, waves, shake
   or flashes.
 
@@ -192,6 +213,7 @@ by hand: Actions → Deploy to GitHub Pages → Run workflow.
 - [x] **Sound v2**: history instead of warm-up, on-the-beat reactions, shock swell, chord drift, bell
   loops, pulse
 - [x] **Stage 5**: visuals (aura, particles, chart, settings dialog)
+- [x] **Design cleanup** (per taste-skill): title and labels, a text button, no glass/glow/neon
 - [x] **Publishing**: GitHub Pages via Actions, logo and favicon
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
@@ -200,9 +222,23 @@ sound, and Binance covers the pairs that matter.
 <details>
 <summary><b>Manual checks per stage</b></summary>
 
+### Design cleanup
+
+1. `pnpm dev`: the first screen shows the price, the `… in 15m` change, the meter and the **Listen**
+   button; while history loads, text sits under the meter instead of a blank.
+2. Hovering or tapping `Tension ⓘ` shows the tooltip with zones; Esc or a tap outside closes it.
+3. The pair chip always has a border and an arrow; a click opens the list with search, `eth` →
+   `ETHUSDT` with arrows and Enter; an unknown pair gives `No such pair on Binance Futures`; the
+   simulator has no arrow. The tonic in settings opens the same list; Esc closes the list, not the
+   dialog.
+4. No blur under the chip, buttons or dialog; no glow on the sound button or the chart line; at rest
+   the aura is blue, not violet.
+5. Settings headings are in sentence case, the source reads `Live` / `Simulator`; the Debug block
+   appears only on `/?debug`.
+
 ### Stage 5
 
-1. `pnpm test`: includes chart history (price per second, buy/sell volume per 10 s, 15 min trim),
+1. `pnpm test`: includes chart history (price per second, buy/sell volume per 10 s, 1 h trim),
    the aura palette (colour by direction, speed by tension, brightness by volume) and particle merging
    under load.
 2. `pnpm dev` → LIVE: the aura changes colour and motion within seconds; buy bubbles rise from the
@@ -253,22 +289,22 @@ sound, and Binance covers the pairs that matter.
 2. `pnpm dev` → SIMULATOR → **Start**: sound fades in over ~3 s; **Stop** fades out over 1.5 s.
 3. Change the tonic: the drone glides to the new note without a click.
 4. The base volume slider changes the level smoothly.
-5. `vs EMA 1h` well above 0 → the arpeggio sits higher, below 0 → lower. On the simulator this shows
-   after an impulse.
+5. `vs EMA 1h` (Debug, `/?debug`) well above 0 → the arpeggio sits higher, below 0 → lower. On the
+   simulator this shows after an impulse.
 6. On LIVE the register follows the EMA immediately (history from REST).
 
 ### Stage 1
 
 1. `pnpm test`: rolling std, z-score, asymmetric smoothing, tension, the metrics engine, Binance
    parsers and reconnection.
-2. `pnpm dev` → LIVE: status `open`, the price updates; z / volZ / tension appear within seconds
+2. `pnpm dev`, open `/?debug` → LIVE: status `Live`, the price updates; z / volZ / tension appear within seconds
    (history from REST; without it, a ~5 min warm-up).
-3. Change the pair (e.g. `ETHUSDT`): label and price switch, warm-up restarts. An unknown pair shows
-   an error under the field.
+3. Change the pair (e.g. `ETHUSDT`): label and price switch, warm-up restarts. An unknown pair: the
+   pair list shows `No such pair on Binance Futures`.
 4. SIMULATOR: metrics are ready at once. An impulse starts every 1.5–5 min, tension climbs above
    1–2.5, and direction shows its sign.
-5. DevTools → Network → Offline: the status shows "retry in Ns" with a growing delay. Back online: the
-   connection is `open` again.
+5. DevTools → Network → Offline: the status shows "retrying in Ns" with a growing delay. Back online:
+   the status is `Live` again.
 6. Reload the page: source, pair, window N and sensitivity are kept.
 
 </details>

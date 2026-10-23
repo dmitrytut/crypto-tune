@@ -68,4 +68,17 @@ describe('MarketHistory', () => {
     expect(h.priceAt(T0 - 50_000)).toBe(100);
     expect(h.priceAt(T0 + 50_000)).toBe(104);
   });
+
+  it('sums both sides of the buckets starting at or after a timestamp', () => {
+    const h = new MarketHistory();
+    expect(h.volumeUsdSince(T0)).toBe(0);
+    h.addTrade(trade(T0, 'buy', 1));
+    h.addTrade(trade(T0 + VOLUME_BUCKET_MS, 'buy', 10));
+    h.addTrade(trade(T0 + VOLUME_BUCKET_MS + 1, 'sell', 20));
+    h.addTrade(trade(T0 + 2 * VOLUME_BUCKET_MS, 'sell', 100));
+    // The bucket starting exactly at `ts` counts; the one before it does not.
+    expect(h.volumeUsdSince(T0 + VOLUME_BUCKET_MS)).toBeCloseTo(130);
+    expect(h.volumeUsdSince(T0 + 1)).toBeCloseTo(130);
+    expect(h.volumeUsdSince(T0)).toBeCloseTo(131);
+  });
 });

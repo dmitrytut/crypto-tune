@@ -329,10 +329,10 @@ export class Fx {
       const t = l.age / LABEL_SEC;
       ctx.globalAlpha = Math.min(1, l.age / 0.15) * (1 - t) ** 1.5;
       ctx.font = `700 ${l.size}px "Onest Variable", system-ui, sans-serif`;
-      // White text, coloured glow: readable on any aura, still carries the side colour.
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-      ctx.shadowColor = css(l.color, 1);
-      ctx.shadowBlur = 14;
+      // Side-coloured text over a neutral dark scrim: readable on any aura, no glow.
+      ctx.fillStyle = css(l.color, 1);
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+      ctx.shadowBlur = 8;
       ctx.fillText(l.text, l.x, l.y - 28 * t);
       this.labels[alive++] = l;
     }
