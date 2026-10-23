@@ -68,8 +68,7 @@
   /* Page level: the stage sits under the film grain. */
   --z-stage: 1;
   --z-grain: 2;
-  /* Inside the stage: the tension hint, then menus, then the chart tooltip on top. */
-  --z-hint: 3;
-  --z-menu: 4;
-  --z-tooltip: 5;
+  /* Inside the stage: menus, then the chart tooltip on top. Hints open in the top layer. */
+  --z-menu: 3;
+  --z-tooltip: 4;
 }

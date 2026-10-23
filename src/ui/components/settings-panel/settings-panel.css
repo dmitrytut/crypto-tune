@@ -21,6 +21,13 @@
       font-weight: 600;
       margin: var(--space-md) 0 0;
     }
+    /* A label and its ⓘ hint sit on one line. */
+    & h3,
+    & .field-head {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
   }
   .settings-body {
     display: grid;
@@ -69,27 +76,6 @@
         border-color: rgb(255 255 255 / 0.5);
         background: var(--surface-strong);
       }
-    }
-  }
-
-  .debug summary {
-    cursor: pointer;
-    font-size: var(--font-size-xs);
-    color: var(--muted);
-  }
-  .stats {
-    display: grid;
-    grid-template-columns: auto 1fr auto 1fr;
-    gap: var(--space-xs) var(--space-lg);
-    margin: var(--space-md) 0 0;
-    font-size: var(--font-size-sm);
-
-    & dt {
-      color: var(--muted);
-    }
-    & dd {
-      margin: 0;
-      font-variant-numeric: tabular-nums;
     }
   }
 }

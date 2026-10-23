@@ -3,11 +3,69 @@ import { HISTORY_PERIODS_MIN } from '../../../metrics/history';
 import { LIMITS, type Settings, type SourceKind, TONICS } from '../../../settings';
 import { el } from '../../dom';
 import { durationLabel, usdFmt } from '../../format';
+import { createHint } from '../hint/hint';
 import { mountPicker } from '../picker/picker';
 
 /** Threshold slider resolution in decades; values snap to two significant digits. */
 const LOG_STEP = 0.05;
 const snapUsd = (log10: number) => Number((10 ** log10).toPrecision(2));
+
+/**
+ * The ⓘ tip of every setting: what it is and what it changes, for a listener rather than a
+ * trader. Keyed by the control's id; the tip goes into the label element just before it.
+ */
+const HELP: Record<string, { label: string; text: string }> = {
+  period: {
+    label: 'Period',
+    text: 'How far back the price change, the volume and the chart look.',
+  },
+  tonic: {
+    label: 'Tonic',
+    text: 'The key the music is in. It changes only the pitch, not how the music reacts.',
+  },
+  'base-volume': {
+    label: 'Base',
+    text: 'Volume of the calm background that always plays: drone, melody and bells.',
+  },
+  'tension-volume': {
+    label: 'Tension',
+    text: 'Volume of what joins when the market gets tense: bass, shaker and a rising noise.',
+  },
+  'events-volume': {
+    label: 'Events',
+    text: 'Volume of single big events: gongs for liquidations, plucks for large trades.',
+  },
+  window: {
+    label: 'Price-change window',
+    text:
+      'How many seconds of price movement count as one move. Shorter catches quick spikes, ' +
+      'longer only steadier moves. Changing it restarts the analysis.',
+  },
+  sensitivity: {
+    label: 'Sensitivity',
+    text:
+      'How easily the music tenses up. Above ×1 smaller moves are enough; below ×1 it waits ' +
+      'for bigger ones.',
+  },
+  'liq-threshold': {
+    label: 'Liquidation threshold',
+    text:
+      "A liquidation is a trader's position closed by force. Ones at least this big sound as " +
+      'a gong and get a dot on the chart.',
+  },
+  'trade-threshold': {
+    label: 'Large trade threshold',
+    text:
+      'Single market orders at least this big sound as a pluck and get a dot on the chart. ' +
+      'Lower both thresholds for small coins.',
+  },
+  source: {
+    label: 'Source',
+    text:
+      'Live plays the real Binance futures market. Simulator plays a made-up market with ' +
+      'regular sell-offs and rallies, to hear every sound quickly.',
+  },
+};
 
 /** What the rest of the view may ask the settings dialog. */
 export interface SettingsPanel {
@@ -28,6 +86,12 @@ export function mountSettingsPanel(
     // A click on the dialog element itself (not its content) is a click on the backdrop.
     if (e.target === dialog) dialog.close();
   });
+
+  for (const [id, { label, text }] of Object.entries(HELP)) {
+    const head = el(id).previousElementSibling;
+    if (!head) throw new Error(`#${id} needs its label just before it in index.html`);
+    head.append(createHint(label, { text }).root);
+  }
 
   const tonic = mountPicker(el('tonic'), {
     label: 'Tonic',

@@ -1,7 +1,7 @@
-/* Self-explaining label (hint.ts): hover or focus shows the tip, a tap pins it. */
+/* Self-explaining label (hint.ts): an ⓘ button and a tip in the top layer. */
 @layer components {
   .hint {
-    position: relative;
+    display: inline-flex;
   }
 
   .hint-btn {
@@ -24,19 +24,20 @@
       color: var(--muted);
     }
     &:hover .icon,
-    .hint[data-open] & .icon {
+    &[aria-expanded="true"] .icon {
       color: var(--text);
     }
   }
 
-  /* Floats above the label, so it shadows like a menu. */
+  /* A popover: the top layer floats it over the stage and the dialog alike; hint.ts places it
+   * in window coordinates. It sits inside headings and labels, so it resets what they set. */
   .hint-pop {
-    position: absolute;
-    bottom: calc(100% + var(--space-md));
-    left: 0;
-    z-index: var(--z-hint);
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    width: max-content;
     /* Never wider than the window minus the page margins. */
-    width: min(340px, calc(100vw - 2 * var(--gutter)));
+    max-width: min(320px, calc(100vw - 2 * var(--gutter)));
     padding: var(--space-lg) var(--space-xl);
     border: var(--border);
     border-radius: var(--radius-lg);
@@ -44,13 +45,10 @@
     box-shadow: var(--shadow-pop);
     color: var(--text);
     font-size: var(--font-size-sm);
+    font-weight: 400;
     line-height: 1.45;
+    text-align: left;
     font-variant-numeric: normal;
-    opacity: 0;
-    visibility: hidden;
-    transition:
-      opacity var(--duration-fast),
-      visibility var(--duration-fast);
 
     & p,
     & ul {
@@ -62,18 +60,6 @@
     }
     & p:last-child {
       color: var(--muted);
-    }
-
-    .hint[data-open] &,
-    .hint-btn:focus-visible + & {
-      opacity: 1;
-      visibility: visible;
-    }
-    @media (hover: hover) {
-      .hint:hover & {
-        opacity: 1;
-        visibility: visible;
-      }
     }
   }
 }
