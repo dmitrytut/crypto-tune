@@ -1,9 +1,12 @@
 /* Event marker tooltip (chart-tip.ts). Floats over the chart, so it shadows like a menu. */
 .chart-tip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   position: fixed;
   z-index: 5;
   translate: -50% -100%;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #141519;
@@ -12,12 +15,14 @@
   pointer-events: none;
   font-variant-numeric: tabular-nums;
 }
+.chart-tip[hidden] {
+  display: none;
+}
 .chart-tip-what {
   font-size: 14px;
   font-weight: 600;
 }
 .chart-tip-when {
-  margin-top: 2px;
   font-size: 12px;
   color: var(--muted);
 }

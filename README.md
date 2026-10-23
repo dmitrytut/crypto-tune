@@ -174,7 +174,7 @@ surfaces without blur or glow, the yellow accent only on the sound button, Lucid
   digits that changed flash. Film grain sits over everything.
 - **Chart** over the same period: a glow under the line coloured by tension, buy volume up and sell
   volume down per 10 s, and event dots. Hovering a dot (or tapping it on a phone) shows what it was
-  and when: `SELL $603K`, `Large trade · 03:57:03`. While history is shorter, the chart stretches over
+  and when, in one line: `SELL $603K 03:57:03`. While history is shorter, the chart stretches over
   what there is (at least 30 s).
 - **Period** (settings → Period): 1m, 5m, 15m or 1h, one for price change, volume and chart; it is
   remembered. While history is shorter than the period, everything uses what there is and the label

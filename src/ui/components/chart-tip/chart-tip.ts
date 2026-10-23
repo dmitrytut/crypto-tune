@@ -12,7 +12,7 @@ const timeFmt = new Intl.DateTimeFormat('en-GB', {
 });
 
 /**
- * Tooltip for the event markers on the chart: what the dot is and when it happened.
+ * Tooltip for the event markers on the chart, one line: `SELL $219K 04:04:12`.
  * A mouse shows it on hover; a tap shows it until the next tap elsewhere. `find`
  * hit-tests the chart in canvas CSS px. Its outside-press listener lives on `document`
  * with no teardown: mount once per page.
@@ -40,7 +40,7 @@ export function mountChartTip(
     const m = hit.marker;
     what.textContent = eventLabel(m.kind, m.side, m.usd);
     what.className = `chart-tip-what ${isDown(m.side) ? 'down' : 'up'}`;
-    when.textContent = `${m.kind === 'liquidation' ? 'Liquidation' : 'Large trade'} · ${timeFmt.format(m.ts)}`;
+    when.textContent = timeFmt.format(m.ts);
     tip.hidden = false;
     canvas.style.cursor = 'pointer';
     // Centred above the marker, kept inside the window.
