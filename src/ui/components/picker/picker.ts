@@ -64,7 +64,8 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   button.className = 'picker-btn';
   button.setAttribute('aria-haspopup', 'listbox');
   button.setAttribute('aria-expanded', 'false');
-  button.setAttribute('aria-controls', `${id}-menu`);
+  // aria-haspopup says a listbox opens: point at the listbox, not the menu wrapping it.
+  button.setAttribute('aria-controls', `${id}-list`);
   const valueNode = document.createElement('span');
   button.append(valueNode);
   button.insertAdjacentHTML('beforeend', CHEVRON);
