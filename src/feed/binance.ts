@@ -86,6 +86,32 @@ const CACHE_TIMEOUT_MS = 1_500;
 const SAVE_EVERY_MS = 30_000;
 
 /**
+ * How many pages older than `newest` to fetch in one parallel wave: exactly up to the cache
+ * when the capped wave reaches it, else enough to reach `sinceMs` at the newest page's pace.
+ * @package
+ */
+export function olderPages(
+  newest: readonly Pick<AggTradeRow, 'a' | 'T'>[],
+  sinceMs: number,
+  cachedLastId: number,
+): number {
+  const first = newest[0];
+  const last = newest.at(-1);
+  if (!first || !last) return 0;
+  const cap = Math.min(HISTORY_MAX_PAGES - 1, Math.ceil(first.a / HISTORY_PAGE_SIZE));
+  const gap = first.a - cachedLastId - 1;
+  if (cachedLastId >= 0 && gap <= cap * HISTORY_PAGE_SIZE) {
+    return Math.max(0, Math.ceil(gap / HISTORY_PAGE_SIZE));
+  }
+  if (first.T <= sinceMs) return 0;
+  const spanMs = last.T - first.T;
+  if (spanMs <= 0) return cap;
+  // shortcut: one wave at the newest page's pace; if older trading was busier, history falls
+  // short of the window (tension needs only 5 min). Add a second wave if that ever shows.
+  return Math.min(cap, Math.ceil((first.T - sinceMs) / spanMs));
+}
+
+/**
  * Recent aggregate trades, oldest first, newer than `afterId`, back to
  * `sinceMs` or HISTORY_MAX_PAGES pages, whichever comes first. Pages walk back
  * by id: ids are contiguous, so stopping at `afterId` + 1 extends a cache exactly.

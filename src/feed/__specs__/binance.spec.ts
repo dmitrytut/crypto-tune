@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BinanceFuturesFeed, binanceStreamUrl, parseAggTrade, parseForceOrder } from '../binance';
+import {
+  BinanceFuturesFeed,
+  binanceStreamUrl,
+  olderPages,
+  parseAggTrade,
+  parseForceOrder,
+} from '../binance';
 import type { Trade } from '../market-feed';
 import type { CachedTrade, TradeStore } from '../trade-cache';
 
@@ -50,6 +56,49 @@ describe('binanceStreamUrl', () => {
     expect(binanceStreamUrl('ETHUSDT')).toBe(
       'wss://fstream.binance.com/market/stream?streams=ethusdt@aggTrade/ethusdt@forceOrder/ethusdt@markPrice@1s',
     );
+  });
+});
+
+describe('olderPages', () => {
+  const SINCE = 1_792_000_000_000;
+  const MIN = 60_000;
+  /** The newest page: 1000 ids from `a`, its first trade at `T`, its last `spanMs` later. */
+  const page = (a: number, T: number, spanMs: number) => [
+    { a, T },
+    { a: a + 999, T: T + spanMs },
+  ];
+
+  it('counts exactly the pages up to a reachable cache', () => {
+    // Ids 7500…9999 are missing: 2500 ids → 3 pages.
+    expect(olderPages(page(10_000, SINCE + 5 * MIN, MIN), SINCE, 7_499)).toBe(3);
+  });
+
+  it('needs none when the newest page already meets the cache', () => {
+    expect(olderPages(page(10_000, SINCE + 5 * MIN, MIN), SINCE, 9_999)).toBe(0);
+    expect(olderPages(page(10_000, SINCE + 5 * MIN, MIN), SINCE, 10_500)).toBe(0);
+  });
+
+  it("reaches back to the window start at the newest page's pace", () => {
+    // 1000 trades per 2 min, the page starts 30 min after the window start → 15 pages.
+    expect(olderPages(page(100_000, SINCE + 30 * MIN, 2 * MIN), SINCE, -1)).toBe(15);
+    // A cache further back than 19 pages is out of reach: same estimate by pace.
+    expect(olderPages(page(100_000, SINCE + 30 * MIN, 2 * MIN), SINCE, 50)).toBe(15);
+  });
+
+  it('needs none once the newest page reaches the window start', () => {
+    expect(olderPages(page(100_000, SINCE, 2 * MIN), SINCE, -1)).toBe(0);
+  });
+
+  it('caps at 19 older pages, fewer near id 0', () => {
+    expect(olderPages(page(100_000, SINCE + 30 * MIN, 10_000), SINCE, -1)).toBe(19);
+    // All 1000 trades in one millisecond: the pace says nothing, take the cap.
+    expect(olderPages(page(100_000, SINCE + 30 * MIN, 0), SINCE, -1)).toBe(19);
+    expect(olderPages(page(1_500, SINCE + 30 * MIN, 2 * MIN), SINCE, -1)).toBe(2);
+    expect(olderPages(page(0, SINCE + 30 * MIN, 2 * MIN), SINCE, -1)).toBe(0);
+  });
+
+  it('needs none for an empty page', () => {
+    expect(olderPages([], SINCE, -1)).toBe(0);
   });
 });
 
