@@ -76,152 +76,6 @@ body::after {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* ── picker: one dropdown for every list (ui/picker.ts) ── */
-.picker {
-  position: relative;
-}
-.picker-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 1px solid var(--line);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-.picker-caret {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  color: var(--muted);
-  transition: rotate 0.15s;
-}
-/* Always looks pickable: a border and a caret, stronger on hover and while open. */
-.picker-btn:hover,
-.picker-btn[aria-expanded="true"] {
-  border-color: rgba(255, 255, 255, 0.36);
-}
-.picker-btn[aria-expanded="true"] .picker-caret {
-  rotate: 180deg;
-}
-.picker-btn:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 3px;
-}
-.picker-btn:disabled {
-  border-color: transparent;
-  color: var(--muted);
-  cursor: default;
-}
-.picker-btn:disabled .picker-caret {
-  display: none;
-}
-/* Floats over everything around it, so it shadows like a menu. */
-.picker-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 4;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #141519;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-}
-.picker-search {
-  width: 100%;
-  margin-bottom: 6px;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: var(--surface-strong);
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  text-transform: uppercase;
-  outline: none;
-}
-.picker-search::placeholder {
-  color: var(--muted);
-  font-weight: 400;
-  text-transform: none;
-}
-.picker-search:focus-visible {
-  border-color: rgba(255, 255, 255, 0.36);
-}
-.picker-list {
-  max-height: min(320px, 55vh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  outline: none;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-}
-.picker-list:empty {
-  display: none;
-}
-.picker-list [role="option"] {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.picker-list [data-active] {
-  background: var(--surface-strong);
-  color: var(--text);
-}
-/* The chosen value: full ink, bold, a dot on the right. */
-.picker-list [aria-selected="true"] {
-  color: var(--text);
-  font-weight: 700;
-}
-.picker-list [aria-selected="true"]::after {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.picker-empty {
-  margin: 0;
-  padding: 10px;
-  color: var(--muted);
-  font-size: 13px;
-}
-/* Chip look: the pair in the top bar. */
-.picker-chip .picker-btn {
-  padding: 9px 14px 9px 18px;
-  border-radius: 999px;
-  background: var(--surface);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-.picker-chip .picker-menu {
-  width: 240px;
-}
-/* Field look: a form control in the settings dialog. */
-.picker-field .picker-btn {
-  width: 100%;
-  padding: 8px 10px 8px 12px;
-  border-radius: 10px;
-  background: var(--surface-strong);
-  font-size: 14px;
-  font-weight: 500;
-}
-.picker-field .picker-menu {
-  width: 100%;
-}
-.picker-field .picker-list {
-  max-height: 240px;
-}
 .top-right {
   display: flex;
   align-items: center;
@@ -290,29 +144,6 @@ body::after {
     transparent
   );
 }
-/* Thin, tabular, quiet: the number is the hero, not its effects. Separators and
- * the fraction step back so the eye reads the big digits first. */
-.price {
-  font-size: clamp(56px, 17vw, 116px);
-  font-weight: 250;
-  letter-spacing: -0.045em;
-  line-height: 1;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  color: #fbfaff;
-  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.35);
-}
-/* Thousands separators step back; the decimal point stays visible (it is inside the dimmed fraction). */
-.price .int .sep {
-  opacity: 0.38;
-}
-.price .frac {
-  font-size: 0.44em;
-  font-weight: 350;
-  letter-spacing: -0.01em;
-  opacity: 0.55;
-  margin-left: 0.04em;
-}
 /* An old event fades out together with its separator, then the view clears it. */
 #last-event,
 .info .dot {
@@ -338,126 +169,6 @@ body::after {
 }
 .down {
   color: var(--down);
-}
-
-.meter {
-  width: 100%;
-  margin-top: 8px;
-}
-.meter-head {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.hint {
-  position: relative;
-}
-.hint-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  color: var(--text);
-  cursor: help;
-}
-.hint-btn .icon {
-  width: 15px;
-  height: 15px;
-  color: var(--muted);
-}
-.hint-btn:hover .icon,
-.hint[data-open] .hint-btn .icon {
-  color: var(--text);
-}
-.hint-btn:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-/* Floats above the label, so it shadows like a menu. */
-.hint-pop {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 0;
-  z-index: 3;
-  width: min(340px, calc(100vw - 48px));
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #141519;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.45;
-  font-variant-numeric: normal;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 0.15s,
-    visibility 0.15s;
-}
-.hint-pop p,
-.hint-pop ul {
-  margin: 0;
-}
-.hint-pop ul {
-  margin: 8px 0;
-  padding-left: 18px;
-}
-.hint-pop p:last-child {
-  color: var(--muted);
-}
-.hint[data-open] .hint-pop,
-.hint-btn:focus-visible + .hint-pop {
-  opacity: 1;
-  visibility: visible;
-}
-@media (hover: hover) {
-  .hint:hover .hint-pop {
-    opacity: 1;
-    visibility: visible;
-  }
-}
-.meter-track {
-  position: relative;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--surface-strong);
-  overflow: hidden;
-}
-/* Grey while calibrating; once ready the view paints it with palette.ts tensionColor. */
-.meter-fill {
-  height: 100%;
-  width: 0;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.35);
-  transition:
-    width 0.25s linear,
-    background-color 0.6s;
-}
-.meter-mark {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: rgba(0, 0, 0, 0.45);
-}
-.meter-scale {
-  position: relative;
-  height: 20px;
-  font-size: 12px;
-  color: var(--muted);
-}
-/* Each zone name starts at its threshold mark. */
-.meter-scale span {
-  position: absolute;
-  top: 4px;
 }
 
 .info {
@@ -514,24 +225,6 @@ body::after {
     box-shadow: 0 0 0 14px rgba(255, 255, 255, 0);
   }
 }
-
-/* Only the digits that changed take the move's colour, then fade back to white. */
-.price .chg.up {
-  animation: digit-up 1.1s ease-out;
-}
-.price .chg.down {
-  animation: digit-down 1.1s ease-out;
-}
-@keyframes digit-up {
-  from {
-    color: var(--up);
-  }
-}
-@keyframes digit-down {
-  from {
-    color: var(--down);
-  }
-}
 .play:hover {
   transform: scale(1.03);
 }
@@ -561,67 +254,7 @@ body.idle .fades {
 body.idle {
   cursor: none;
 }
-
-/* ── settings dialog ── */
-.settings {
-  width: min(440px, calc(100% - 32px));
-  max-height: calc(100% - 48px);
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: #141519;
-  color: var(--text);
-}
-.settings::backdrop {
-  background: rgba(0, 0, 0, 0.45);
-}
-.settings-body {
-  display: grid;
-  gap: 12px;
-  padding: 18px 22px 22px;
-}
-.settings-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.settings h2 {
-  font-size: 18px;
-  margin: 0;
-}
-.settings h3 {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 10px 0 0;
-}
-.field {
-  display: grid;
-  gap: 6px;
-  font-size: 14px;
-  color: var(--muted);
-}
-.field input[type="range"] {
-  accent-color: var(--text);
-}
-
-.segmented {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  gap: 6px;
-}
-.segmented label {
-  flex: 1;
-  text-align: center;
-  font-size: 14px;
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  cursor: pointer;
-}
-/* Visually hidden but still focusable and in the accessibility tree (arrow keys switch source). */
-.segmented input,
+/* Visually hidden but still focusable and in the accessibility tree. */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -631,38 +264,9 @@ body.idle {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.segmented label:has(input:focus-visible) {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
-.segmented label:has(input:checked) {
-  border-color: rgba(255, 255, 255, 0.5);
-  background: var(--surface-strong);
-}
-
-.debug summary {
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--muted);
-}
-.stats {
-  display: grid;
-  grid-template-columns: auto 1fr auto 1fr;
-  gap: 6px 12px;
-  margin: 10px 0 0;
-  font-size: 13px;
-}
-.stats dt {
-  color: var(--muted);
-}
-.stats dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .fades,
-  .meter-fill,
   .play {
     transition: none;
     animation: none;

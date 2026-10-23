@@ -15,6 +15,7 @@ let settings = loadSettings();
 let feed: MarketFeed | null = null;
 let engine: MetricsEngine | null = null;
 let history: MarketHistory | null = null;
+let events: EventBuffer | null = null;
 let unsubs: Unsubscribe[] = [];
 
 const tensionParams = (s: Settings) => ({
@@ -35,7 +36,6 @@ const eventThresholds = (s: Settings): EventThresholds => ({
 });
 
 const audio = new AudioEngine(audioParams(settings));
-const events = new EventBuffer(eventThresholds(settings));
 
 const view = mountApp(settings, {
   onSettings(next) {
@@ -51,7 +51,7 @@ const view = mountApp(settings, {
       engine?.setTensionParams(tensionParams(next));
     }
     audio.setParams(audioParams(next));
-    events.setThresholds(eventThresholds(next));
+    events?.setThresholds(eventThresholds(next));
     saveSettings(next);
   },
   onToggleAudio() {
@@ -74,7 +74,7 @@ const view = mountApp(settings, {
 /** Feeds replay this much history on connect: exactly the window the tension statistics need. */
 const HISTORY_MS = DEFAULT_METRICS_CONFIG.statsWindowMin * 60_000;
 
-/** (Re)create feed, metrics and chart history from current settings; history is discarded. */
+/** (Re)create feed, metrics, events and chart history from current settings; all are discarded. */
 function startPipeline(): void {
   for (const u of unsubs) u();
   feed?.disconnect();
@@ -92,15 +92,17 @@ function startPipeline(): void {
     tension: tensionParams(settings),
   });
   const h = new MarketHistory();
+  // Fresh per pipeline: an event buffered for the old pair must not cue under the new one.
+  const ev = new EventBuffer(eventThresholds(settings));
   unsubs = [
     f.onTrade((t) => {
       e.addTrade(t);
       h.addTrade(t);
-      events.addTrade(t);
+      ev.addTrade(t);
       view.trade(t);
     }),
     f.onLiquidation((l) => {
-      events.addLiquidation(l);
+      ev.addLiquidation(l);
       view.liquidation(l);
     }),
     f.onStatus((s) => {
@@ -113,12 +115,13 @@ function startPipeline(): void {
   feed = f;
   engine = e;
   history = h;
+  events = ev;
   view.reset(h);
   f.connect();
 }
 
 window.setInterval(() => {
-  if (!feed || !engine) return;
+  if (!feed || !engine || !events) return;
   const now = feed.now();
   const snap = engine.advanceTo(now, (s) => history?.addSnapshot(s));
   if (snap) {

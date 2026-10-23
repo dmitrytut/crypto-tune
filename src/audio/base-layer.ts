@@ -2,6 +2,7 @@ import * as Tone from 'tone';
 import { arpDegree, type Contour, entryStep, stickyShift } from './arp-pattern';
 import { degreeToMidi, midiToHz, pitchClassMidi, TONIC_GLIDE_SEC } from './scale';
 import { MIX_RAMP_SEC, type TensionMix } from './tension-map';
+import { stepIndex } from './transport-step';
 
 /** Drone sits in octave 2 (A2 = 110 Hz), arpeggio starts an octave higher. */
 const DRONE_OCTAVE = 2;
@@ -114,7 +115,7 @@ export class BaseLayer {
       // thins a calm line without losing the pulse.
       const transport = this.loop.context.transport;
       const stepTicks = this.eighths ? transport.PPQ / 2 : transport.PPQ;
-      const weak = Math.round(transport.getTicksAtTime(time) / stepTicks) % 2 === 1;
+      const weak = stepIndex(transport.getTicksAtTime(time), stepTicks, 2) === 1;
       if (weak && Math.random() < this.restProb) return;
       const degree = this.lastDegree + this.shift + this.bias;
       const midi = degreeToMidi(pitchClassMidi(this.tonicPc, ARP_OCTAVE), degree);

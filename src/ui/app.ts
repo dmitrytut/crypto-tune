@@ -1,3 +1,4 @@
+import './styles.css';
 import type {
   FeedStatus,
   Liquidation,
@@ -5,23 +6,24 @@ import type {
   Trade,
   TradeSide,
 } from '../feed/market-feed';
-import { DEFAULT_METRICS_CONFIG, type MetricsSnapshot } from '../metrics/engine';
+import type { MetricsSnapshot } from '../metrics/engine';
 import type { EventCue } from '../metrics/events';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
+import { mountChartTip } from './components/chart-tip/chart-tip';
+import { TensionMeter } from './components/meter/meter';
+import { mountPicker } from './components/picker/picker';
+import { PriceReadout } from './components/price-readout/price-readout';
+import { mountSettingsPanel } from './components/settings-panel/settings-panel';
 import { el } from './dom';
 import { FlowMeter } from './flow';
-import { clock, durationLabel, usdFmt } from './format';
-import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
-import { mountPicker } from './picker';
-import { PriceReadout } from './price-readout';
+import { durationLabel, eventLabel, usdFmt } from './format';
+import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, UP_COLOR } from './palette';
 import { mountStage } from './scene/stage';
-import { mountSettingsPanel } from './settings-panel';
-import './styles.css';
 
-/** Tension value at the right edge of the meter. */
-const METER_MAX = 5;
+/** Smoothed direction beyond ±this gets an arrow (tab title, debug); inside it reads as flat. */
+const DIRECTION_ARROW_MIN = 0.2;
 /** Chrome fades after this long without pointer or keyboard input. */
 const IDLE_MS = 10_000;
 const TITLE_EVERY_MS = 1_000;
@@ -77,76 +79,15 @@ function statusText(s: FeedStatus, source: Settings['source']): string {
   }
 }
 
-/** Named zones of the meter, each starting at its level, and what the music does there. */
-const METER_ZONES = [
-  { from: 0, name: 'Calm', sound: 'the base drone and arpeggio' },
-  { from: TENSION_LEVELS.mid, name: 'Tense', sound: 'tempo and filter rise, sub and shaker join' },
-  { from: TENSION_LEVELS.high, name: 'Shock', sound: 'double time and noise, the aura tears' },
-] as const;
-
-/** Threshold marks on the track and zone names under it, positioned from TENSION_LEVELS. */
-function buildMeterScale(track: HTMLElement, scale: HTMLElement): void {
-  for (const { from, name } of METER_ZONES) {
-    const pct = (from / METER_MAX) * 100;
-    if (from > 0) {
-      const mark = document.createElement('span');
-      mark.className = 'meter-mark';
-      mark.style.left = `${pct}%`;
-      track.append(mark);
-    }
-    const label = document.createElement('span');
-    label.textContent = name;
-    label.style.left = `${pct}%`;
-    scale.append(label);
-  }
-}
-
-/** Tooltip body for the meter: what tension measures and what each zone sounds like. */
-function fillTensionHelp(node: HTMLElement, windowSec: number): void {
-  const intro = document.createElement('p');
-  intro.textContent =
-    `How unusual the price move of the last ${windowSec}\u00a0s is for this market, ` +
-    `against its own moves over the last ${DEFAULT_METRICS_CONFIG.statsWindowMin}\u00a0min.`;
-  const zones = document.createElement('ul');
-  for (const { from, name, sound } of METER_ZONES) {
-    const li = document.createElement('li');
-    const b = document.createElement('b');
-    b.textContent = from > 0 ? `${name} (${from}+)` : name;
-    li.append(b, `: ${sound}.`);
-    zones.append(li);
-  }
-  const tune = document.createElement('p');
-  tune.textContent = 'Sensitivity in settings scales it.';
-  node.replaceChildren(intro, zones, tune);
-}
-
-/**
- * A label that explains itself: hover or keyboard focus shows the tip (CSS), a click or tap
- * pins it, Esc or a press anywhere else closes it.
- */
-function mountHint(root: HTMLElement, button: HTMLButtonElement): void {
-  const set = (open: boolean) => {
-    root.toggleAttribute('data-open', open);
-    button.setAttribute('aria-expanded', String(open));
-  };
-  set(false);
-  button.addEventListener('click', () => set(!root.hasAttribute('data-open')));
-  document.addEventListener('pointerdown', (e) => {
-    if (!(e.target instanceof Node && root.contains(e.target))) set(false);
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') set(false);
-  });
-}
-
-const arrowOf = (d: number) => (d > 0.2 ? '▲' : d < -0.2 ? '▼' : '•');
+const arrowOf = (d: number) =>
+  d > DIRECTION_ARROW_MIN ? '▲' : d < -DIRECTION_ARROW_MIN ? '▼' : '•';
 
 export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let settings = initial;
   const update = (patch: Partial<Settings>) => {
     settings = { ...settings, ...patch };
     if ('source' in patch || 'symbol' in patch) syncPair();
-    if ('windowSec' in patch) fillTensionHelp(tensionHelp, settings.windowSec);
+    if ('windowSec' in patch) meter.setWindow(settings.windowSec);
     if ('periodMin' in patch) chartDirty = true;
     handlers.onSettings(settings);
   };
@@ -160,12 +101,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const priceNode = el('price');
   const price = new PriceReadout(priceNode, reducedMotion);
   const change = el('change');
-  const fill = el('tension-fill');
-  buildMeterScale(el('tension-track'), el('tension-scale'));
-  const tensionValue = el('tension-value');
-  const tensionHelp = el('tension-help');
-  fillTensionHelp(tensionHelp, settings.windowSec);
-  mountHint(el('tension-hint'), el<HTMLButtonElement>('tension-hint-btn'));
+  const meter = new TensionMeter(settings.windowSec);
   const title = el('title');
   const audioLabel = el('audio-label');
   // Raw metric readouts are for tuning, not for listeners: shown only with ?debug in the URL.
@@ -247,6 +183,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       }
     },
   });
+  mountChartTip(el<HTMLCanvasElement>('chart'), el('chart-tip'), (x, y) => chart.markerAt(x, y));
 
   // ── immersive mode ──
   let idleTimer = 0;
@@ -296,16 +233,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
         vol.textContent = `vol ${usdFmt.format(history.volumeUsdSince(s.ts - spanMs))}/${span}`;
       }
       paintEvent();
-      if (s.ready) {
-        fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
-        fill.style.backgroundColor = css(tensionColor(s.tension));
-        tensionValue.textContent = '';
-      } else {
-        // Tension needs a few minutes of this market's own statistics before it means anything.
-        fill.style.width = `${Math.floor(s.warmup * 100)}%`;
-        fill.style.backgroundColor = '';
-        tensionValue.textContent = `calibrating · ${clock(s.warmupLeftSec)}`;
-      }
+      meter.render(s);
       aura?.setTarget(auraTarget(s, flow.read(Date.now())));
       updateTitle(s);
       debug.tension.textContent = s.tension.toFixed(2);
@@ -325,12 +253,10 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       // A new pair trades on a different notional scale; its pace baseline starts fresh.
       flow = new FlowMeter();
       vol.textContent = '—';
-      tensionValue.textContent = '';
+      meter.reset();
       for (const node of Object.values(debug)) node.textContent = '—';
       change.textContent = '\u00a0';
       clearEvent();
-      fill.style.width = '0';
-      fill.style.backgroundColor = '';
       fx.clear();
       chart.draw(h, Date.now(), settings.periodMin * 60_000);
       aura?.setTarget(CALM_AURA);
@@ -351,9 +277,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     },
     showEvent(e) {
       chartDirty = true;
-      const what = e.kind === 'liquidation' ? `LIQ ${e.side.toUpperCase()}` : e.side.toUpperCase();
       const times = e.count > 1 ? ` ×${e.count}` : '';
-      shownEvent = { text: `${what} ${usdFmt.format(e.usd)}${times}`, at: Date.now() };
+      shownEvent = { text: `${eventLabel(e.kind, e.side, e.usd)}${times}`, at: Date.now() };
       lastEvent.className = isDown(e.side) ? 'down' : 'up';
       paintEvent();
     },

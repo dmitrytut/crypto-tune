@@ -1,0 +1,54 @@
+/* Tension meter (meter.ts). */
+.meter {
+  width: 100%;
+  margin-top: 8px;
+}
+.meter-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.meter-track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-strong);
+  overflow: hidden;
+}
+/* Grey while calibrating; once ready the view paints it with palette.ts tensionColor. */
+.meter-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.35);
+  transition:
+    width 0.25s linear,
+    background-color 0.6s;
+}
+.meter-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.meter-scale {
+  position: relative;
+  height: 20px;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Each zone name starts at its threshold mark. */
+.meter-scale span {
+  position: absolute;
+  top: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meter-fill {
+    transition: none;
+  }
+}

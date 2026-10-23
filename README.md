@@ -152,7 +152,7 @@ the line under the meter says what it is waiting for (`Connecting to the market�
 `Loading recent trades…`), and the status in the top right is in words (`Live`, `Connecting…`).
 Sound, sensitivity and source live in settings (⚙); debug metrics show only with `?debug` in the
 URL. The pair chip in the top left always shows its border and arrow; a click opens a searchable
-list. Pair and tonic share one dropdown component (`ui/picker.ts`): arrows and Enter pick, Esc or a
+list. Pair and tonic share one dropdown component (`ui/components/picker/`): arrows and Enter pick, Esc or a
 click outside closes. There is no visible title; the `h1` is for screen readers only. Style: opaque
 surfaces without blur or glow, the yellow accent only on the sound button, Lucide icons.
 - **Aura** (WebGL shader) reacts from the first trade, with no warm-up:
@@ -173,8 +173,9 @@ surfaces without blur or glow, the yellow accent only on the sound button, Lucid
 - **Price** uses thin tabular digits with fixed precision per pair, so the width never jumps. Only the
   digits that changed flash. Film grain sits over everything.
 - **Chart** over the same period: a glow under the line coloured by tension, buy volume up and sell
-  volume down per 10 s, and event dots. While history is shorter, the chart stretches over what there
-  is (at least 30 s).
+  volume down per 10 s, and event dots. Hovering a dot (or tapping it on a phone) shows what it was
+  and when, in one line: `SELL $603K 03:57:03`. While history is shorter, the chart stretches over
+  what there is (at least 30 s).
 - **Period** (settings → Period): 1m, 5m, 15m or 1h, one for price change, volume and chart; it is
   remembered. While history is shorter than the period, everything uses what there is and the label
   shows the real span (`in 26m`). History is kept for up to an hour; on LIVE about 30 min are loaded

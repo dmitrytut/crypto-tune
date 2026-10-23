@@ -1,8 +1,9 @@
-import { HISTORY_PERIODS_MIN } from '../metrics/history';
-import { LIMITS, type Settings, type SourceKind, TONICS } from '../settings';
-import { el } from './dom';
-import { durationLabel, usdFmt } from './format';
-import { mountPicker } from './picker';
+import './settings-panel.css';
+import { HISTORY_PERIODS_MIN } from '../../../metrics/history';
+import { LIMITS, type Settings, type SourceKind, TONICS } from '../../../settings';
+import { el } from '../../dom';
+import { durationLabel, usdFmt } from '../../format';
+import { mountPicker } from '../picker/picker';
 
 /** Threshold slider resolution in decades; values snap to two significant digits. */
 const LOG_STEP = 0.05;
@@ -16,7 +17,6 @@ export interface SettingsPanel {
 /**
  * Binds every control in the settings dialog to `update`. The dialog opens
  * from the gear button, closes on ✕, Esc, or a click on the backdrop.
- * @package
  */
 export function mountSettingsPanel(
   initial: Settings,
@@ -39,7 +39,7 @@ export function mountSettingsPanel(
   tonic.setOptions(TONICS);
   tonic.set(initial.tonic);
 
-  for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="source"]')) {
+  for (const radio of dialog.querySelectorAll<HTMLInputElement>('input[name="source"]')) {
     radio.checked = radio.value === initial.source;
     radio.addEventListener('change', () => {
       if (radio.checked) update({ source: radio.value as SourceKind });
@@ -52,6 +52,7 @@ export function mountSettingsPanel(
       const radio = document.createElement('input');
       radio.type = 'radio';
       radio.name = 'period';
+      radio.className = 'visually-hidden';
       radio.value = String(periodMin);
       radio.checked = periodMin === initial.periodMin;
       radio.addEventListener('change', () => {

@@ -29,7 +29,7 @@
 
     <main id="stage" class="stage">
       <header class="top fades">
-        <!-- Pair dropdown, built by ui/picker.ts. -->
+        <!-- Pair dropdown, built by ui/components/picker. -->
         <div class="picker picker-chip" id="pair"></div>
         <div class="top-right">
           <span id="status" class="status" data-state="idle">idle</span>
@@ -79,6 +79,11 @@
       </section>
 
       <canvas id="chart" class="chart" role="img"></canvas>
+      <!-- Event marker tooltip, filled by ui/components/chart-tip. -->
+      <div id="chart-tip" class="chart-tip" role="tooltip" hidden>
+        <span class="chart-tip-what"></span>
+        <span class="chart-tip-when"></span>
+      </div>
     </main>
 
     <dialog id="settings" class="settings" aria-labelledby="settings-title">
@@ -133,8 +138,8 @@
         <h3>Source</h3>
         <fieldset class="segmented">
           <legend class="visually-hidden">Data source</legend>
-          <label><input type="radio" name="source" value="live" /> Live</label>
-          <label><input type="radio" name="source" value="simulator" /> Simulator</label>
+          <label><input class="visually-hidden" type="radio" name="source" value="live" /> Live</label>
+          <label><input class="visually-hidden" type="radio" name="source" value="simulator" /> Simulator</label>
         </fieldset>
 
         <details class="debug" id="debug" hidden>

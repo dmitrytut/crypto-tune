@@ -12,6 +12,8 @@ import { CALM_BPM, INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from 
 const FADE_IN_SEC = 3;
 const FADE_OUT_SEC = 1.5;
 const MASTER_DB = -2;
+/** Headroom before playback so Tone has a moment to prepare the first scheduled event. */
+const LOOKAHEAD_SEC = 0.05;
 
 export interface AudioParams {
   /** Tonic pitch class, 0 = C … 11 = B. */
@@ -66,12 +68,16 @@ export class AudioEngine {
     // A restart before the last stop's teardown would be undone by it: Tone ignores
     // transport.start while the pending stop still reads "started", then stops.
     const pending = this.stopAt - Tone.now();
-    if (pending > 0) await new Promise((resolve) => setTimeout(resolve, pending * 1000));
+    if (pending > 0) {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setTimeout(resolve, pending * 1000);
+      await promise;
+    }
     const transport = Tone.getTransport();
     // Resume at the market's current tempo: update() keeps tracking it while stopped,
     // so restarting mid-move does not drop to calm and jump back on the next tick.
     transport.bpm.value = this.bpm;
-    const t = Tone.now() + 0.05;
+    const t = Tone.now() + LOOKAHEAD_SEC;
     g.base.start(t);
     g.tension.start(t);
     transport.start(t);

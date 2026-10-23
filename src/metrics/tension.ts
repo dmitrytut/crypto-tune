@@ -45,6 +45,7 @@ export interface TensionInput {
   ready: boolean;
 }
 
+/** @package */
 export interface TensionState {
   z: number;
   volZ: number;

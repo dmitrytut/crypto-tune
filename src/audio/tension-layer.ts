@@ -1,6 +1,7 @@
 import * as Tone from 'tone';
 import { midiToHz, pitchClassMidi, TONIC_GLIDE_SEC } from './scale';
 import { MIX_RAMP_SEC, type TensionMix } from './tension-map';
+import { stepIndex } from './transport-step';
 
 /** Sub-bass on the tonic in octave 1 (A1 = 55 Hz). */
 const SUB_OCTAVE = 1;
@@ -64,8 +65,12 @@ export class TensionLayer {
     const transport = this.perc.context.transport;
     this.percLoop = new Tone.Loop((time) => {
       // Eighth in the beat from the transport, so accents stay on the beat after a restart.
-      const eighth = Math.round(transport.getTicksAtTime(time) / (transport.PPQ / 2));
-      const accent = PERC_ACCENTS[eighth % PERC_ACCENTS.length] as number;
+      const eighth = stepIndex(
+        transport.getTicksAtTime(time),
+        transport.PPQ / 2,
+        PERC_ACCENTS.length,
+      );
+      const accent = PERC_ACCENTS[eighth] as number;
       this.perc.triggerAttackRelease('32n', time, accent);
     }, '8n');
   }

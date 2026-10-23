@@ -11,6 +11,11 @@ import {
 
 export const TICK_MS = 250;
 const TICKS_PER_SEC = 1000 / TICK_MS;
+/**
+ * Consumed trades are dropped from the queue once at least this many sit in front of it and
+ * they outnumber the unread ones: one splice per few thousand trades instead of one per tick.
+ */
+const COMPACT_AFTER = 4096;
 
 export interface MetricsConfig {
   /** Return horizon N, seconds. */
@@ -194,7 +199,7 @@ export class MetricsEngine {
   }
 
   private compactPending(): void {
-    if (this.pendingHead > 4096 && this.pendingHead * 2 > this.pending.length) {
+    if (this.pendingHead > COMPACT_AFTER && this.pendingHead * 2 > this.pending.length) {
       this.pending.splice(0, this.pendingHead);
       this.pendingHead = 0;
     }

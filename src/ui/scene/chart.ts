@@ -1,4 +1,4 @@
-import { type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
+import { type EventMarker, type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
 import { durationLabel } from '../format';
 import { css, DOWN_COLOR, sideColor, tensionColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
@@ -15,6 +15,18 @@ const MIN_SPAN_MS = 30_000;
 /** Marker radius at the smallest size; each decade of `sizeDecades` adds MARKER_GROWTH px. */
 const MARKER_BASE_R = 2;
 const MARKER_GROWTH = 4 / 3;
+/** Pointer tolerance around a marker, CSS px: small markers stay easy to hit. */
+const HIT_SLOP_PX = 5;
+
+const markerRadius = (usd: number) => MARKER_BASE_R + sizeDecades(usd) * MARKER_GROWTH;
+
+/** A marker found under the pointer: the event and its circle in canvas CSS px. */
+export interface MarkerHit {
+  marker: EventMarker;
+  x: number;
+  y: number;
+  r: number;
+}
 
 /**
  * Bottom strip: the chosen period of price with the area under the line tinted
@@ -26,6 +38,16 @@ const MARKER_GROWTH = 4 / 3;
 export class Chart {
   private readonly ctx: CanvasRenderingContext2D;
   private labelledMs = 0;
+  /** Scale of the last draw, for hit-testing markers; `history` is null when none were drawn. */
+  private readonly view = {
+    history: null as HistorySeries | null,
+    from: 0,
+    span: 1,
+    w: 0,
+    lo: 0,
+    hi: 1,
+    bottom: 0,
+  };
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -35,7 +57,7 @@ export class Chart {
 
   /** Draws up to `periodMs` of history ending at `now`; a shorter history fills the width. */
   draw(h: HistorySeries, now: number, periodMs: number): void {
-    const { ctx, canvas } = this;
+    const { ctx, canvas, view } = this;
     if (periodMs !== this.labelledMs) {
       this.labelledMs = periodMs;
       canvas.setAttribute('aria-label', `Price and volume, last ${durationLabel(periodMs)}`);
@@ -49,9 +71,38 @@ export class Chart {
     const oldest = Math.min(h.prices[0]?.ts ?? now, h.volumes[0]?.ts ?? now);
     const span = Math.min(periodMs, Math.max(MIN_SPAN_MS, now - oldest));
     const from = now - span;
+    view.history = null;
+    view.from = from;
+    view.span = span;
+    view.w = w;
     const x = (ts: number) => ((ts - from) / span) * w;
     this.drawVolume(h, x, (VOLUME_BUCKET_MS / span) * w, ht, from);
     this.drawPrice(h, x, ht, from);
+  }
+
+  /**
+   * The event marker under a point of the canvas (CSS pixels), nearest first, with its
+   * centre and radius as last drawn; null when the pointer is not on one.
+   */
+  markerAt(px: number, py: number): MarkerHit | null {
+    const { history: h, from, span, w, lo, hi, bottom } = this.view;
+    if (!h) return null;
+    let best: MarkerHit | null = null;
+    let bestD2 = Number.POSITIVE_INFINITY;
+    for (const m of h.markers) {
+      if (m.ts < from) continue;
+      const price = h.priceAt(m.ts);
+      if (Number.isNaN(price)) continue;
+      const x = ((m.ts - from) / span) * w;
+      const y = bottom - ((price - lo) / (hi - lo)) * bottom;
+      const r = markerRadius(m.usd);
+      const d2 = (px - x) ** 2 + (py - y) ** 2;
+      if (d2 <= (r + HIT_SLOP_PX) ** 2 && d2 < bestD2) {
+        bestD2 = d2;
+        best = { marker: m, x, y, r };
+      }
+    }
+    return best;
   }
 
   private drawPrice(h: HistorySeries, x: (ts: number) => number, ht: number, from: number): void {
@@ -69,6 +120,11 @@ export class Chart {
     hi += span * PRICE_PAD;
     const bottom = ht * PRICE_SHARE;
     const y = (price: number) => bottom - ((price - lo) / (hi - lo)) * bottom;
+    // Markers are drawn from here on: remember the scale so markerAt finds them.
+    this.view.history = h;
+    this.view.lo = lo;
+    this.view.hi = hi;
+    this.view.bottom = bottom;
 
     const first = pts[0];
     const last = pts.at(-1);
@@ -114,7 +170,7 @@ export class Chart {
       const price = h.priceAt(m.ts);
       if (Number.isNaN(price)) continue;
       const color = css(sideColor(m.side), 0.95);
-      const r = MARKER_BASE_R + sizeDecades(m.usd) * MARKER_GROWTH;
+      const r = markerRadius(m.usd);
       ctx.beginPath();
       ctx.arc(x(m.ts), y(price), r, 0, Math.PI * 2);
       if (m.kind === 'liquidation') {

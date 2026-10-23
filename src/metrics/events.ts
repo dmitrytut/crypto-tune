@@ -45,6 +45,8 @@ function collapse<S extends string>(
   minTs: number,
   thresholdUsd: number,
 ): EventCue<S> | null {
+  // Most ticks have no event above threshold: nothing to merge, nothing to allocate.
+  if (events.length === 0) return null;
   const totals = new Map<S, { usd: number; count: number }>();
   for (const e of events) {
     if (e.ts < minTs) continue;
@@ -67,8 +69,8 @@ function collapse<S extends string>(
  * collapses them once per tick into cues for audio, readout and chart.
  */
 export class EventBuffer {
-  private liquidations: PendingEvent<LiquidationSide>[] = [];
-  private trades: PendingEvent<TradeSide>[] = [];
+  private readonly liquidations: PendingEvent<LiquidationSide>[] = [];
+  private readonly trades: PendingEvent<TradeSide>[] = [];
 
   constructor(private thresholds: EventThresholds) {}
 
@@ -94,8 +96,8 @@ export class EventBuffer {
       liquidation: collapse(this.liquidations, minTs, this.thresholds.liquidationUsd),
       trade: collapse(this.trades, minTs, this.thresholds.tradeUsd),
     };
-    this.liquidations = [];
-    this.trades = [];
+    this.liquidations.length = 0;
+    this.trades.length = 0;
     return cues;
   }
 }

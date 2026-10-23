@@ -1,3 +1,5 @@
+import './picker.css';
+
 /**
  * Options matching a typed query, case-insensitively: an exact match first, then
  * prefix matches, then the rest that contain it, each group in list order. An empty
@@ -19,7 +21,7 @@ export function matchOptions(list: readonly string[], query: string): string[] {
   return exact.concat(starts, contains);
 }
 
-/** @package */
+/** What a picker shows and what happens on a pick. */
 export interface PickerConfig {
   /** Names the control for assistive tech: "<label>: <value>". */
   label: string;
@@ -34,7 +36,7 @@ export interface PickerConfig {
   onPick(value: string): void;
 }
 
-/** @package */
+/** What the owner may change on a mounted picker. */
 export interface Picker {
   setOptions(values: readonly string[]): void;
   /** Shows `value` as chosen and enables the control. */
@@ -52,8 +54,8 @@ let nextId = 0;
  * Dropdown list built into `host`: a button showing the value and a menu of options,
  * optionally with a search field filtering as you type. Arrows and Enter pick, Esc or
  * a press outside close. One component for every list in the UI, so they look and
- * behave alike; `host` classes choose the look (`picker-chip`, `picker-field`).
- * @package
+ * behave alike; `host` classes choose the look (`picker-chip`, `picker-field`). Its
+ * outside-press listener lives on `document` with no teardown: mount once per page.
  */
 export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   const id = `picker-${nextId++}`;
