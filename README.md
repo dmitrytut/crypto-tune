@@ -45,8 +45,9 @@ looked at the chart.
 - **A living picture.** A WebGL aura takes its colour from order flow. Buys float up as bubbles, sells
   sink as drops, and liquidations send shockwaves out of the price. A price and volume strip runs
   along the bottom, over the period you pick: 1m, 5m, 15m or 1h.
-- **Ready in seconds.** The last 30 minutes of trades load on connect and are cached in IndexedDB,
-  so tension is calibrated almost at once instead of after a five-minute warm-up.
+- **Ready in seconds.** The live market shows the moment the socket opens. The last 30 minutes of
+  trades load in the background (the pages in parallel, mostly from an IndexedDB cache on a
+  reload), and tension calibrates as soon as they land instead of after a five-minute warm-up.
 - **Glanceable.** The tab title reads `▲ 81,305.2 · BTCUSDT · tension 2.6`. After 10 s without input
   the UI fades out, leaving only the aura, the price and the chart.
 - **Any Binance USDⓈ-M perpetual.** You can also switch to the built-in simulator to hear a sell-off
@@ -84,15 +85,17 @@ computation runs in the browser, which talks to Binance directly.
 ### Data sources
 
 - **LIVE**: Binance Futures public WebSocket `wss://fstream.binance.com/market/stream` (`aggTrade` +
-  `forceOrder`). The pair can be picked from the list of trading perpetuals. On connect the last
-  30 min of trades come from REST (`/fapi/v1/aggTrades`, up to 20 requests) and are stitched to the
-  live stream by trade id. The last 30 min per pair live in IndexedDB (written every 30 s and when the
-  tab is hidden), so a reload usually fetches only the gap, in one request. If neither history nor
-  cache answers within 1.5 s, metrics warm up on live data. The socket reconnects with exponential
-  backoff and jitter, and is recreated after 15 s of silence or a stuck connect.
+  `forceOrder`). The pair can be picked from the list of trading perpetuals. Live trades show at
+  once; meanwhile the last 30 min of trades come from REST (`/fapi/v1/aggTrades`: the newest page,
+  then the older ones in one parallel wave, up to 20 requests) and end right before the first live
+  trade by id. The last 30 min per pair live in IndexedDB (written every 30 s and when the tab is
+  hidden), read while the newest page loads, so a reload usually fetches only that one page. When
+  history lands, metrics are rebuilt from it plus the live trades seen so far. If history fails or
+  takes over 15 s, metrics warm up on live data. The socket reconnects with exponential backoff and
+  jitter, and is recreated after 15 s of silence or a stuck connect.
 - **SIMULATOR**: a synthetic market. Calm stretches (1.5–5 min) alternate with impulses (15–90 s,
-  0.3–1.5 % moves with bursts of volume and liquidations). It generates 30 min of history at start, so
-  no warm-up is needed.
+  0.3–1.5 % moves with bursts of volume and liquidations). It hands over 30 min of history at
+  start, so no warm-up is needed.
 
 ### Tension
 
@@ -143,11 +146,12 @@ Recomputed every 250 ms on the feed clock, never wall time:
 
 The main screen works like "now playing" (the whole UI is in English): a large price, its change over
 the chosen period below it (`▼ 0.11% in 15m`), the **Tension** meter with Calm / Tense / Shock zones
-(`calibrating · 4:52` on the right during warm-up), dollar volume over the same period
-(`vol $90.9M/15m`), the latest event, and the **Listen** / **Stop** button. The tooltip on `Tension`
-(hover, focus or tap) explains what the meter measures and how each zone sounds. Until data arrives,
+(`loading recent trades…` until history lands, `calibrating · 4:52` during a warm-up without it),
+dollar volume over the same period (`vol $90.9M/15m`), the latest event, and the **Listen** /
+**Stop** button. The tooltip on `Tension` (hover, focus or tap) explains what the meter measures
+and how each zone sounds. Until data arrives,
 the line under the meter says what it is waiting for (`Connecting to the market…`,
-`Loading recent trades…`), and the status in the top right is in words (`Live`, `Connecting…`).
+`Waiting for trades…`), and the status in the top right is in words (`Live`, `Connecting…`).
 Sound, sensitivity and source live in settings (⚙); every setting has an ⓘ tip that says in a line
 what it is and what it changes. The pair chip in the top left always shows its border and arrow; a click opens a searchable
 list. Pair and tonic share one dropdown component (`ui/components/picker/`): arrows and Enter pick, Esc or a
@@ -229,12 +233,26 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Stage 5**: visuals (aura, particles, chart, settings dialog)
 - [x] **Design cleanup** (per taste-skill): title and labels, a text button, no glass/glow/neon
 - [x] **Publishing**: GitHub Pages via Actions, logo and favicon
+- [x] **Live-first loading**: the live market at once, history in the background
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Live-first loading
+
+1. `pnpm test`: includes the page count for the parallel wave (to the cache by id, to the window
+   by pace, the cap) and the feed contract (live at once, history once and before the first live
+   trade, cache stitching, fallback on error).
+2. `pnpm dev` → LIVE in a private window: the price and bubbles appear within a second; the meter
+   says `loading recent trades…`, then comes alive with the chart and `… in 15m` within a few
+   seconds. DevTools → Network: the older `aggTrades` pages start together after the first one.
+3. Reload after 30 s: the meter is ready almost at once, with a single `aggTrades` request.
+4. Block `fapi.binance.com/fapi/v1/aggTrades` in DevTools: the price still flows; the meter falls
+   back to `calibrating · 5:0x`.
+5. SIMULATOR: the meter is ready at once, with no `loading recent trades…` in between.
 
 ### Design cleanup
 
