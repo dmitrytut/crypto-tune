@@ -13,9 +13,12 @@ export interface Hint {
 }
 
 /** The one hint showing now; opening another closes it. */
-let shown: { root: HTMLElement; hide(): void } | null = null;
+let shown: { root: HTMLElement; place(): void; hide(): void } | null = null;
 let closersInstalled = false;
 let nextId = 0;
+
+/** Whether a hint tip is on screen, e.g. so immersive mode does not fade the page under it. */
+export const isHintOpen = (): boolean => shown !== null;
 
 /** Page-level closers, installed once with the first hint; they live as long as the page. */
 function installClosers(): void {
@@ -34,9 +37,10 @@ function installClosers(): void {
     },
     true,
   );
-  // The tip is placed once when shown; a scroll or resize would leave it beside nothing.
-  document.addEventListener('scroll', () => shown?.hide(), true);
-  window.addEventListener('resize', () => shown?.hide());
+  // The tip sits in window coordinates: it follows its button when the dialog scrolls or the
+  // window resizes (focusing a hint in a long dialog scrolls it into view, then this runs).
+  document.addEventListener('scroll', () => shown?.place(), true);
+  window.addEventListener('resize', () => shown?.place());
 }
 
 /**
@@ -71,6 +75,13 @@ export function createHint(
   let pinned = false;
   const state = {
     root,
+    place() {
+      const r = button.getBoundingClientRect();
+      const left = Math.min(Math.max(r.left, GAP_PX), innerWidth - body.offsetWidth - GAP_PX);
+      const above = r.top - GAP_PX - body.offsetHeight;
+      body.style.left = `${left}px`;
+      body.style.top = `${above >= GAP_PX ? above : r.bottom + GAP_PX}px`;
+    },
     hide() {
       pinned = false;
       button.setAttribute('aria-expanded', 'false');
@@ -83,11 +94,7 @@ export function createHint(
     shown = state;
     button.setAttribute('aria-expanded', 'true');
     if (!body.matches(':popover-open')) body.showPopover();
-    const r = button.getBoundingClientRect();
-    const left = Math.min(Math.max(r.left, GAP_PX), innerWidth - body.offsetWidth - GAP_PX);
-    const above = r.top - GAP_PX - body.offsetHeight;
-    body.style.left = `${left}px`;
-    body.style.top = `${above >= GAP_PX ? above : r.bottom + GAP_PX}px`;
+    state.place();
   };
 
   root.addEventListener('pointerenter', (e) => {
@@ -99,9 +106,8 @@ export function createHint(
   button.addEventListener('focus', () => {
     if (button.matches(':focus-visible')) show();
   });
-  button.addEventListener('blur', () => {
-    if (!pinned) state.hide();
-  });
+  // Focus moving on (Tab, a press elsewhere) closes even a pinned tip: it belongs to this button.
+  button.addEventListener('blur', () => state.hide());
   button.addEventListener('click', () => {
     if (pinned) {
       state.hide();

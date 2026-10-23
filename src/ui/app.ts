@@ -12,6 +12,7 @@ import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { mountChartTip } from './components/chart-tip/chart-tip';
+import { isHintOpen } from './components/hint/hint';
 import { TensionMeter } from './components/meter/meter';
 import { mountPicker } from './components/picker/picker';
 import { PriceReadout } from './components/price-readout/price-readout';
@@ -181,7 +182,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     document.body.classList.remove('idle');
     clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => {
-      if (!panel.isOpen()) document.body.classList.add('idle');
+      // Never fade the chrome out from under an open dialog or a tip someone is reading.
+      if (!panel.isOpen() && !isHintOpen()) document.body.classList.add('idle');
     }, IDLE_MS);
   };
   for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const) {

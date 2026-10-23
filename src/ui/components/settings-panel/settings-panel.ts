@@ -88,7 +88,9 @@ export function mountSettingsPanel(
   });
 
   for (const [id, { label, text }] of Object.entries(HELP)) {
-    el(id).previousElementSibling?.append(createHint(label, { text }).root);
+    const head = el(id).previousElementSibling;
+    if (!head) throw new Error(`#${id} needs its label just before it in index.html`);
+    head.append(createHint(label, { text }).root);
   }
 
   const tonic = mountPicker(el('tonic'), {
