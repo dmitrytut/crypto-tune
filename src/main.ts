@@ -2,14 +2,13 @@ import { AudioEngine, type AudioParams } from './audio/engine';
 import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
 import type { MarketFeed, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
+import { cachedSymbols } from './feed/symbol-cache';
 import { indexedDbTradeStore } from './feed/trade-cache';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
 import { EventBuffer, type EventThresholds } from './metrics/events';
 import { MarketHistory } from './metrics/history';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { mountApp } from './ui/app';
-
-const SYMBOLS_CACHE_KEY = 'crypto-tune.binance-symbols';
 
 let settings = loadSettings();
 let feed: MarketFeed | null = null;
@@ -149,33 +148,11 @@ window.setInterval(() => {
 }, TICK_MS);
 
 async function loadSymbols(): Promise<void> {
-  const cached = readCachedSymbols();
-  if (cached) {
-    view.setSymbols(cached);
-    return;
-  }
-  let list: string[];
   try {
-    list = await fetchBinanceSymbols();
+    view.setSymbols(await cachedSymbols(fetchBinanceSymbols));
   } catch (err) {
     // Symbol input still accepts any well-formed ticker without the list.
     console.warn('Binance symbol list unavailable', err);
-    return;
-  }
-  view.setSymbols(list);
-  try {
-    sessionStorage.setItem(SYMBOLS_CACHE_KEY, JSON.stringify(list));
-  } catch {
-    // Cache is optional (storage disabled or full).
-  }
-}
-
-function readCachedSymbols(): string[] | null {
-  try {
-    const raw = sessionStorage.getItem(SYMBOLS_CACHE_KEY);
-    return raw ? (JSON.parse(raw) as string[]) : null;
-  } catch {
-    return null;
   }
 }
 
