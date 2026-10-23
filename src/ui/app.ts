@@ -5,14 +5,14 @@ import type {
   Trade,
   TradeSide,
 } from '../feed/market-feed';
-import type { MetricsSnapshot } from '../metrics/engine';
+import { DEFAULT_METRICS_CONFIG, type MetricsSnapshot } from '../metrics/engine';
 import type { EventCue } from '../metrics/events';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { el } from './dom';
 import { FlowMeter } from './flow';
-import { clock, usdFmt, volFmt } from './format';
+import { clock, usdFmt } from './format';
 import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
 import { PriceReadout } from './price-readout';
 import { mountStage } from './scene/stage';
@@ -27,6 +27,8 @@ const TITLE_EVERY_MS = 1_000;
 /** Events older than this (wall clock) are history replays, not news: no sparks, no flow. */
 const VISUAL_MAX_AGE_MS = 2_000;
 const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
+/** The volume readout is USD traded over about this long (whole 10 s buckets). */
+const VOLUME_SPAN_MS = 60_000;
 
 export interface AppHandlers {
   /** Called with the full updated settings after any control change. */
@@ -74,18 +76,18 @@ function statusText(s: FeedStatus, source: Settings['source']): string {
   }
 }
 
-/** Named zones under the meter, each label at the level where the zone starts. */
+/** Named zones of the meter, each starting at its level, and what the music does there. */
 const METER_ZONES = [
-  [0, 'Calm'],
-  [TENSION_LEVELS.mid, 'Tense'],
-  [TENSION_LEVELS.high, 'Shock'],
+  { from: 0, name: 'Calm', sound: 'the base drone and arpeggio' },
+  { from: TENSION_LEVELS.mid, name: 'Tense', sound: 'tempo and filter rise, sub and shaker join' },
+  { from: TENSION_LEVELS.high, name: 'Shock', sound: 'double time and noise, the aura tears' },
 ] as const;
 
 /** Threshold marks on the track and zone names under it, positioned from TENSION_LEVELS. */
 function buildMeterScale(track: HTMLElement, scale: HTMLElement): void {
-  for (const [v, name] of METER_ZONES) {
-    const pct = (v / METER_MAX) * 100;
-    if (v > 0) {
+  for (const { from, name } of METER_ZONES) {
+    const pct = (from / METER_MAX) * 100;
+    if (from > 0) {
       const mark = document.createElement('span');
       mark.className = 'meter-mark';
       mark.style.left = `${pct}%`;
@@ -98,6 +100,44 @@ function buildMeterScale(track: HTMLElement, scale: HTMLElement): void {
   }
 }
 
+/** Tooltip body for the meter: what tension measures and what each zone sounds like. */
+function fillTensionHelp(node: HTMLElement, windowSec: number): void {
+  const intro = document.createElement('p');
+  intro.textContent =
+    `How unusual the price move of the last ${windowSec}\u00a0s is for this market, ` +
+    `against its own moves over the last ${DEFAULT_METRICS_CONFIG.statsWindowMin}\u00a0min.`;
+  const zones = document.createElement('ul');
+  for (const { from, name, sound } of METER_ZONES) {
+    const li = document.createElement('li');
+    const b = document.createElement('b');
+    b.textContent = from > 0 ? `${name} (${from}+)` : name;
+    li.append(b, `: ${sound}.`);
+    zones.append(li);
+  }
+  const tune = document.createElement('p');
+  tune.textContent = 'Sensitivity in settings scales it.';
+  node.replaceChildren(intro, zones, tune);
+}
+
+/**
+ * A label that explains itself: hover or keyboard focus shows the tip (CSS), a click or tap
+ * pins it, Esc or a press anywhere else closes it.
+ */
+function mountHint(root: HTMLElement, button: HTMLButtonElement): void {
+  const set = (open: boolean) => {
+    root.toggleAttribute('data-open', open);
+    button.setAttribute('aria-expanded', String(open));
+  };
+  set(false);
+  button.addEventListener('click', () => set(!root.hasAttribute('data-open')));
+  document.addEventListener('pointerdown', (e) => {
+    if (!(e.target instanceof Node && root.contains(e.target))) set(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') set(false);
+  });
+}
+
 const arrowOf = (d: number) => (d > 0.2 ? '▲' : d < -0.2 ? '▼' : '•');
 
 export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
@@ -106,6 +146,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const update = (patch: Partial<Settings>) => {
     settings = { ...settings, ...patch };
     if ('source' in patch) syncSymbolChip();
+    if ('windowSec' in patch) fillTensionHelp(tensionHelp, settings.windowSec);
     handlers.onSettings(settings);
   };
   const panel = mountSettingsPanel(initial, update);
@@ -121,6 +162,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const fill = el('tension-fill');
   buildMeterScale(el('tension-track'), el('tension-scale'));
   const tensionValue = el('tension-value');
+  const tensionHelp = el('tension-help');
+  fillTensionHelp(tensionHelp, settings.windowSec);
+  mountHint(el('tension-hint'), el<HTMLButtonElement>('tension-hint-btn'));
   const title = el('title');
   const audioLabel = el('audio-label');
   // Raw metric readouts are for tuning, not for listeners: shown only with ?debug in the URL.
@@ -141,6 +185,14 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   };
 
   audioToggle.addEventListener('click', () => handlers.onToggleAudio());
+  // The datalist opens on any click, not only on the native arrow (hidden in favour of our caret).
+  symbol.addEventListener('click', () => {
+    try {
+      symbol.showPicker();
+    } catch {
+      // Unsupported for datalist in this browser, or no user activation: typing still filters.
+    }
+  });
 
   const syncSymbolChip = () => {
     const live = settings.source === 'live';
@@ -212,18 +264,31 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       last = s;
       chartDirty = true;
       price.render(s.price);
-      const pct = (Math.exp(s.ret) - 1) * 100;
-      // Arrow and colour follow the number shown, not the smoothed direction.
-      const shown = Math.abs(pct) < 0.005 ? 0 : pct;
-      change.textContent = Number.isNaN(s.price)
-        ? '\u00a0'
-        : `${shown > 0 ? '▲' : shown < 0 ? '▼' : '•'} ${shown >= 0 ? '+' : ''}${shown.toFixed(2)}% · ${settings.windowSec}s`;
-      change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
-      vol.textContent = Number.isFinite(s.volPerSec) ? `vol ${volFmt.format(s.volPerSec)}/s` : '—';
+      // Change over the chart's span, so the number describes the line below it.
+      const first = history?.prices[0];
+      if (!first || Number.isNaN(s.price)) {
+        change.textContent = '\u00a0';
+        change.className = 'change';
+      } else {
+        const pct = (s.price / first.price - 1) * 100;
+        const shown = Math.abs(pct) < 0.005 ? 0 : pct;
+        const arrow = shown > 0 ? '▲ ' : shown < 0 ? '▼ ' : '';
+        const spanMs = s.ts - first.ts;
+        const span =
+          spanMs >= 60_000
+            ? `${Math.round(spanMs / 60_000)} min`
+            : `${Math.max(1, Math.round(spanMs / 1000))} s`;
+        change.textContent = `${arrow}${Math.abs(shown).toFixed(2)}% in ${span}`;
+        change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
+      }
+      if (history) {
+        const usd = history.volumeUsdSince(s.ts - VOLUME_SPAN_MS);
+        vol.textContent = `${usdFmt.format(usd)} traded per min`;
+      }
       if (s.ready) {
         fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
         fill.style.backgroundColor = css(tensionColor(s.tension));
-        tensionValue.textContent = s.tension.toFixed(1);
+        tensionValue.textContent = '';
       } else {
         // Tension needs a few minutes of this market's own statistics before it means anything.
         fill.style.width = `${Math.floor(s.warmup * 100)}%`;
@@ -248,7 +313,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       price.reset();
       // A new pair trades on a different notional scale; its pace baseline starts fresh.
       flow = new FlowMeter();
-      for (const node of [vol, tensionValue, ...Object.values(debug)]) node.textContent = '—';
+      vol.textContent = '—';
+      tensionValue.textContent = '';
+      for (const node of Object.values(debug)) node.textContent = '—';
       lastEvent.textContent = '';
       change.textContent = '\u00a0';
       lastEvent.className = '';

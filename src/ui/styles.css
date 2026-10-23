@@ -68,25 +68,59 @@ body::after {
   justify-content: space-between;
   align-items: center;
 }
+/* Stroke icons (Lucide). */
+.icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Always looks pickable: a border and a caret, not only on hover. */
+.chip {
+  position: relative;
+}
 .chip input {
   font: inherit;
   font-weight: 700;
   font-size: 15px;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 9px 18px;
-  width: 15ch;
+  padding: 9px 40px 9px 18px;
+  width: calc(15ch + 22px);
   text-transform: uppercase;
+  cursor: pointer;
+}
+.chip input::-webkit-calendar-picker-indicator {
+  display: none;
 }
 .chip input:hover,
 .chip input:focus-visible {
-  border-color: var(--line);
+  border-color: rgba(255, 255, 255, 0.36);
   outline: none;
+}
+.chip input:focus {
+  cursor: text;
+}
+.chip-caret {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  translate: 0 -50%;
+  color: var(--muted);
+  pointer-events: none;
 }
 .chip input:disabled {
   color: var(--muted);
+  border-color: transparent;
+  cursor: default;
+}
+.chip:has(input:disabled) .chip-caret {
+  display: none;
 }
 .top-right {
   display: flex;
@@ -125,7 +159,6 @@ body::after {
 .icon-btn svg {
   width: 20px;
   height: 20px;
-  fill: currentColor;
 }
 .icon-btn:hover {
   background: var(--surface-strong);
@@ -160,21 +193,6 @@ body::after {
     rgba(0, 0, 0, 0.28) 55%,
     transparent
   );
-}
-.title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  text-align: center;
-  text-wrap: balance;
-}
-.lede {
-  margin: -6px 0 4px;
-  font-size: 15px;
-  color: var(--muted);
-  text-align: center;
 }
 /* Thin, tabular, quiet: the number is the hero, not its effects. Separators and
  * the fraction step back so the eye reads the big digits first. */
@@ -229,8 +247,77 @@ body::after {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-.meter-head span:first-child {
+.hint {
+  position: relative;
+}
+.hint-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
   color: var(--text);
+  cursor: help;
+}
+.hint-btn .icon {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+.hint-btn:hover .icon,
+.hint[data-open] .hint-btn .icon {
+  color: var(--text);
+}
+.hint-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+/* Floats above the label, so it shadows like a menu. */
+.hint-pop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 3;
+  width: min(340px, calc(100vw - 48px));
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #141519;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: normal;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.15s,
+    visibility 0.15s;
+}
+.hint-pop p,
+.hint-pop ul {
+  margin: 0;
+}
+.hint-pop ul {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+.hint-pop p:last-child {
+  color: var(--muted);
+}
+.hint[data-open] .hint-pop,
+.hint-btn:focus-visible + .hint-pop {
+  opacity: 1;
+  visibility: visible;
+}
+@media (hover: hover) {
+  .hint:hover .hint-pop {
+    opacity: 1;
+    visibility: visible;
+  }
 }
 .meter-track {
   position: relative;
@@ -272,6 +359,8 @@ body::after {
   font-size: 14px;
   color: var(--muted);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);

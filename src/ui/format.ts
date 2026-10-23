@@ -42,12 +42,3 @@ export const usdFmt = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1,
 });
-
-/**
- * Compact plain number, e.g. 12.4K (base-asset volume).
- * @package
- */
-export const volFmt = new Intl.NumberFormat('en-US', {
-  notation: 'compact',
-  maximumFractionDigits: 1,
-});
