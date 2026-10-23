@@ -4,7 +4,7 @@ import { TENSION_LEVELS } from '../../../metrics/tension';
 import { el } from '../../dom';
 import { clock } from '../../format';
 import { css, tensionColor } from '../../palette';
-import { mountHint } from '../hint/hint';
+import { createHint } from '../hint/hint';
 
 /** Tension value at the right edge of the meter. */
 const METER_MAX = 5;
@@ -24,7 +24,7 @@ const METER_ZONES = [
 export class TensionMeter {
   private readonly fill = el('tension-fill');
   private readonly value = el('tension-value');
-  private readonly help = el('tension-help');
+  private readonly help = createHint('Tension', { showLabel: true });
 
   constructor(windowSec: number) {
     const track = el('tension-track');
@@ -42,7 +42,8 @@ export class TensionMeter {
       label.style.left = `${pct}%`;
       scale.append(label);
     }
-    mountHint(el('tension-hint'), el<HTMLButtonElement>('tension-hint-btn'));
+    // The label opens the meter's head; the calibration countdown sits after it.
+    this.value.before(this.help.root);
     this.setWindow(windowSec);
   }
 
@@ -62,7 +63,7 @@ export class TensionMeter {
     }
     const tune = document.createElement('p');
     tune.textContent = 'Sensitivity in settings scales it.';
-    this.help.replaceChildren(intro, zones, tune);
+    this.help.body.replaceChildren(intro, zones, tune);
   }
 
   render(s: Pick<MetricsSnapshot, 'ready' | 'tension' | 'warmup' | 'warmupLeftSec'>): void {

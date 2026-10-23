@@ -52,9 +52,10 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   implements `AppView`), `components/` (self-contained DOM widgets, one folder each:
   `<name>/<name>.ts`, its `<name>.css` imported by the `.ts`, specs in `<name>/__specs__/`;
   `picker/` one dropdown for every
-  list, pair and tonic; `hint/` label with a tip; `meter/` tension meter with zones and its hint;
-  `price-readout/` fixed-decimal price with per-digit flash; `settings-panel/` settings
-  `<dialog>`; `chart-tip/` tooltip for chart event markers, hit-tested by `Chart.markerAt`),
+  list, pair and tonic; `hint/` ⓘ label with a tip in the top layer (popover), one open at a time;
+  `meter/` tension meter with zones and its hint; `price-readout/` fixed-decimal price with
+  per-digit flash; `settings-panel/` settings `<dialog>`, a hint per setting from its `HELP`
+  texts; `chart-tip/` tooltip for chart event markers, hit-tested by `Chart.markerAt`),
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
   trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).

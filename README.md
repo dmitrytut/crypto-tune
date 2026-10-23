@@ -150,8 +150,8 @@ the chosen period below it (`▼ 0.11% in 15m`), the **Tension** meter with Calm
 (hover, focus or tap) explains what the meter measures and how each zone sounds. Until data arrives,
 the line under the meter says what it is waiting for (`Connecting to the market…`,
 `Loading recent trades…`), and the status in the top right is in words (`Live`, `Connecting…`).
-Sound, sensitivity and source live in settings (⚙); debug metrics show only with `?debug` in the
-URL. The pair chip in the top left always shows its border and arrow; a click opens a searchable
+Sound, sensitivity and source live in settings (⚙); every setting has an ⓘ tip that says in a line
+what it is and what it changes. The pair chip in the top left always shows its border and arrow; a click opens a searchable
 list. Pair and tonic share one dropdown component (`ui/components/picker/`): arrows and Enter pick, Esc or a
 click outside closes. There is no visible title; the `h1` is for screen readers only. Style: opaque
 surfaces without blur or glow, the yellow accent only on the sound button, Lucide icons, one white
@@ -241,8 +241,8 @@ sound, and Binance covers the pairs that matter.
    dialog.
 4. No blur under the chip, buttons or dialog; no glow on the sound button or the chart line; at rest
    the aura is blue, not violet.
-5. Settings headings are in sentence case, the source reads `Live` / `Simulator`; the Debug block
-   appears only on `/?debug`.
+5. Settings headings are in sentence case, the source reads `Live` / `Simulator`; hovering or tapping
+   any ⓘ in settings shows its tip, and Esc closes the tip first, then the dialog.
 
 ### Stage 5
 
@@ -297,16 +297,16 @@ sound, and Binance covers the pairs that matter.
 2. `pnpm dev` → SIMULATOR → **Start**: sound fades in over ~3 s; **Stop** fades out over 1.5 s.
 3. Change the tonic: the drone glides to the new note without a click.
 4. The base volume slider changes the level smoothly.
-5. `vs EMA 1h` (Debug, `/?debug`) well above 0 → the arpeggio sits higher, below 0 → lower. On the
-   simulator this shows after an impulse.
+5. After a simulator rally the arpeggio sits higher, after a sell-off lower: the register follows the
+   price's distance from its hourly EMA.
 6. On LIVE the register follows the EMA immediately (history from REST).
 
 ### Stage 1
 
 1. `pnpm test`: rolling std, z-score, asymmetric smoothing, tension, the metrics engine, Binance
    parsers and reconnection.
-2. `pnpm dev`, open `/?debug` → LIVE: status `Live`, the price updates; z / volZ / tension appear within seconds
-   (history from REST; without it, a ~5 min warm-up).
+2. `pnpm dev` → LIVE: status `Live`, the price updates; the tension meter comes alive within seconds
+   (history from REST; without it, a ~5 min warm-up with a countdown).
 3. Change the pair (e.g. `ETHUSDT`): label and price switch, warm-up restarts. An unknown pair: the
    pair list shows `No such pair on Binance Futures`.
 4. SIMULATOR: metrics are ready at once. An impulse starts every 1.5–5 min, tension climbs above

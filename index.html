@@ -49,14 +49,8 @@
         <div class="change" id="change">&nbsp;</div>
 
         <div class="meter fades">
+          <!-- The Tension label with its hint is built by ui/components/meter. -->
           <div class="meter-head">
-            <div class="hint" id="tension-hint">
-              <button type="button" class="hint-btn" id="tension-hint-btn" aria-describedby="tension-help">
-                Tension
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-              </button>
-              <div class="hint-pop" id="tension-help" role="tooltip"></div>
-            </div>
             <span id="tension-value"></span>
           </div>
           <div class="meter-track" id="tension-track">
@@ -95,64 +89,66 @@
           </button>
         </header>
 
+        <!-- Every setting gets an ⓘ hint from settings-panel.ts, after the label just before it. -->
         <h3 id="period-title">Period</h3>
         <!-- Options built from HISTORY_PERIODS_MIN by settings-panel.ts. -->
         <fieldset class="segmented" id="period" aria-labelledby="period-title"></fieldset>
 
         <h3>Sound</h3>
         <div class="field">
-          <span>Tonic</span>
+          <div class="field-head"><span id="tonic-label">Tonic</span></div>
           <div class="picker picker-field" id="tonic"></div>
         </div>
-        <label class="field">
-          <span>Base: <output id="base-volume-out"></output> dB</span>
+        <div class="field">
+          <div class="field-head">
+            <label for="base-volume">Base: <output id="base-volume-out"></output> dB</label>
+          </div>
           <input id="base-volume" type="range" />
-        </label>
-        <label class="field">
-          <span>Tension: <output id="tension-volume-out"></output> dB</span>
+        </div>
+        <div class="field">
+          <div class="field-head">
+            <label for="tension-volume">Tension: <output id="tension-volume-out"></output> dB</label>
+          </div>
           <input id="tension-volume" type="range" />
-        </label>
-        <label class="field">
-          <span>Events: <output id="events-volume-out"></output> dB</span>
+        </div>
+        <div class="field">
+          <div class="field-head">
+            <label for="events-volume">Events: <output id="events-volume-out"></output> dB</label>
+          </div>
           <input id="events-volume" type="range" />
-        </label>
+        </div>
 
         <h3>Response</h3>
-        <label class="field">
-          <span>Price-change window: <output id="window-out"></output> s</span>
+        <div class="field">
+          <div class="field-head">
+            <label for="window">Price-change window: <output id="window-out"></output> s</label>
+          </div>
           <input id="window" type="range" />
-        </label>
-        <label class="field">
-          <span>Sensitivity: ×<output id="sensitivity-out"></output></span>
+        </div>
+        <div class="field">
+          <div class="field-head">
+            <label for="sensitivity">Sensitivity: ×<output id="sensitivity-out"></output></label>
+          </div>
           <input id="sensitivity" type="range" />
-        </label>
-        <label class="field">
-          <span>Liquidation threshold: <output id="liq-threshold-out"></output></span>
+        </div>
+        <div class="field">
+          <div class="field-head">
+            <label for="liq-threshold">Liquidation threshold: <output id="liq-threshold-out"></output></label>
+          </div>
           <input id="liq-threshold" type="range" />
-        </label>
-        <label class="field">
-          <span>Large trade threshold: <output id="trade-threshold-out"></output></span>
+        </div>
+        <div class="field">
+          <div class="field-head">
+            <label for="trade-threshold">Large trade threshold: <output id="trade-threshold-out"></output></label>
+          </div>
           <input id="trade-threshold" type="range" />
-        </label>
+        </div>
 
-        <h3>Source</h3>
-        <fieldset class="segmented">
-          <legend class="visually-hidden">Data source</legend>
+        <h3 id="source-title">Source</h3>
+        <fieldset class="segmented" id="source" aria-labelledby="source-title">
           <label><input class="visually-hidden" type="radio" name="source" value="live" /> Live</label>
           <label><input class="visually-hidden" type="radio" name="source" value="simulator" /> Simulator</label>
         </fieldset>
-
-        <details class="debug" id="debug" hidden>
-          <summary>Debug</summary>
-          <dl class="stats">
-            <dt>tension</dt><dd id="tension">—</dd>
-            <dt>direction</dt><dd id="direction">—</dd>
-            <dt>z (ret)</dt><dd id="z">—</dd>
-            <dt>volZ</dt><dd id="volz">—</dd>
-            <dt>vs EMA 1h</dt><dd id="emaz">—</dd>
-            <dt>warm-up</dt><dd id="warmup">—</dd>
-          </dl>
-        </details>
       </form>
     </dialog>
 

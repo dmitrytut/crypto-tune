@@ -22,7 +22,7 @@ import { durationLabel, eventLabel, usdFmt } from './format';
 import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, UP_COLOR } from './palette';
 import { mountStage } from './scene/stage';
 
-/** Smoothed direction beyond ±this gets an arrow (tab title, debug); inside it reads as flat. */
+/** Smoothed direction beyond ±this gets an arrow in the tab title; inside it reads as flat. */
 const DIRECTION_ARROW_MIN = 0.2;
 /** Chrome fades after this long without pointer or keyboard input. */
 const IDLE_MS = 10_000;
@@ -104,8 +104,6 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const meter = new TensionMeter(settings.windowSec);
   const title = el('title');
   const audioLabel = el('audio-label');
-  // Raw metric readouts are for tuning, not for listeners: shown only with ?debug in the URL.
-  el('debug').hidden = !new URLSearchParams(location.search).has('debug');
   const vol = el('vol');
   const lastEvent = el('last-event');
   // Last big event and when it arrived (wall clock: the "ago" is for the listener's eyes).
@@ -146,14 +144,6 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     onPick: (symbol) => update({ symbol }),
   });
   let pairList: readonly string[] = [];
-  const debug = {
-    tension: el('tension'),
-    direction: el('direction'),
-    z: el('z'),
-    volz: el('volz'),
-    emaz: el('emaz'),
-    warmup: el('warmup'),
-  };
 
   audioToggle.addEventListener('click', () => handlers.onToggleAudio());
 
@@ -236,12 +226,6 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       meter.render(s);
       aura?.setTarget(auraTarget(s, flow.read(Date.now())));
       updateTitle(s);
-      debug.tension.textContent = s.tension.toFixed(2);
-      debug.direction.textContent = `${arrowOf(s.direction)} ${s.direction.toFixed(2)}`;
-      debug.z.textContent = s.z.toFixed(2);
-      debug.volz.textContent = s.volZ.toFixed(2);
-      debug.emaz.textContent = s.ready ? s.emaZ.toFixed(2) : '—';
-      debug.warmup.textContent = s.ready ? 'ready' : `${Math.floor(s.warmup * 100)}%`;
     },
     reset(h) {
       history = h;
@@ -254,7 +238,6 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       flow = new FlowMeter();
       vol.textContent = '—';
       meter.reset();
-      for (const node of Object.values(debug)) node.textContent = '—';
       change.textContent = '\u00a0';
       clearEvent();
       fx.clear();
