@@ -112,8 +112,9 @@
           </button>
         </header>
 
-        <!-- Every setting gets an ⓘ hint from settings-panel.ts, after the label just before it. -->
-        <h3 id="period-title">Period</h3>
+        <!-- Every setting gets an ⓘ hint from settings-panel.ts, appended to the element just
+          before it. A heading's hint goes beside it, not inside: it would join the name. -->
+        <div class="field-head"><h3 id="period-title">Period</h3></div>
         <!-- Options built from HISTORY_PERIODS_MIN by settings-panel.ts. -->
         <fieldset class="segmented" id="period" aria-labelledby="period-title"></fieldset>
 
@@ -176,7 +177,7 @@
           <input id="trade-threshold" type="range" />
         </div>
 
-        <h3 id="source-title">Source</h3>
+        <div class="field-head"><h3 id="source-title">Source</h3></div>
         <fieldset class="segmented" id="source" aria-labelledby="source-title">
           <label><input class="visually-hidden" type="radio" name="source" value="live" /> Live</label>
           <label><input class="visually-hidden" type="radio" name="source" value="simulator" /> Simulator</label>

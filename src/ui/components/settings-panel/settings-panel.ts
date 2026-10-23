@@ -13,7 +13,7 @@ const snapUsd = (log10: number) => Number((10 ** log10).toPrecision(2));
 
 /**
  * The ⓘ tip of every setting: what it is and what it changes, for a listener rather than a
- * trader. Keyed by the control's id; the tip goes into the label element just before it.
+ * trader. Keyed by the control's id; the tip goes into the `.field-head` row just before it.
  */
 const HELP: Record<string, { label: string; text: string }> = {
   period: {
