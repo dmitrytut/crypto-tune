@@ -31,6 +31,10 @@
     color: var(--muted);
     transition: rotate var(--duration-fast);
 
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+
     .picker-btn[aria-expanded="true"] & {
       rotate: 180deg;
     }
@@ -115,11 +119,16 @@
       }
     }
   }
+  /* A live region, so it stays rendered: an empty note takes no room. */
   .picker-empty {
     margin: 0;
     padding: var(--space-md);
     color: var(--muted);
     font-size: var(--font-size-sm);
+
+    &:empty {
+      padding: 0;
+    }
   }
 
   /* Chip look: the pair in the top bar. */

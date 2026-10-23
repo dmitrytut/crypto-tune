@@ -64,7 +64,8 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   button.className = 'picker-btn';
   button.setAttribute('aria-haspopup', 'listbox');
   button.setAttribute('aria-expanded', 'false');
-  button.setAttribute('aria-controls', `${id}-menu`);
+  // aria-haspopup says a listbox opens: point at the listbox, not the menu wrapping it.
+  button.setAttribute('aria-controls', `${id}-list`);
   const valueNode = document.createElement('span');
   button.append(valueNode);
   button.insertAdjacentHTML('beforeend', CHEVRON);
@@ -78,9 +79,10 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   list.id = `${id}-list`;
   list.setAttribute('role', 'listbox');
   list.setAttribute('aria-label', cfg.label);
+  // "No such pair" is announced as it appears; it lives outside the listbox and needs no focus.
   const empty = document.createElement('p');
   empty.className = 'picker-empty';
-  empty.hidden = true;
+  empty.setAttribute('role', 'status');
 
   let search: HTMLInputElement | null = null;
   if (cfg.search) {
@@ -95,7 +97,6 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     search.setAttribute('aria-controls', list.id);
     search.setAttribute('aria-expanded', 'true');
     search.setAttribute('aria-autocomplete', 'list');
-    empty.textContent = cfg.search.empty;
     menu.append(search);
   } else {
     // Without a search field the list itself takes focus and the arrow keys.
@@ -140,7 +141,7 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
         return row;
       }),
     );
-    empty.hidden = shown.length > 0;
+    empty.textContent = shown.length > 0 ? '' : (cfg.search?.empty ?? '');
     active = -1;
     const at = onCurrent ? shown.indexOf(current) : -1;
     highlight(at >= 0 ? at : shown.length > 0 ? 0 : -1);

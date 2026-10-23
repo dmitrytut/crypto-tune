@@ -22,13 +22,22 @@ const METER_ZONES = [
  * either the wait for history or the calibration countdown. Mounted once for the page's lifetime.
  */
 export class TensionMeter {
+  private readonly track = el('tension-track');
   private readonly fill = el('tension-fill');
   private readonly value = el('tension-value');
   private readonly help = createHint('Tension', { showLabel: true });
 
   constructor(windowSec: number) {
-    const track = el('tension-track');
+    const track = this.track;
+    // The fill is the reading; assistive tech gets it as a meter with the zone in words.
+    track.setAttribute('role', 'meter');
+    track.setAttribute('aria-label', 'Tension');
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', String(METER_MAX));
+    this.setReading(0, 'Calm');
     const scale = el('tension-scale');
+    // The zone names under the track repeat what the meter's value text says.
+    scale.setAttribute('aria-hidden', 'true');
     for (const { from, name } of METER_ZONES) {
       const pct = (from / METER_MAX) * 100;
       if (from > 0) {
@@ -74,16 +83,20 @@ export class TensionMeter {
       this.fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
       this.fill.style.backgroundColor = css(tensionColor(s.tension));
       this.value.textContent = '';
+      const zone = METER_ZONES.findLast(({ from }) => s.tension >= from) ?? METER_ZONES[0];
+      this.setReading(s.tension, `${zone.name}, ${s.tension.toFixed(1)}`);
     } else if (loadingHistory) {
       // History is on its way: a warm-up countdown would promise minutes that never come.
       this.fill.style.width = '0';
       this.fill.style.backgroundColor = '';
       this.value.textContent = 'loading recent trades…';
+      this.setReading(0, 'Loading recent trades');
     } else {
       // Tension needs a few minutes of this market's own statistics before it means anything.
       this.fill.style.width = `${Math.floor(s.warmup * 100)}%`;
       this.fill.style.backgroundColor = '';
       this.value.textContent = `calibrating · ${clock(s.warmupLeftSec)}`;
+      this.setReading(0, `Calibrating, ${clock(s.warmupLeftSec)} left`);
     }
   }
 
@@ -91,5 +104,13 @@ export class TensionMeter {
     this.fill.style.width = '0';
     this.fill.style.backgroundColor = '';
     this.value.textContent = '';
+    this.setReading(0, 'Calm');
+  }
+
+  /** The meter's value for assistive tech; written only when the spoken text changes. */
+  private setReading(tension: number, text: string): void {
+    if (this.track.getAttribute('aria-valuetext') === text) return;
+    this.track.setAttribute('aria-valuenow', Math.min(tension, METER_MAX).toFixed(1));
+    this.track.setAttribute('aria-valuetext', text);
   }
 }

@@ -13,9 +13,9 @@ const timeFmt = new Intl.DateTimeFormat('en-GB', {
 
 /**
  * Tooltip for the event markers on the chart, one line: `SELL $219K 04:04:12`.
- * A mouse shows it on hover; a tap shows it until the next tap elsewhere. `find`
- * hit-tests the chart in canvas CSS px. Its outside-press listener lives on `document`
- * with no teardown: mount once per page.
+ * A mouse shows it on hover; a tap shows it until the next tap elsewhere; Esc hides it
+ * without moving the pointer. `find` hit-tests the chart in canvas CSS px. Its outside-press
+ * and Esc listeners live on `document` with no teardown: mount once per page.
  */
 export function mountChartTip(
   canvas: HTMLCanvasElement,
@@ -59,5 +59,8 @@ export function mountChartTip(
   });
   document.addEventListener('pointerdown', (e) => {
     if (e.target !== canvas) hide();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !tip.hidden) hide();
   });
 }

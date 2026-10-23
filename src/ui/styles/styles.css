@@ -22,11 +22,15 @@
   body {
     margin: 0;
     height: 100%;
+  }
+  html {
     overflow: hidden;
   }
-
-  /* Fallback when WebGL is unavailable; the aura canvas covers it otherwise. */
   body {
+    /* One screen by default; a short window or a zoomed page scrolls instead of cutting the
+     * controls off (WCAG 1.4.10). The hero's dark pool overhangs it sideways: no x scroll. */
+    overflow: hidden auto;
+    /* Fallback when WebGL is unavailable; the aura canvas covers it otherwise. */
     background: var(--bg);
 
     /* Film grain over everything: kills gradient banding and gives the glow a printed texture. */
@@ -76,7 +80,7 @@
   .stage {
     position: relative;
     z-index: var(--z-stage);
-    height: 100%;
+    min-height: 100%;
     display: grid;
     grid-template-rows: auto 1fr auto;
     padding: 20px var(--gutter) 16px;
@@ -95,7 +99,8 @@
   body.idle {
     cursor: none;
 
-    & .fades {
+    /* Chrome holding keyboard focus stays: the focus ring must not fade out (WCAG 2.4.7). */
+    & .fades:not(:focus-visible, :has(:focus-visible)) {
       opacity: 0;
     }
   }
@@ -115,8 +120,9 @@
     font-size: var(--font-size-sm);
     color: var(--muted);
 
+    /* Decoration: the alt text after "/" keeps screen readers from saying "black circle". */
     &::before {
-      content: "● ";
+      content: "● " / "";
     }
     &[data-state="open"]::before {
       color: var(--up);
@@ -161,7 +167,8 @@
     /* Particles start here; keep it above the chart. */
     grid-row: 2;
 
-    /* Soft dark pool behind the readout: the aura can blaze without swallowing the numbers. */
+    /* Soft dark pool behind the readout: the aura can blaze without swallowing the numbers.
+     * Dark enough that sell-coloured text (change, last event) keeps 4.5:1 over a bright aura. */
     &::before {
       content: "";
       position: absolute;
@@ -170,8 +177,8 @@
       pointer-events: none;
       background: radial-gradient(
         closest-side,
-        rgb(0 0 0 / 0.5),
-        rgb(0 0 0 / 0.28) 55%,
+        rgb(0 0 0 / 0.65),
+        rgb(0 0 0 / 0.5) 70%,
         transparent
       );
     }
