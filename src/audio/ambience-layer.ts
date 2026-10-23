@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
 import { degreeToMidi, midiToHz, pitchClassMidi } from './scale';
+import { stepIndex } from './transport-step';
 
 /** Bells start an octave above the arpeggio (A4 = 440 Hz). */
 const BELL_OCTAVE = 4;
@@ -62,7 +63,7 @@ export class AmbienceLayer {
 
     new Tone.Loop((time) => {
       // Beat in the bar from the transport, so accents stay on the bar after a restart.
-      const beat = Math.round(transport.getTicksAtTime(time) / ppq) % PULSE_ACCENTS.length;
+      const beat = stepIndex(transport.getTicksAtTime(time), ppq, PULSE_ACCENTS.length);
       this.pulse.triggerAttackRelease(
         midiToHz(pitchClassMidi(this.tonicPc, PULSE_OCTAVE)),
         '8n',

@@ -21,6 +21,8 @@ const RISER_TO_HZ = 5000;
 const MAX_DIRECTION_BIAS = 2;
 const MAX_VIBRATO_DEPTH = 0.15;
 const MAX_DRONE_FLAT_CENTS = 20;
+/** Fraction of intensity the percussion lags the sub before it starts fading in. */
+const PERC_ENTRY_OFFSET = 0.1;
 /**
  * Rise of tension within SHOCK_WINDOW_TICKS that counts as a sudden move.
  * Tuned on 2 h of live BTCUSDT (calm evening, 0.46 % range): 1.5 fired 53×/h,
@@ -100,7 +102,7 @@ export function tensionMix(tension: number, direction: number, wasDoubleTime: bo
     registerBias: Math.round(MAX_DIRECTION_BIAS * intensity * direction),
     subLevel: easeOut(intensity),
     // Percussion trails the sub so the texture builds in two steps.
-    percLevel: easeOut(clamp01((intensity - 0.1) / 0.9)),
+    percLevel: easeOut(clamp01((intensity - PERC_ENTRY_OFFSET) / (1 - PERC_ENTRY_OFFSET))),
     riserLevel: smoothstep(peak),
     riserHz: RISER_FROM_HZ * (RISER_TO_HZ / RISER_FROM_HZ) ** peak,
     vibratoDepth: MAX_VIBRATO_DEPTH * peak,

@@ -54,7 +54,8 @@ let nextId = 0;
  * Dropdown list built into `host`: a button showing the value and a menu of options,
  * optionally with a search field filtering as you type. Arrows and Enter pick, Esc or
  * a press outside close. One component for every list in the UI, so they look and
- * behave alike; `host` classes choose the look (`picker-chip`, `picker-field`).
+ * behave alike; `host` classes choose the look (`picker-chip`, `picker-field`). Its
+ * outside-press listener lives on `document` with no teardown: mount once per page.
  */
 export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   const id = `picker-${nextId++}`;

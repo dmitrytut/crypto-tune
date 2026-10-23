@@ -39,7 +39,7 @@ export function mountSettingsPanel(
   tonic.setOptions(TONICS);
   tonic.set(initial.tonic);
 
-  for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="source"]')) {
+  for (const radio of dialog.querySelectorAll<HTMLInputElement>('input[name="source"]')) {
     radio.checked = radio.value === initial.source;
     radio.addEventListener('change', () => {
       if (radio.checked) update({ source: radio.value as SourceKind });
