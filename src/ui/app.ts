@@ -14,6 +14,7 @@ import { el } from './dom';
 import { FlowMeter } from './flow';
 import { clock, usdFmt } from './format';
 import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
+import { mountPicker } from './picker';
 import { PriceReadout } from './price-readout';
 import { mountStage } from './scene/stage';
 import { mountSettingsPanel } from './settings-panel';
@@ -142,10 +143,9 @@ const arrowOf = (d: number) => (d > 0.2 ? '▲' : d < -0.2 ? '▼' : '•');
 
 export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let settings = initial;
-  let symbols = new Set<string>();
   const update = (patch: Partial<Settings>) => {
     settings = { ...settings, ...patch };
-    if ('source' in patch) syncSymbolChip();
+    if ('source' in patch || 'symbol' in patch) syncPair();
     if ('windowSec' in patch) fillTensionHelp(tensionHelp, settings.windowSec);
     handlers.onSettings(settings);
   };
@@ -172,9 +172,20 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const vol = el('vol');
   const lastEvent = el('last-event');
   const audioToggle = el<HTMLButtonElement>('audio-toggle');
-  const symbol = el<HTMLInputElement>('symbol');
-  const symbolList = el<HTMLDataListElement>('symbols');
-  const symbolError = el('symbol-error');
+  const pair = mountPicker(el('pair'), {
+    label: 'Pair',
+    search: {
+      placeholder: 'Search pairs',
+      empty: 'No such pair on Binance Futures',
+      // Without a loaded list (REST unreachable) any well-formed symbol can be tried as typed.
+      fallback: (query) => {
+        const s = query.toUpperCase();
+        return pairList.length === 0 && SYMBOL_PATTERN.test(s) ? s : null;
+      },
+    },
+    onPick: (symbol) => update({ symbol }),
+  });
+  let pairList: readonly string[] = [];
   const debug = {
     tension: el('tension'),
     direction: el('direction'),
@@ -185,36 +196,16 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   };
 
   audioToggle.addEventListener('click', () => handlers.onToggleAudio());
-  // The datalist opens on any click, not only on the native arrow (hidden in favour of our caret).
-  symbol.addEventListener('click', () => {
-    try {
-      symbol.showPicker();
-    } catch {
-      // Unsupported for datalist in this browser, or no user activation: typing still filters.
-    }
-  });
 
-  const syncSymbolChip = () => {
+  const syncPair = () => {
     const live = settings.source === 'live';
-    symbol.disabled = !live;
-    symbol.value = live ? settings.symbol : 'SIMULATOR';
+    if (live) pair.set(settings.symbol);
+    else pair.disable('Simulator');
     title.textContent = live
       ? `${settings.symbol} futures, played as sound`
       : 'A simulated market, played as sound';
-    symbolError.hidden = true;
   };
-  syncSymbolChip();
-  symbol.addEventListener('change', () => {
-    const next = symbol.value.trim().toUpperCase();
-    // Without a loaded list (REST unreachable) accept any well-formed symbol.
-    const valid = SYMBOL_PATTERN.test(next) && (symbols.size === 0 || symbols.has(next));
-    symbolError.hidden = valid;
-    symbolError.textContent = valid ? '' : `${next || '∅'}: no such pair on Binance Futures`;
-    if (!valid) return;
-    symbol.value = next;
-    symbol.blur();
-    if (next !== settings.symbol) update({ symbol: next });
-  });
+  syncPair();
 
   // ── scene ──
   let flow = new FlowMeter();
@@ -358,14 +349,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(0.35);
     },
     setSymbols(list) {
-      symbols = new Set(list);
-      symbolList.replaceChildren(
-        ...list.map((s) => {
-          const opt = document.createElement('option');
-          opt.value = s;
-          return opt;
-        }),
-      );
+      pairList = list;
+      pair.setOptions(list);
     },
   };
 }

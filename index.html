@@ -12,18 +12,8 @@
 
     <main id="stage" class="stage">
       <header class="top fades">
-        <div class="chip">
-          <input
-            id="symbol"
-            list="symbols"
-            autocomplete="off"
-            spellcheck="false"
-            aria-label="Binance USDⓈ-M pair"
-          />
-          <datalist id="symbols"></datalist>
-          <!-- Icons: Lucide (ISC). -->
-          <svg class="chip-caret icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-        </div>
+        <!-- Pair dropdown, built by ui/picker.ts. -->
+        <div class="picker picker-chip" id="pair"></div>
         <div class="top-right">
           <span id="status" class="status" data-state="idle">idle</span>
           <button id="settings-open" class="icon-btn" type="button" aria-label="Settings">
@@ -36,8 +26,6 @@
           </button>
         </div>
       </header>
-      <small id="symbol-error" class="error" hidden></small>
-
       <section class="hero">
         <h1 class="visually-hidden" id="title">Market, played as sound</h1>
         <div class="price" id="price">—</div>
@@ -86,10 +74,10 @@
         </header>
 
         <h3>Sound</h3>
-        <label class="field">
+        <div class="field">
           <span>Tonic</span>
-          <select id="tonic"></select>
-        </label>
+          <div class="picker picker-field" id="tonic"></div>
+        </div>
         <label class="field">
           <span>Base: <output id="base-volume-out"></output> dB</span>
           <input id="base-volume" type="range" />

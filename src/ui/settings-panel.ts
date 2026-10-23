@@ -1,6 +1,7 @@
 import { LIMITS, type Settings, type SourceKind, TONICS } from '../settings';
 import { el } from './dom';
 import { usdFmt } from './format';
+import { mountPicker } from './picker';
 
 /** Threshold slider resolution in decades; values snap to two significant digits. */
 const LOG_STEP = 0.05;
@@ -27,19 +28,15 @@ export function mountSettingsPanel(
     if (e.target === dialog) dialog.close();
   });
 
-  const tonic = el<HTMLSelectElement>('tonic');
-  tonic.replaceChildren(
-    ...TONICS.map((t) => {
-      const opt = document.createElement('option');
-      opt.value = opt.textContent = t;
-      return opt;
-    }),
-  );
-  tonic.value = initial.tonic;
-  tonic.addEventListener('change', () => {
-    const t = TONICS.find((x) => x === tonic.value);
-    if (t) update({ tonic: t });
+  const tonic = mountPicker(el('tonic'), {
+    label: 'Tonic',
+    onPick: (value) => {
+      const t = TONICS.find((x) => x === value);
+      if (t) update({ tonic: t });
+    },
   });
+  tonic.setOptions(TONICS);
+  tonic.set(initial.tonic);
 
   for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="source"]')) {
     radio.checked = radio.value === initial.source;
