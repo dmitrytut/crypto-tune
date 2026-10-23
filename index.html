@@ -5,16 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#07060d" />
-    <meta name="description" content="Hear the crypto market: live futures trades turned into calm generative music." />
+    <meta name="description" content="Listen to Bitcoin and crypto futures in real time: Binance trades, liquidations and price shocks turned into calm generative music. Free, in the browser." />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Crypto Tune: the market, played as sound</title>
+    <!-- One page: query strings (?debug, share-tracking params) must not become duplicates. -->
+    <link rel="canonical" href="https://dmitrytut.github.io/crypto-tune/" />
     <!-- Link previews (Telegram, Slack, X, Discord). Crawlers need absolute URLs. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Crypto Tune" />
     <meta property="og:title" content="Crypto Tune: the market, played as sound" />
-    <meta property="og:description" content="Hear the crypto market: live futures trades turned into calm generative music." />
+    <meta property="og:description" content="Listen to Bitcoin and crypto futures in real time: Binance trades, liquidations and price shocks turned into calm generative music. Free, in the browser." />
     <meta property="og:url" content="https://dmitrytut.github.io/crypto-tune/" />
     <meta property="og:image" content="https://dmitrytut.github.io/crypto-tune/og.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
@@ -22,6 +24,22 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Crypto Tune logo and tagline over the app's aura" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Crypto Tune",
+        "url": "https://dmitrytut.github.io/crypto-tune/",
+        "description": "Listen to Bitcoin and crypto futures in real time: Binance trades, liquidations and price shocks turned into calm generative music. Free, in the browser.",
+        "image": "https://dmitrytut.github.io/crypto-tune/og.jpg",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript and the Web Audio API",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "sameAs": "https://github.com/dmitrytut/crypto-tune"
+      }
+    </script>
   </head>
   <body>
     <canvas id="aura" class="layer" aria-hidden="true"></canvas>
@@ -44,7 +62,8 @@
         </div>
       </header>
       <section class="hero">
-        <h1 class="visually-hidden" id="title">Market, played as sound</h1>
+        <!-- Brand stays static; ui/app.ts rewrites the #title part per pair/source. -->
+        <h1 class="visually-hidden">Crypto Tune: <span id="title">the market, played as sound</span></h1>
         <div class="price" id="price">—</div>
         <div class="change" id="change">&nbsp;</div>
 
