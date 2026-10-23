@@ -1,73 +1,79 @@
 /* Self-explaining label (hint.ts): hover or focus shows the tip, a tap pins it. */
-.hint {
-  position: relative;
-}
-.hint-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  color: var(--text);
-  cursor: help;
-}
-.hint-btn .icon {
-  width: 15px;
-  height: 15px;
-  color: var(--muted);
-}
-.hint-btn:hover .icon,
-.hint[data-open] .hint-btn .icon {
-  color: var(--text);
-}
-.hint-btn:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-/* Floats above the label, so it shadows like a menu. */
-.hint-pop {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 0;
-  z-index: 3;
-  width: min(340px, calc(100vw - 48px));
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #141519;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.45;
-  font-variant-numeric: normal;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 0.15s,
-    visibility 0.15s;
-}
-.hint-pop p,
-.hint-pop ul {
-  margin: 0;
-}
-.hint-pop ul {
-  margin: 8px 0;
-  padding-left: 18px;
-}
-.hint-pop p:last-child {
-  color: var(--muted);
-}
-.hint[data-open] .hint-pop,
-.hint-btn:focus-visible + .hint-pop {
-  opacity: 1;
-  visibility: visible;
-}
-@media (hover: hover) {
-  .hint:hover .hint-pop {
-    opacity: 1;
-    visibility: visible;
+@layer components {
+  .hint {
+    position: relative;
+  }
+
+  .hint-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--text);
+    cursor: help;
+
+    /* The ring hugs the label text. */
+    &:focus-visible {
+      border-radius: 4px;
+    }
+    & .icon {
+      width: 15px;
+      height: 15px;
+      color: var(--muted);
+    }
+    &:hover .icon,
+    .hint[data-open] & .icon {
+      color: var(--text);
+    }
+  }
+
+  /* Floats above the label, so it shadows like a menu. */
+  .hint-pop {
+    position: absolute;
+    bottom: calc(100% + var(--space-md));
+    left: 0;
+    z-index: var(--z-hint);
+    /* Never wider than the window minus the page margins. */
+    width: min(340px, calc(100vw - 2 * var(--gutter)));
+    padding: var(--space-lg) var(--space-xl);
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-overlay);
+    box-shadow: var(--shadow-pop);
+    color: var(--text);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+    font-variant-numeric: normal;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--duration-fast),
+      visibility var(--duration-fast);
+
+    & p,
+    & ul {
+      margin: 0;
+    }
+    & ul {
+      margin: var(--space-sm) 0;
+      padding-left: 18px;
+    }
+    & p:last-child {
+      color: var(--muted);
+    }
+
+    .hint[data-open] &,
+    .hint-btn:focus-visible + & {
+      opacity: 1;
+      visibility: visible;
+    }
+    @media (hover: hover) {
+      .hint:hover & {
+        opacity: 1;
+        visibility: visible;
+      }
+    }
   }
 }

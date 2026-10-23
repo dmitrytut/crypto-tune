@@ -136,6 +136,8 @@ export class Fx {
   private labels: Label[] = [];
   private queued: { side: TradeSide; usd: number }[] = [];
   private origin = { x: 0, y: 0 };
+  /** The page font stack (--font-sans), inherited by the canvas: one source for CSS and labels. */
+  private readonly fontFamily: string;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -144,6 +146,7 @@ export class Fx {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas unavailable');
     this.ctx = ctx;
+    this.fontFamily = getComputedStyle(canvas).fontFamily;
     this.sprites = { buy: bubbleSprite(UP_COLOR), sell: dropSprite(DOWN_COLOR) };
     this.halos = { buy: haloSprite(UP_COLOR), sell: haloSprite(DOWN_COLOR) };
   }
@@ -328,7 +331,7 @@ export class Fx {
       if (l.age >= LABEL_SEC) continue;
       const t = l.age / LABEL_SEC;
       ctx.globalAlpha = Math.min(1, l.age / 0.15) * (1 - t) ** 1.5;
-      ctx.font = `700 ${l.size}px "Onest Variable", system-ui, sans-serif`;
+      ctx.font = `700 ${l.size}px ${this.fontFamily}`;
       // Side-coloured text over a neutral dark scrim: readable on any aura, no glow.
       ctx.fillStyle = css(l.color, 1);
       ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';

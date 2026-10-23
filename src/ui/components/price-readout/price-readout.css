@@ -1,42 +1,47 @@
 /* The big price (price-readout.ts). */
-/* Thin, tabular, quiet: the number is the hero, not its effects. Separators and
- * the fraction step back so the eye reads the big digits first. */
-.price {
-  font-size: clamp(56px, 17vw, 116px);
-  font-weight: 250;
-  letter-spacing: -0.045em;
-  line-height: 1;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  color: #fbfaff;
-  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.35);
-}
-/* Thousands separators step back; the decimal point stays visible (it is inside the dimmed fraction). */
-.price .int .sep {
-  opacity: 0.38;
-}
-.price .frac {
-  font-size: 0.44em;
-  font-weight: 350;
-  letter-spacing: -0.01em;
-  opacity: 0.55;
-  margin-left: 0.04em;
-}
+@layer components {
+  /* Thin, tabular, quiet: the number is the hero, not its effects. Separators and
+   * the fraction step back so the eye reads the big digits first. */
+  .price {
+    font-size: clamp(56px, 17vw, 116px);
+    font-weight: 250;
+    letter-spacing: -0.045em;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    /* A touch brighter than --text: the brightest thing on screen. */
+    color: #fbfaff;
+    text-shadow: 0 2px 30px rgb(0 0 0 / 0.35);
 
-/* Only the digits that changed take the move's colour, then fade back to white. */
-.price .chg.up {
-  animation: digit-up 1.1s ease-out;
-}
-.price .chg.down {
-  animation: digit-down 1.1s ease-out;
-}
-@keyframes digit-up {
-  from {
-    color: var(--up);
+    /* Thousands separators step back; the decimal point stays visible (it is inside the dimmed fraction). */
+    & .int .sep {
+      opacity: 0.38;
+    }
+    & .frac {
+      font-size: 0.44em;
+      font-weight: 350;
+      letter-spacing: -0.01em;
+      opacity: 0.55;
+      margin-left: 0.04em;
+    }
+
+    /* Only the digits that changed take the move's colour, then fade back to the price colour.
+     * Own class names: the .up/.down utilities would hold the colour after the flash. */
+    & .chg-up {
+      animation: digit-up 1.1s ease-out;
+    }
+    & .chg-down {
+      animation: digit-down 1.1s ease-out;
+    }
   }
-}
-@keyframes digit-down {
-  from {
-    color: var(--down);
+  @keyframes digit-up {
+    from {
+      color: var(--up);
+    }
+  }
+  @keyframes digit-down {
+    from {
+      color: var(--down);
+    }
   }
 }
