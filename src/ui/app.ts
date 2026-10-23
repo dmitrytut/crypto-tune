@@ -211,11 +211,13 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       chartDirty = true;
       price.render(s.price);
       // Change, volume and chart cover the same period: the chosen one, or all the history
-      // there is while it is shorter.
+      // there is while it is shorter. While history loads, a second of live data would read as
+      // "0.00% in 1s, vol $0/1s": the readouts stay blank for those few seconds instead.
       const first = history?.prices[0];
-      if (!history || !first || Number.isNaN(s.price)) {
+      if (!history || !first || Number.isNaN(s.price) || loadingHistory) {
         change.textContent = '\u00a0';
         change.className = 'change';
+        vol.textContent = '—';
       } else {
         const spanMs = Math.min(settings.periodMin * 60_000, s.ts - first.ts);
         const span = durationLabel(spanMs);
