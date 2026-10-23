@@ -99,7 +99,8 @@
   body.idle {
     cursor: none;
 
-    & .fades {
+    /* Chrome holding keyboard focus stays: the focus ring must not fade out (WCAG 2.4.7). */
+    & .fades:not(:focus-visible, :has(:focus-visible)) {
       opacity: 0;
     }
   }
