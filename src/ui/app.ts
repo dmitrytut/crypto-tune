@@ -1,3 +1,4 @@
+import './styles.css';
 import type {
   FeedStatus,
   Liquidation,
@@ -10,15 +11,15 @@ import type { EventCue } from '../metrics/events';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
+import { mountHint } from './components/hint';
+import { mountPicker } from './components/picker';
+import { PriceReadout } from './components/price-readout';
+import { mountSettingsPanel } from './components/settings-panel';
 import { el } from './dom';
 import { FlowMeter } from './flow';
 import { clock, durationLabel, usdFmt } from './format';
 import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, tensionColor, UP_COLOR } from './palette';
-import { mountPicker } from './picker';
-import { PriceReadout } from './price-readout';
 import { mountStage } from './scene/stage';
-import { mountSettingsPanel } from './settings-panel';
-import './styles.css';
 
 /** Tension value at the right edge of the meter. */
 const METER_MAX = 5;
@@ -118,25 +119,6 @@ function fillTensionHelp(node: HTMLElement, windowSec: number): void {
   const tune = document.createElement('p');
   tune.textContent = 'Sensitivity in settings scales it.';
   node.replaceChildren(intro, zones, tune);
-}
-
-/**
- * A label that explains itself: hover or keyboard focus shows the tip (CSS), a click or tap
- * pins it, Esc or a press anywhere else closes it.
- */
-function mountHint(root: HTMLElement, button: HTMLButtonElement): void {
-  const set = (open: boolean) => {
-    root.toggleAttribute('data-open', open);
-    button.setAttribute('aria-expanded', String(open));
-  };
-  set(false);
-  button.addEventListener('click', () => set(!root.hasAttribute('data-open')));
-  document.addEventListener('pointerdown', (e) => {
-    if (!(e.target instanceof Node && root.contains(e.target))) set(false);
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') set(false);
-  });
 }
 
 const arrowOf = (d: number) => (d > 0.2 ? '▲' : d < -0.2 ? '▼' : '•');

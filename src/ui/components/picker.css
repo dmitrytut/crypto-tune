@@ -1,0 +1,146 @@
+/* Dropdown list (picker.ts): chip and field looks share one menu. */
+.picker {
+  position: relative;
+}
+.picker-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.picker-caret {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  transition: rotate 0.15s;
+}
+/* Always looks pickable: a border and a caret, stronger on hover and while open. */
+.picker-btn:hover,
+.picker-btn[aria-expanded="true"] {
+  border-color: rgba(255, 255, 255, 0.36);
+}
+.picker-btn[aria-expanded="true"] .picker-caret {
+  rotate: 180deg;
+}
+.picker-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+.picker-btn:disabled {
+  border-color: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+.picker-btn:disabled .picker-caret {
+  display: none;
+}
+/* Floats over everything around it, so it shadows like a menu. */
+.picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 4;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #141519;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.picker-search {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  outline: none;
+}
+.picker-search::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+  text-transform: none;
+}
+.picker-search:focus-visible {
+  border-color: rgba(255, 255, 255, 0.36);
+}
+.picker-list {
+  max-height: min(320px, 55vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  outline: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.picker-list:empty {
+  display: none;
+}
+.picker-list [role="option"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.picker-list [data-active] {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+/* The chosen value: full ink, bold, a dot on the right. */
+.picker-list [aria-selected="true"] {
+  color: var(--text);
+  font-weight: 700;
+}
+.picker-list [aria-selected="true"]::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.picker-empty {
+  margin: 0;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+/* Chip look: the pair in the top bar. */
+.picker-chip .picker-btn {
+  padding: 9px 14px 9px 18px;
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.picker-chip .picker-menu {
+  width: 240px;
+}
+/* Field look: a form control in the settings dialog. */
+.picker-field .picker-btn {
+  width: 100%;
+  padding: 8px 10px 8px 12px;
+  border-radius: 10px;
+  background: var(--surface-strong);
+  font-size: 14px;
+  font-weight: 500;
+}
+.picker-field .picker-menu {
+  width: 100%;
+}
+.picker-field .picker-list {
+  max-height: 240px;
+}

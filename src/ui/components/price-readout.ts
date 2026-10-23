@@ -1,9 +1,9 @@
-import { priceDecimals, splitPrice } from './format';
+import './price-readout.css';
+import { priceDecimals, splitPrice } from '../format';
 
 /**
  * The big price. Decimals are fixed per pair from its first price, so the
  * layout never jitters; only the digits that changed flash in the move's colour.
- * @package
  */
 export class PriceReadout {
   private decimals = -1;
