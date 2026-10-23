@@ -22,11 +22,15 @@
   body {
     margin: 0;
     height: 100%;
+  }
+  html {
     overflow: hidden;
   }
-
-  /* Fallback when WebGL is unavailable; the aura canvas covers it otherwise. */
   body {
+    /* One screen by default; a short window or a zoomed page scrolls instead of cutting the
+     * controls off (WCAG 1.4.10). The hero's dark pool overhangs it sideways: no x scroll. */
+    overflow: hidden auto;
+    /* Fallback when WebGL is unavailable; the aura canvas covers it otherwise. */
     background: var(--bg);
 
     /* Film grain over everything: kills gradient banding and gives the glow a printed texture. */
@@ -76,7 +80,7 @@
   .stage {
     position: relative;
     z-index: var(--z-stage);
-    height: 100%;
+    min-height: 100%;
     display: grid;
     grid-template-rows: auto 1fr auto;
     padding: 20px var(--gutter) 16px;
