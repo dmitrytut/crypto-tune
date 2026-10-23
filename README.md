@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="public/favicon.svg" width="112" height="112" alt="crypto-tune logo: a price line turning into a sound wave, on the app's aura">
+  <img src="public/favicon.svg" width="112" height="112" alt="Crypto Tune logo: a price line turning into a sound wave, on the app's aura">
 </p>
 
-<h1 align="center">crypto-tune</h1>
+<h1 align="center">Crypto Tune</h1>
 
 <p align="center">
   <b>Hear the market.</b><br>
@@ -22,11 +22,11 @@
 </p>
 
 <p align="center">
-  <a href="https://dmitrytut.github.io/crypto-tune/"><img src="docs/media/hero.webp" width="880" alt="A sell-off in crypto-tune: the aura turns magenta, sell drops rain down, liquidation rings burst from the price"></a><br>
+  <a href="https://dmitrytut.github.io/crypto-tune/"><img src="docs/media/hero.webp" width="880" alt="A sell-off in Crypto Tune: the aura turns magenta, sell drops rain down, liquidation rings burst from the price"></a><br>
   <sub>A simulated sell-off. Sound on in the app: here you only see it.</sub>
 </p>
 
-Charts need your eyes. crypto-tune only needs your ears. Leave it in a background tab while you work.
+Charts need your eyes. Crypto Tune only needs your ears. Leave it in a background tab while you work.
 A quiet market is an ambient drone with slow bells. When price jumps, the music speeds up, the filters
 open and the bass comes in. Liquidations hit like gongs. You hear the shock before you would have
 looked at the chart.
@@ -207,6 +207,10 @@ conventions are in [`AGENTS.md`](AGENTS.md).
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): check, test, build, upload
 `dist/`). The site lives under `/crypto-tune/`, which is why `vite.config.ts` sets `base`. To redeploy
 by hand: Actions → Deploy to GitHub Pages → Run workflow.
+
+**Link previews.** Open Graph and Twitter card tags in `index.html` point at `public/og.jpg`
+(1200×630). Crawlers need absolute URLs, so those tags hard-code
+`https://dmitrytut.github.io/crypto-tune/`; update them if the site moves.
 
 ## Status
 
