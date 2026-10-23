@@ -1,8 +1,7 @@
 # AGENTS.md
 
 Browser-only sonification of a futures market: calm generative music that tightens with price
-shocks. Vite + TypeScript (no framework), Tone.js for audio, no backend. Plan and decisions:
-`docs/plan.md`.
+shocks. Vite + TypeScript (no framework), Tone.js for audio, no backend.
 
 ## Commands
 
@@ -25,6 +24,7 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `trade-cache.ts` is the injected `TradeStore`: recent trades with ids per pair in IndexedDB, so a
   reload fetches only the gap after the cache. History is emitted before live events, trades always
   in `ts` order. Any history or storage failure degrades to a plain live start, never blocks the stream.
+  `symbol-cache.ts` caches the pair list in localStorage.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`, and `events.ts`
   (`EventBuffer`: trades and liquidations above their thresholds collapse to at most one
