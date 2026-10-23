@@ -115,8 +115,9 @@
     font-size: var(--font-size-sm);
     color: var(--muted);
 
+    /* Decoration: the alt text after "/" keeps screen readers from saying "black circle". */
     &::before {
-      content: "● ";
+      content: "● " / "";
     }
     &[data-state="open"]::before {
       color: var(--up);
