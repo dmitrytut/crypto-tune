@@ -48,10 +48,11 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `getTicksAtTime` before scheduling on the transport.
 - `src/ui/` — DOM view; `index.html` holds the static markup, `styles.css` the global tokens and page
   layout. `app.ts` (composes the view: readouts, immersive mode, tab title; implements
-  `AppView`), `components/` (self-contained DOM widgets, each with its own `.css` imported by its
-  `.ts`: `picker.ts` one dropdown for every list, pair and tonic; `hint.ts` label with a tip;
-  `meter.ts` tension meter with zones and its hint; `price-readout.ts` fixed-decimal price with
-  per-digit flash; `settings-panel.ts` settings `<dialog>`), `scene/` (`stage.ts` creates the layers and
+  `AppView`), `components/` (self-contained DOM widgets, one folder each: `<name>/<name>.ts`, its
+  `<name>.css` imported by the `.ts`, specs in `<name>/__specs__/`; `picker/` one dropdown for every
+  list, pair and tonic; `hint/` label with a tip; `meter/` tension meter with zones and its hint;
+  `price-readout/` fixed-decimal price with per-digit flash; `settings-panel/` settings
+  `<dialog>`), `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
   trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
   Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no warm-up), `palette.ts` (market +

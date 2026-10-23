@@ -1,10 +1,10 @@
 import './meter.css';
-import { DEFAULT_METRICS_CONFIG, type MetricsSnapshot } from '../../metrics/engine';
-import { TENSION_LEVELS } from '../../metrics/tension';
-import { el } from '../dom';
-import { clock } from '../format';
-import { css, tensionColor } from '../palette';
-import { mountHint } from './hint';
+import { DEFAULT_METRICS_CONFIG, type MetricsSnapshot } from '../../../metrics/engine';
+import { TENSION_LEVELS } from '../../../metrics/tension';
+import { el } from '../../dom';
+import { clock } from '../../format';
+import { css, tensionColor } from '../../palette';
+import { mountHint } from '../hint/hint';
 
 /** Tension value at the right edge of the meter. */
 const METER_MAX = 5;

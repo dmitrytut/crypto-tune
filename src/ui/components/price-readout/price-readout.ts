@@ -1,5 +1,5 @@
 import './price-readout.css';
-import { priceDecimals, splitPrice } from '../format';
+import { priceDecimals, splitPrice } from '../../format';
 
 /**
  * The big price. Decimals are fixed per pair from its first price, so the

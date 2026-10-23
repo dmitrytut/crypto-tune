@@ -1,9 +1,9 @@
 import './settings-panel.css';
-import { HISTORY_PERIODS_MIN } from '../../metrics/history';
-import { LIMITS, type Settings, type SourceKind, TONICS } from '../../settings';
-import { el } from '../dom';
-import { durationLabel, usdFmt } from '../format';
-import { mountPicker } from './picker';
+import { HISTORY_PERIODS_MIN } from '../../../metrics/history';
+import { LIMITS, type Settings, type SourceKind, TONICS } from '../../../settings';
+import { el } from '../../dom';
+import { durationLabel, usdFmt } from '../../format';
+import { mountPicker } from '../picker/picker';
 
 /** Threshold slider resolution in decades; values snap to two significant digits. */
 const LOG_STEP = 0.05;
