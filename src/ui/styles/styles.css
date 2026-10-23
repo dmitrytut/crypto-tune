@@ -162,7 +162,8 @@
     /* Particles start here; keep it above the chart. */
     grid-row: 2;
 
-    /* Soft dark pool behind the readout: the aura can blaze without swallowing the numbers. */
+    /* Soft dark pool behind the readout: the aura can blaze without swallowing the numbers.
+     * Dark enough that sell-coloured text (change, last event) keeps 4.5:1 over a bright aura. */
     &::before {
       content: "";
       position: absolute;
@@ -171,8 +172,8 @@
       pointer-events: none;
       background: radial-gradient(
         closest-side,
-        rgb(0 0 0 / 0.5),
-        rgb(0 0 0 / 0.28) 55%,
+        rgb(0 0 0 / 0.65),
+        rgb(0 0 0 / 0.5) 70%,
         transparent
       );
     }
