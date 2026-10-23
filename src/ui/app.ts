@@ -102,7 +102,6 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const price = new PriceReadout(priceNode, reducedMotion);
   const change = el('change');
   const meter = new TensionMeter(settings.windowSec);
-  const title = el('title');
   const audioLabel = el('audio-label');
   // Raw metric readouts are for tuning, not for listeners: shown only with ?debug in the URL.
   el('debug').hidden = !new URLSearchParams(location.search).has('debug');
@@ -161,9 +160,6 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     const live = settings.source === 'live';
     if (live) pair.set(settings.symbol);
     else pair.disable('Simulator');
-    title.textContent = live
-      ? `${settings.symbol} futures, played as sound`
-      : 'A simulated market, played as sound';
   };
   syncPair();
 
