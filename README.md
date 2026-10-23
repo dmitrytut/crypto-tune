@@ -105,8 +105,6 @@ Recomputed every 250 ms on the feed clock, never wall time:
 - Without history, the warm-up lasts N + 5 min and the UI counts it down
   (`calibrating · m:ss`).
 
-Design notes and decisions: [`docs/plan.md`](docs/plan.md).
-
 ### Sound
 
 - **Base** (always on): a drone on the root and fifth whose filter slowly breathes. Every 16 bars it
