@@ -215,6 +215,10 @@ structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-cod
 `https://crypto-tune.com/`; update them if the site moves. The description appears
 three times (meta, Open Graph, JSON-LD): keep them identical.
 
+**Analytics.** Cloudflare Web Analytics (cookieless, no consent banner): the beacon at the end of
+`index.html`. Visits, referrers, countries and Core Web Vitals are in the Cloudflare dashboard →
+Web Analytics → `crypto-tune.com`. No custom events: it does not count presses of Listen.
+
 ## Status
 
 - [x] **Stage 1**: feed (Binance, any pair) + simulator + metrics + numeric UI
