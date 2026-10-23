@@ -29,7 +29,7 @@ const DIRECTION_ARROW_MIN = 0.2;
 /** Chrome fades after this long without pointer or keyboard input. */
 const IDLE_MS = 10_000;
 const TITLE_EVERY_MS = 1_000;
-/** Events older than this (wall clock) are history replays, not news: no sparks, no flow. */
+/** Events older than this (wall clock) are catch-up, not news: no sparks, no flow. */
 const VISUAL_MAX_AGE_MS = 2_000;
 const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
 /** The last big trade or liquidation stays readable this long, then fades out. */
@@ -51,16 +51,18 @@ export type EventReadout =
 
 export interface AppView {
   render(s: MetricsSnapshot): void;
-  /** Clear readouts and visuals when the pipeline restarts. */
+  /** Clear readouts and visuals when the pipeline restarts; the meter waits for history. */
   reset(history: HistorySeries): void;
+  /** History arrived (or never will): the chart switches to `history`, the meter stops waiting. */
+  historyReady(history: HistorySeries): void;
   setStatus(s: FeedStatus): void;
   setSymbols(symbols: string[]): void;
   setPlayback(state: PlaybackView): void;
   /** Last event that crossed its threshold (shown even while audio is stopped). */
   showEvent(e: EventReadout): void;
-  /** Every trade, for the flow and the particle stream; replayed history is ignored. */
+  /** Every live trade, for the flow and the particle stream; a stale catch-up is ignored. */
   trade(t: Trade): void;
-  /** Every liquidation, for the shock waves; replayed history is ignored. */
+  /** Every liquidation, for the shock waves; a stale catch-up is ignored. */
   liquidation(l: Liquidation): void;
 }
 
@@ -161,6 +163,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let history: HistorySeries | null = null;
   let last: MetricsSnapshot | null = null;
   let chartDirty = false;
+  /** Between reset() and historyReady(): the meter shows the wait, not a warm-up countdown. */
+  let loadingHistory = true;
   const { aura, fx, chart } = mountStage({
     origin: priceNode,
     reducedMotion,
@@ -223,12 +227,13 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
         vol.textContent = `vol ${usdFmt.format(history.volumeUsdSince(s.ts - spanMs))}/${span}`;
       }
       paintEvent();
-      meter.render(s);
+      meter.render(s, loadingHistory);
       aura?.setTarget(auraTarget(s, flow.read(Date.now())));
       updateTitle(s);
     },
     reset(h) {
       history = h;
+      loadingHistory = true;
       // The old pair's price must not linger in the tab, and its clock must not gate the new one.
       document.title = idleTitle;
       titleAt = 0;
@@ -244,13 +249,18 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       chart.draw(h, Date.now(), settings.periodMin * 60_000);
       aura?.setTarget(CALM_AURA);
     },
+    historyReady(h) {
+      history = h;
+      loadingHistory = false;
+      chartDirty = true;
+    },
     setStatus(s) {
       status.dataset.state = s.state;
       status.textContent = statusText(s, settings.source);
       // No snapshot yet: say what the empty readout is waiting for.
       if (!last && s.state === 'connecting') vol.textContent = 'Connecting to the market…';
-      // Connected but no snapshot yet: the feed is replaying history before live trades flow.
-      if (!last && s.state === 'open') vol.textContent = 'Loading recent trades…';
+      // Connected but no snapshot yet: waiting for the first live trade.
+      if (!last && s.state === 'open') vol.textContent = 'Waiting for trades…';
     },
     setPlayback(state) {
       audioToggle.dataset.state = state;

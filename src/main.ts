@@ -1,6 +1,6 @@
 import { AudioEngine, type AudioParams } from './audio/engine';
 import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
-import type { MarketFeed, Unsubscribe } from './feed/market-feed';
+import type { MarketFeed, Trade, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
 import { cachedSymbols } from './feed/symbol-cache';
 import { indexedDbTradeStore } from './feed/trade-cache';
@@ -33,6 +33,14 @@ const eventThresholds = (s: Settings): EventThresholds => ({
   liquidationUsd: s.liqThresholdUsd,
   tradeUsd: s.tradeThresholdUsd,
 });
+
+/** Metrics for the current settings: one per pipeline, rebuilt once history arrives. */
+const metricsEngine = (s: Settings) =>
+  new MetricsEngine({
+    ...DEFAULT_METRICS_CONFIG,
+    windowSec: s.windowSec,
+    tension: tensionParams(s),
+  });
 
 const audio = new AudioEngine(audioParams(settings));
 
@@ -70,7 +78,7 @@ const view = mountApp(settings, {
   },
 });
 
-/** Feeds replay this much history on connect: exactly the window the tension statistics need. */
+/** Feeds fetch this much history in the background: exactly the window the tension statistics need. */
 const HISTORY_MS = DEFAULT_METRICS_CONFIG.statsWindowMin * 60_000;
 
 /** (Re)create feed, metrics, events and chart history from current settings; all are discarded. */
@@ -85,38 +93,59 @@ function startPipeline(): void {
           historyMs: HISTORY_MS,
           store: indexedDbTradeStore(`binance:${settings.symbol}`),
         });
-  const e = new MetricsEngine({
-    ...DEFAULT_METRICS_CONFIG,
-    windowSec: settings.windowSec,
-    tension: tensionParams(settings),
-  });
   const h = new MarketHistory();
+  engine = metricsEngine(settings);
+  history = h;
   // Fresh per pipeline: an event buffered for the old pair must not cue under the new one.
-  const ev = new EventBuffer(eventThresholds(settings));
+  events = new EventBuffer(eventThresholds(settings));
+  /** Live trades since connect, replayed after history into the rebuilt metrics; null after. */
+  let seen: Trade[] | null = [];
   unsubs = [
     f.onTrade((t) => {
-      e.addTrade(t);
-      h.addTrade(t);
-      ev.addTrade(t);
+      engine?.addTrade(t);
+      history?.addTrade(t);
+      events?.addTrade(t);
+      seen?.push(t);
       view.trade(t);
     }),
+    f.onHistory((past) => {
+      if (past.length > 0) warmStart([...past, ...(seen ?? [])], f.now());
+      seen = null;
+      if (history) view.historyReady(history);
+    }),
     f.onLiquidation((l) => {
-      ev.addLiquidation(l);
+      events?.addLiquidation(l);
       view.liquidation(l);
     }),
     f.onStatus((s) => {
       view.setStatus(s);
       // A data gap is not a calm market: drop tick-level state so the move
       // across the gap is never scored as a move within window N.
-      if (s.state !== 'open') e.resync();
+      if (s.state !== 'open') engine?.resync();
     }),
   ];
   feed = f;
-  engine = e;
-  history = h;
-  events = ev;
   view.reset(h);
   f.connect();
+}
+
+/**
+ * Swaps in metrics and chart rebuilt from history plus the live trades already seen, in `ts`
+ * order. Markers placed meanwhile carry over: they are live cues, history has none.
+ * shortcut: a reconnect while history loaded is not replayed as a resync, so the move across
+ * that gap can count within window N once; queue statuses with `seen` if it ever shows up.
+ */
+function warmStart(trades: readonly Trade[], now: number): void {
+  const e = metricsEngine(settings);
+  const h = new MarketHistory();
+  for (const t of trades) {
+    e.addTrade(t);
+    h.addTrade(t);
+  }
+  e.advanceTo(now, (s) => h.addSnapshot(s));
+  for (const m of history?.markers ?? []) h.addMarker(m);
+  engine = e;
+  history = h;
 }
 
 window.setInterval(() => {
