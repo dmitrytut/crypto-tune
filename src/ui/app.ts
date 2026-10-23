@@ -167,6 +167,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let loadingHistory = true;
   const { aura, fx, chart } = mountStage({
     origin: priceNode,
+    readout: el('readout'),
+    legible: [change, vol, lastEvent, el('tension-scale')],
     reducedMotion,
     bigTradeUsd: () => settings.tradeThresholdUsd,
     onFrame() {

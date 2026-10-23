@@ -133,3 +133,67 @@ export const isDown = (side: TradeSide | LiquidationSide): boolean =>
 /** @package */
 export const sideColor = (side: TradeSide | LiquidationSide): Rgb =>
   isDown(side) ? DOWN_COLOR : UP_COLOR;
+
+/** Contrast the stage text keeps over the aura: WCAG AA for normal text. */
+const TEXT_CONTRAST = 4.5;
+/** Alpha of the readout's dark pool where the text rows sit (styles.css `.hero::before`). */
+const POOL_TEXT_ALPHA = 0.8;
+/** Luminance resolution of `backdropLuminance`; fine enough near the dark end that matters. */
+const LUMINANCE_BINS = 1024;
+
+/** sRGB channel 0…1 → linear light. */
+const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+/** Linear light of every 8-bit sRGB channel value. */
+const LINEAR_BYTE = Float32Array.from({ length: 256 }, (_, i) => toLinear(i / 255));
+
+/**
+ * WCAG relative luminance of a colour as it lands on screen: CSS and the aura shader both write
+ * these channels straight out as sRGB.
+ * @package
+ */
+export const luminance = ([r, g, b]: Rgb): number =>
+  0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+
+/**
+ * Luminance that `share` of the pixels stay at or under, from RGBA bytes as `readPixels` returns
+ * them: a bright fold under the text counts, a few stray hot pixels do not.
+ * @package
+ */
+export function backdropLuminance(rgba: Uint8Array, share = 0.9): number {
+  const count = Math.floor(rgba.length / 4);
+  if (count === 0) return 0;
+  const bins = new Uint32Array(LUMINANCE_BINS);
+  for (let p = 0; p < count * 4; p += 4) {
+    const l =
+      0.2126 * (LINEAR_BYTE[rgba[p] ?? 0] ?? 0) +
+      0.7152 * (LINEAR_BYTE[rgba[p + 1] ?? 0] ?? 0) +
+      0.0722 * (LINEAR_BYTE[rgba[p + 2] ?? 0] ?? 0);
+    const bin = Math.min(LUMINANCE_BINS - 1, Math.floor(l * LUMINANCE_BINS));
+    bins[bin] = (bins[bin] ?? 0) + 1;
+  }
+  const need = Math.ceil(count * share);
+  let seen = 0;
+  for (let i = 0; i < LUMINANCE_BINS; i++) {
+    seen += bins[i] ?? 0;
+    // The bin's upper edge: never reports the backdrop darker than it is.
+    if (seen >= need) return (i + 1) / LUMINANCE_BINS;
+  }
+  return 1;
+}
+
+/**
+ * How much of the readout's dark pool text of `textLuminance` needs over a backdrop of
+ * `backdrop`, 0 (none) … 1 (full): none while it already keeps TEXT_CONTRAST (its text shadow
+ * is not counted), then just enough to bring the backdrop down to that. A black veil of alpha a
+ * scales sRGB channels by 1 − a, so luminance by about (1 − a)^2.2. Capped at the full pool,
+ * which is what the CSS draws.
+ * @package
+ */
+export function poolStrength(backdrop: number, textLuminance: number): number {
+  const limit = (textLuminance + 0.05) / TEXT_CONTRAST - 0.05;
+  if (backdrop <= limit) return 0;
+  // Text too dark to keep the contrast even over black: the most the pool can do.
+  if (limit <= 0) return 1;
+  const alpha = 1 - (limit / backdrop) ** (1 / 2.2);
+  return Math.min(1, alpha / POOL_TEXT_ALPHA);
+}

@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { auraTarget } from '../palette';
+import {
+  auraTarget,
+  backdropLuminance,
+  DOWN_COLOR,
+  luminance,
+  poolStrength,
+  UP_COLOR,
+} from '../palette';
+
+/** RGBA bytes: `n` pixels of one sRGB colour (0…255 channels). */
+const pixels = (n: number, [r, g, b]: [number, number, number]) =>
+  Uint8Array.from({ length: n * 4 }, (_, i) => [r, g, b, 255][i % 4] ?? 0);
+const contrast = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 
 const calm = { tension: 0, direction: 0, volZ: 0, emaZ: 0 };
 
@@ -61,5 +73,61 @@ describe('auraTarget', () => {
   it('lets strong opposite flow override a stale direction', () => {
     const a = auraTarget({ ...calm, direction: 0.3 }, { imbalance: -1, activity: 0.5 });
     expect(a.colorB[0]).toBeGreaterThan(a.colorB[2]);
+  });
+});
+
+describe('backdropLuminance', () => {
+  it('ignores a few hot pixels but not a bright fold', () => {
+    const dark = pixels(95, [10, 12, 20]);
+    const spots = new Uint8Array([...dark, ...pixels(5, [255, 255, 255])]);
+    const fold = new Uint8Array([...pixels(80, [10, 12, 20]), ...pixels(20, [130, 50, 90])]);
+    expect(backdropLuminance(spots)).toBeLessThan(0.01);
+    expect(backdropLuminance(fold)).toBeCloseTo(luminance([130 / 255, 50 / 255, 90 / 255]), 2);
+  });
+
+  it('never reads darker than the backdrop is', () => {
+    const c: [number, number, number] = [40, 90, 120];
+    expect(backdropLuminance(pixels(50, c))).toBeGreaterThanOrEqual(
+      luminance([c[0] / 255, c[1] / 255, c[2] / 255]),
+    );
+  });
+});
+
+describe('poolStrength', () => {
+  const sell = luminance(DOWN_COLOR);
+
+  it('needs no pool over a dim aura', () => {
+    expect(poolStrength(0, sell)).toBe(0);
+    expect(poolStrength(0.01, sell)).toBe(0);
+  });
+
+  it('grows with the backdrop and caps at the full pool', () => {
+    expect(poolStrength(0.05, sell)).toBeGreaterThan(poolStrength(0.03, sell));
+    expect(poolStrength(0.03, sell)).toBeGreaterThan(0);
+    expect(poolStrength(1, sell)).toBe(1);
+  });
+
+  it('asks less for lighter text over the same backdrop', () => {
+    expect(poolStrength(0.1, luminance(UP_COLOR))).toBeLessThan(poolStrength(0.1, sell));
+    expect(poolStrength(0.05, luminance(UP_COLOR))).toBe(0);
+  });
+
+  it('gives text that cannot reach the contrast even over black the full pool', () => {
+    expect(poolStrength(0.01, 0.05)).toBe(1);
+  });
+
+  it('darkens just enough for the text to keep 4.5:1', () => {
+    for (const [text, backdrop] of [
+      [sell, 0.03],
+      [sell, 0.08],
+      [sell, 0.3],
+      [luminance(UP_COLOR), 0.3],
+    ] as const) {
+      const strength = poolStrength(backdrop, text);
+      expect(strength).toBeLessThan(1);
+      // The pool's veil where the text rows sit is 0.8 alpha at full strength.
+      const veiled = backdrop * (1 - 0.8 * strength) ** 2.2;
+      expect(contrast(text, veiled)).toBeCloseTo(4.5, 1);
+    }
   });
 });

@@ -1,4 +1,4 @@
-import type { AuraTarget, Rgb } from '../palette';
+import { type AuraTarget, backdropLuminance, type Rgb } from '../palette';
 
 /** Render at this fraction of the screen; the soft upscale is part of the look and keeps the GPU idle. */
 const RESOLUTION_SCALE = 0.33;
@@ -150,6 +150,8 @@ export class Aura {
   private readonly shockBuf = new Float32Array(MAX_SHOCKS * 4);
   private readonly bloomBuf = new Float32Array(MAX_BLOOMS * 4);
   private readonly bloomColorBuf = new Float32Array(MAX_BLOOMS * 3);
+  /** Readback for `backdropUnder`, grown to the largest region asked for. */
+  private pixels = new Uint8Array(0);
 
   private constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -236,6 +238,29 @@ export class Aura {
     for (const b of this.blooms) b.strength *= fade;
     this.blooms = this.blooms.filter((b) => b.strength > 0.01);
     this.draw();
+  }
+
+  /**
+   * How bright the aura is under `rect` (CSS px, window coordinates, as the canvas fills the
+   * window): `backdropLuminance` of the frame just drawn. Call right after `frame`, in the same
+   * animation frame: the drawing buffer is not kept once the frame is shown.
+   */
+  backdropUnder(rect: DOMRect): number {
+    const { gl, canvas } = this;
+    const sx = canvas.width / (canvas.clientWidth || 1);
+    const sy = canvas.height / (canvas.clientHeight || 1);
+    const x0 = Math.max(0, Math.floor(rect.left * sx));
+    const x1 = Math.min(canvas.width, Math.ceil(rect.right * sx));
+    // WebGL rows count from the bottom.
+    const y0 = Math.max(0, Math.floor(canvas.height - rect.bottom * sy));
+    const y1 = Math.min(canvas.height, Math.ceil(canvas.height - rect.top * sy));
+    const w = x1 - x0;
+    const h = y1 - y0;
+    if (w <= 0 || h <= 0) return 0;
+    if (this.pixels.length < w * h * 4) this.pixels = new Uint8Array(w * h * 4);
+    const view = this.pixels.subarray(0, w * h * 4);
+    gl.readPixels(x0, y0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, view);
+    return backdropLuminance(view);
   }
 
   /** CSS px → shader space: centred, y up, unit = screen height. */

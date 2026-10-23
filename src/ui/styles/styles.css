@@ -168,17 +168,20 @@
     grid-row: 2;
 
     /* Soft dark pool behind the readout: the aura can blaze without swallowing the numbers.
-     * Dark enough that sell-coloured text (change, last event) keeps 4.5:1 over a bright aura. */
+     * At full strength sell-coloured text (change, last event) keeps 4.5:1 over a bright aura.
+     * scene/stage.ts sets --pool from how bright the aura under the readout is: none over a dim
+     * aura, just enough over a bright one (palette.ts poolStrength). Without WebGL it stays full. */
     &::before {
       content: "";
       position: absolute;
       inset: -12% -22%;
       z-index: -1;
       pointer-events: none;
+      opacity: var(--pool, 1);
       background: radial-gradient(
         closest-side,
-        rgb(0 0 0 / 0.65),
-        rgb(0 0 0 / 0.5) 70%,
+        rgb(0 0 0 / 0.85),
+        rgb(0 0 0 / 0.8) 70%,
         transparent
       );
     }
