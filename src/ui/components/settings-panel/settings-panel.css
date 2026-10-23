@@ -6,12 +6,19 @@
       font-weight: 600;
       margin: var(--space-md) 0 0;
     }
-    /* A label and its ⓘ hint sit on one line. */
-    & h3,
+    /* A label or a section heading and its ⓘ hint sit on one line. */
     & .field-head {
       display: flex;
       align-items: center;
       gap: var(--space-xs);
+    }
+    /* A heading with a hint: the row takes the heading's top margin, so the two stay centred. */
+    & .field-head:has(> h3) {
+      margin-top: var(--space-md);
+
+      & h3 {
+        margin: 0;
+      }
     }
   }
 

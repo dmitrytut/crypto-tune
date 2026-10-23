@@ -50,7 +50,7 @@
         <!-- Pair dropdown, built by ui/components/picker. -->
         <div class="picker picker-chip" id="pair"></div>
         <div class="top-right">
-          <span id="status" class="status" data-state="idle">idle</span>
+          <span id="status" class="status" role="status" data-state="idle">idle</span>
           <button id="about-open" class="icon-btn" type="button" aria-label="About">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" />
@@ -112,8 +112,9 @@
           </button>
         </header>
 
-        <!-- Every setting gets an ⓘ hint from settings-panel.ts, after the label just before it. -->
-        <h3 id="period-title">Period</h3>
+        <!-- Every setting gets an ⓘ hint from settings-panel.ts, appended to the element just
+          before it. A heading's hint goes beside it, not inside: it would join the name. -->
+        <div class="field-head"><h3 id="period-title">Period</h3></div>
         <!-- Options built from HISTORY_PERIODS_MIN by settings-panel.ts. -->
         <fieldset class="segmented" id="period" aria-labelledby="period-title"></fieldset>
 
@@ -122,21 +123,26 @@
           <div class="field-head"><span id="tonic-label">Tonic</span></div>
           <div class="picker picker-field" id="tonic"></div>
         </div>
+        <!-- Each slider is named by its label alone; its value reaches assistive tech as
+          aria-valuetext (settings-panel.ts reads it from .field-value), so the readout is hidden. -->
         <div class="field">
           <div class="field-head">
-            <label for="base-volume">Base: <output id="base-volume-out"></output> dB</label>
+            <label for="base-volume">Base:</label>
+            <span class="field-value" aria-hidden="true"><output id="base-volume-out"></output> dB</span>
           </div>
           <input id="base-volume" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="tension-volume">Tension: <output id="tension-volume-out"></output> dB</label>
+            <label for="tension-volume">Tension:</label>
+            <span class="field-value" aria-hidden="true"><output id="tension-volume-out"></output> dB</span>
           </div>
           <input id="tension-volume" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="events-volume">Events: <output id="events-volume-out"></output> dB</label>
+            <label for="events-volume">Events:</label>
+            <span class="field-value" aria-hidden="true"><output id="events-volume-out"></output> dB</span>
           </div>
           <input id="events-volume" type="range" />
         </div>
@@ -144,30 +150,34 @@
         <h3>Response</h3>
         <div class="field">
           <div class="field-head">
-            <label for="window">Price-change window: <output id="window-out"></output> s</label>
+            <label for="window">Price-change window:</label>
+            <span class="field-value" aria-hidden="true"><output id="window-out"></output> s</span>
           </div>
           <input id="window" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="sensitivity">Sensitivity: ×<output id="sensitivity-out"></output></label>
+            <label for="sensitivity">Sensitivity:</label>
+            <span class="field-value" aria-hidden="true">×<output id="sensitivity-out"></output></span>
           </div>
           <input id="sensitivity" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="liq-threshold">Liquidation threshold: <output id="liq-threshold-out"></output></label>
+            <label for="liq-threshold">Liquidation threshold:</label>
+            <span class="field-value" aria-hidden="true"><output id="liq-threshold-out"></output></span>
           </div>
           <input id="liq-threshold" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="trade-threshold">Large trade threshold: <output id="trade-threshold-out"></output></label>
+            <label for="trade-threshold">Large trade threshold:</label>
+            <span class="field-value" aria-hidden="true"><output id="trade-threshold-out"></output></span>
           </div>
           <input id="trade-threshold" type="range" />
         </div>
 
-        <h3 id="source-title">Source</h3>
+        <div class="field-head"><h3 id="source-title">Source</h3></div>
         <fieldset class="segmented" id="source" aria-labelledby="source-title">
           <label><input class="visually-hidden" type="radio" name="source" value="live" /> Live</label>
           <label><input class="visually-hidden" type="radio" name="source" value="simulator" /> Simulator</label>

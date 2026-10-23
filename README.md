@@ -183,9 +183,22 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   on connect, and it grows from there.
 - **Tab title**: `▲ 81,305.2 · BTCUSDT · tension 2.6`, so the state is visible without switching tabs.
 - **Immersive mode**: after 10 s without mouse or keyboard the UI fades out, leaving the aura, the
-  price and the chart.
+  price and the chart. A control that holds keyboard focus stays visible.
 - `prefers-reduced-motion`: the aura is nearly still, and there are no bubbles, rings, waves, shake
   or flashes.
+
+### Accessibility
+
+Audited for WCAG 2.2 AA: Lighthouse and axe-core, keyboard, zoom, hover and contrast checks over the
+live aura that the tools cannot do, then a control-by-control review of names, keyboard, focus,
+ARIA and motion. What that changed:
+- Screen readers get the tension meter as a `meter` with its zone in words (`Tense, 2.4`), settings
+  sliders with their value and unit (`-6 dB`, `$20K`), and hear the connection status and an empty
+  pair search as they change.
+- ⓘ tips stay open while the pointer moves from the button onto the tip; Esc closes them and the
+  chart marker tip alike.
+- The dark pool under the readout keeps the sell colour at 4.5:1 or better over a bright aura.
+- A short window or a zoomed page (up to 400%) scrolls instead of cutting off the controls.
 
 ## Development
 
@@ -229,12 +242,27 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Stage 5**: visuals (aura, particles, chart, settings dialog)
 - [x] **Design cleanup** (per taste-skill): title and labels, a text button, no glass/glow/neon
 - [x] **Publishing**: GitHub Pages via Actions, logo and favicon
+- [x] **Accessibility**: WCAG 2.2 AA pass (names and values, live regions, hover tips, contrast,
+  reflow)
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Accessibility
+
+1. `npx lighthouse http://localhost:5173/ --only-categories=accessibility`: 100; axe-core (WCAG 2.2
+   AA + best practice) finds nothing on the page, the open pair list, Settings and About.
+2. VoiceOver (⌘F5): the meter reads `Tension, Calm` (or `Calibrating, … left`); moving a threshold
+   slider reads `$22K`, not `4.35`; `Period` and `Source` headings are read once, without
+   `About …`.
+3. Typing `zzzz` in the pair search announces `No such pair on Binance Futures`.
+4. Hover an ⓘ and move onto its tip: it stays open; leave it and it closes. Hover a chart marker
+   and press Esc: its tip hides.
+5. Tab to ⚙ and wait 10 s: the top bar stays while it has focus, the rest fades.
+6. Zoom to 400% (or a 320×256 window): the page scrolls down to Listen and the chart.
 
 ### Design cleanup
 

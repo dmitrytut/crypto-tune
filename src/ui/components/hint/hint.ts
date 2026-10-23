@@ -5,6 +5,8 @@ const INFO_ICON =
   '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
 /** Gap between the label and its tip, and from the tip to the window edge, px. */
 const GAP_PX = 8;
+/** How long a hovered tip outlives the pointer leaving, so it can cross the gap onto the tip. */
+const HOVER_GRACE_MS = 300;
 
 /** A mounted hint: `root` goes next to what it explains, `body` holds the tip's content. */
 export interface Hint {
@@ -69,10 +71,13 @@ export function createHint(
   body.popover = 'manual';
   body.textContent = text;
   button.setAttribute('aria-describedby', body.id);
+  // A click pins the tip open, so the button is a disclosure: it says what it expands.
+  button.setAttribute('aria-controls', body.id);
   button.setAttribute('aria-expanded', 'false');
   root.append(button, body);
 
   let pinned = false;
+  let leaveTimer = 0;
   const state = {
     root,
     place() {
@@ -83,6 +88,7 @@ export function createHint(
       body.style.top = `${above >= GAP_PX ? above : r.bottom + GAP_PX}px`;
     },
     hide() {
+      clearTimeout(leaveTimer);
       pinned = false;
       button.setAttribute('aria-expanded', 'false');
       if (body.matches(':popover-open')) body.hidePopover();
@@ -97,11 +103,17 @@ export function createHint(
     state.place();
   };
 
+  // The tip is inside `root`, so pointing at it keeps it open (WCAG 1.4.13 hoverable); the
+  // grace period covers the gap between the button and the tip.
   root.addEventListener('pointerenter', (e) => {
-    if (e.pointerType === 'mouse') show();
+    if (e.pointerType !== 'mouse') return;
+    clearTimeout(leaveTimer);
+    show();
   });
   root.addEventListener('pointerleave', (e) => {
-    if (e.pointerType === 'mouse' && !pinned) state.hide();
+    if (e.pointerType === 'mouse' && !pinned) {
+      leaveTimer = window.setTimeout(() => state.hide(), HOVER_GRACE_MS);
+    }
   });
   button.addEventListener('focus', () => {
     if (button.matches(':focus-visible')) show();
