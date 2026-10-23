@@ -130,14 +130,20 @@ export function mountSettingsPanel(
   ) => {
     const input = el<HTMLInputElement>(id);
     const out = el<HTMLOutputElement>(`${id}-out`);
+    // The readout with its unit ("-6 dB", "$20K"), hidden from assistive tech: it is what a
+    // screen reader speaks as the slider's value, instead of the raw (often log10) position.
+    const readout = out.closest('.field-value');
+    if (!readout) throw new Error(`#${id}-out needs a .field-value wrapper in index.html`);
+    const show = (v: number) => {
+      out.value = format(v);
+      input.setAttribute('aria-valuetext', readout.textContent ?? out.value);
+    };
     input.min = String(limits.min);
     input.max = String(limits.max);
     input.step = String(limits.step);
     input.value = String(value);
-    out.value = format(value);
-    input.addEventListener('input', () => {
-      out.value = format(Number(input.value));
-    });
+    show(value);
+    input.addEventListener('input', () => show(Number(input.value)));
     input.addEventListener(commitOn, () => apply(Number(input.value)));
   };
   // Notional thresholds: the slider moves log10(USD) so each decade gets equal travel.

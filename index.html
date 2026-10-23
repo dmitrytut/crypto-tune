@@ -122,21 +122,26 @@
           <div class="field-head"><span id="tonic-label">Tonic</span></div>
           <div class="picker picker-field" id="tonic"></div>
         </div>
+        <!-- Each slider is named by its label alone; its value reaches assistive tech as
+          aria-valuetext (settings-panel.ts reads it from .field-value), so the readout is hidden. -->
         <div class="field">
           <div class="field-head">
-            <label for="base-volume">Base: <output id="base-volume-out"></output> dB</label>
+            <label for="base-volume">Base:</label>
+            <span class="field-value" aria-hidden="true"><output id="base-volume-out"></output> dB</span>
           </div>
           <input id="base-volume" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="tension-volume">Tension: <output id="tension-volume-out"></output> dB</label>
+            <label for="tension-volume">Tension:</label>
+            <span class="field-value" aria-hidden="true"><output id="tension-volume-out"></output> dB</span>
           </div>
           <input id="tension-volume" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="events-volume">Events: <output id="events-volume-out"></output> dB</label>
+            <label for="events-volume">Events:</label>
+            <span class="field-value" aria-hidden="true"><output id="events-volume-out"></output> dB</span>
           </div>
           <input id="events-volume" type="range" />
         </div>
@@ -144,25 +149,29 @@
         <h3>Response</h3>
         <div class="field">
           <div class="field-head">
-            <label for="window">Price-change window: <output id="window-out"></output> s</label>
+            <label for="window">Price-change window:</label>
+            <span class="field-value" aria-hidden="true"><output id="window-out"></output> s</span>
           </div>
           <input id="window" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="sensitivity">Sensitivity: ×<output id="sensitivity-out"></output></label>
+            <label for="sensitivity">Sensitivity:</label>
+            <span class="field-value" aria-hidden="true">×<output id="sensitivity-out"></output></span>
           </div>
           <input id="sensitivity" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="liq-threshold">Liquidation threshold: <output id="liq-threshold-out"></output></label>
+            <label for="liq-threshold">Liquidation threshold:</label>
+            <span class="field-value" aria-hidden="true"><output id="liq-threshold-out"></output></span>
           </div>
           <input id="liq-threshold" type="range" />
         </div>
         <div class="field">
           <div class="field-head">
-            <label for="trade-threshold">Large trade threshold: <output id="trade-threshold-out"></output></label>
+            <label for="trade-threshold">Large trade threshold:</label>
+            <span class="field-value" aria-hidden="true"><output id="trade-threshold-out"></output></span>
           </div>
           <input id="trade-threshold" type="range" />
         </div>
