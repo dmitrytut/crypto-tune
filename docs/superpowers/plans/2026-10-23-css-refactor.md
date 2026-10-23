@@ -13,8 +13,12 @@
 **Tech Stack:** Vite 8 (Lightning CSS minify, PostCSS `@import` inline), Biome 2 (CSS lint + format),
 Chromium-baseline: `:has()` уже обязателен, значит nesting, `@layer` и `color-mix()` доступны.
 
-**Spec:** этот документ (разделы «Решения» и «Токены»); стек на PR #10 (`feat/ui-components`),
-где CSS уже разложен по компонентам.
+**Spec:** этот документ (разделы «Решения» и «Токены»). База: `master` после мержа #10
+(`feat/ui-components`: CSS разложен по папкам компонентов) и #11 (`feat/link-preview`: OG-теги и
+название Crypto Tune в `<head>` и README; стили не затрагивает).
+
+**Статус:** выполнен, PR #12 (`feat/css-refactor` → `master`). Ветка начиналась как стек на #10;
+после мержа #10 и #11 в неё влит `origin/master` без конфликтов, база PR переключена на `master`.
 
 ## Global Constraints
 
@@ -84,53 +88,62 @@ src/ui/
 ### Task 1: Снимок «до»
 
 **Files:** нет изменений в репо; артефакт `/tmp/css-before.json`, скриншоты `/tmp/css-before-*.png`.
-- [ ] Поднять `pnpm exec vite --port 5181` в worktree на `feat/ui-components`.
-- [ ] Для всех элементов (кроме спанов цены) снять `getComputedStyle` + `::before/::after/::backdrop/::placeholder`
+- [x] Поднять `pnpm exec vite --port 5181` в worktree на базовом коммите (до рефакторинга).
+- [x] Для всех элементов (кроме спанов цены) снять `getComputedStyle` + `::before/::after/::backdrop/::placeholder`
   в состояниях: base; toggled (`body.idle`, Listen `running`, hint `data-open`, тултип графика видим);
-  меню пары открыто (live); диалог настроек (+ debug); меню тоники; reduced motion.
-- [ ] Пройти Tab по странице (6) и диалогу (14), записать outline активного элемента.
-- [ ] Скриншоты: главный экран с подсказкой, открытый пикер, диалог.
+  меню пары открыто (live: в симуляторе пикер пары выключен); диалог настроек (+ debug); меню тоники.
+- [x] Reduced motion эмулировать через Puppeteer `page.emulateMediaFeatures` (в `tab.run`): хелпер
+  `tab.emulate({ media })` медиа-фичу не включает, `matchMedia` остаётся `false`.
+- [x] Пройти Tab по странице (6) и диалогу (14), записать outline активного элемента.
+- [x] Скриншоты: главный экран с подсказкой, открытый пикер, диалог. Перед снимком дождаться
+  `#price .int` и дать переходам закончиться (подсказка появляется за 0.15 s).
 
 ### Task 2: Токены и глобальные стили
 
 **Files:** Create `src/ui/tokens.css`; Modify `src/ui/styles.css` (весь файл).
 
 **Interfaces:** Produces: все токены из таблицы «Токены», слои `base, page, components, utilities`.
-- [ ] Создать `tokens.css` со всеми токенами из таблицы.
-- [ ] `styles.css`: первой строкой `@layer base, page, components, utilities;`, затем `@import` шрифта и токенов.
-- [ ] `@layer base`: `:root` (шрифт, цвет, фон), box-sizing, `html, body`, body-фон, зерно (`z-index: var(--z-grain)`),
+- [x] Создать `tokens.css` со всеми токенами из таблицы.
+- [x] `styles.css`: первой строкой `@layer base, page, components, utilities;`, затем `@import` шрифта и токенов.
+- [x] `@layer base`: `:root` (шрифт, цвет, фон), box-sizing, `html, body`, body-фон, зерно (`z-index: var(--z-grain)`),
   `:where(button, input) { font: inherit }`, единое кольцо фокуса, `.icon`.
-- [ ] `@layer page`: `.layer`, `.stage`, верхняя панель, `.status`, `.icon-btn`, hero, `.change`, `.info`, `#last-event`,
-  `.play` (+ `opacity` в transition), `.chart`, immersive (`.fades`, `body.idle`); reduced motion вложен в правило.
-- [ ] `@layer utilities`: `.up`, `.down`, `.visually-hidden`.
+- [x] `@layer page`: `.layer`, `.stage`, immersive (`.fades`, `body.idle`) **до** правил элементов с
+  `.fades`, верхняя панель, `.status`, `.icon-btn`, hero, `.change`, `.info`, `#last-event`,
+  `.play` (+ `opacity` в transition), `.chart`; reduced motion вложен в правило.
+- [x] `@layer utilities`: `.up`, `.down`, `.visually-hidden`.
 
 ### Task 3: Компоненты
 
 **Files:** Modify все 6 `components/*/*.css`, `price-readout.ts:39`.
 
 **Interfaces:** Consumes: токены Task 2, слой `components`.
-- [ ] Обернуть каждый файл в `@layer components { … }`, переписать вложенностью (`&`).
-- [ ] Заменить литералы токенами по таблице; удалить локальные `outline` (их даёт base) и `font: inherit`.
-- [ ] `price-readout.ts`: `c.className = up ? 'chg-up' : 'chg-down'`; CSS `.price .chg-up/.chg-down`.
+- [x] Обернуть каждый файл в `@layer components { … }`, переписать вложенностью (`&`).
+- [x] Заменить литералы токенами по таблице; удалить локальные `outline` (их даёт base) и `font: inherit`.
+- [x] `price-readout.ts`: `c.className = up ? 'chg-up' : 'chg-down'`; CSS `.price .chg-up/.chg-down`.
 
 ### Task 4: Шрифт на canvas
 
 **Files:** Modify `src/ui/scene/fx.ts` (конструктор `Fx`, отрисовка подписей).
-- [ ] Поле `private readonly fontFamily`, в конструкторе `getComputedStyle(canvas).fontFamily`.
-- [ ] `ctx.font = \`700 ${l.size}px ${this.fontFamily}\``.
+- [x] Поле `private readonly fontFamily`, в конструкторе `getComputedStyle(canvas).fontFamily`.
+- [x] `ctx.font = \`700 ${l.size}px ${this.fontFamily}\``.
 
 ### Task 5: Проверка
 
-- [ ] `pnpm check && pnpm test && pnpm build`.
-- [ ] Повторить снимок Task 1 → `/tmp/css-after.json`; дифф по свойствам с нормализацией цвета
+- [x] `pnpm check && pnpm test && pnpm build`.
+- [x] Повторить снимок Task 1 → `/tmp/css-after.json`; дифф по свойствам с нормализацией цвета
   (`color(srgb …)` → `rgba`). Каждая разница должна попасть в «Намеренные изменения».
-- [ ] В собранном CSS (`dist/assets/*.css`) порядок слоёв первый, `@import` разрешены.
-- [ ] Цифра цены после вспышки имеет цвет `.price`.
-- [ ] Скриншоты «после».
+- [x] В собранном CSS (`dist/assets/*.css`): `@import` развёрнуты, `&` не осталось, блоки `@layer`
+  идут в порядке base → page → components → utilities. Отдельный оператор `@layer …;` Lightning CSS
+  выбрасывает как избыточный: порядок задают сами блоки.
+- [x] Цифра цены после вспышки имеет цвет `.price`.
+- [x] При reduced motion у running-кнопки `animation-name: none` (до правки `breathe`).
+- [x] Скриншоты «после».
 
 ### Task 6: Документация и PR
 
 **Files:** Modify `AGENTS.md` (раздел `src/ui/` + правило «Styles» в Code organization), `README.md`.
-- [ ] AGENTS.md: где токены, слои, правило «токен vs литерал», запрет `.up/.down` вне утилит.
-- [ ] README: строка про стили.
-- [ ] Коммит, push `feat/css-refactor`, PR в `feat/ui-components` (стек на #10).
+- [x] AGENTS.md: где токены, слои, правило «токен vs литерал», запрет `.up/.down` вне утилит.
+- [x] README: строка про стили.
+- [x] Коммит, push `feat/css-refactor`, PR #12 (открыт в `feat/ui-components`).
+- [x] После мержа #10 и #11: влить `origin/master`, перепроверить `check`/`test`/`build`, переключить
+  базу PR на `master`.
