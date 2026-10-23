@@ -384,4 +384,23 @@ describe('BinanceFuturesFeed history', () => {
     await vi.waitFor(() => expect(saved.at(-1)?.id).toBe(5001));
     feed.disconnect();
   });
+
+  it('leaves the cache alone when the page is left before history lands', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.withResolvers<never>().promise),
+    );
+    const page = new EventTarget();
+    vi.stubGlobal('window', page);
+    const save = vi.fn(async () => {});
+    const cache = Array.from({ length: 1800 }, (_, i) => cachedRow(3201 + i));
+    const { feed, ws } = connect({ load: async () => cache, save });
+    ws.live(5001);
+    ws.live(5002);
+    // A few live trades must not replace a 30-min cache: reload or pair switch mid-load.
+    page.dispatchEvent(new Event('pagehide'));
+    feed.disconnect();
+    await Promise.resolve();
+    expect(save).not.toHaveBeenCalled();
+  });
 });

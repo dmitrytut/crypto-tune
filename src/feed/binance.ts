@@ -136,6 +136,12 @@ export class BinanceFuturesFeed implements MarketFeed {
   private clockSynced = false;
   /** History is fetched once, from the first live trade. */
   private historyStarted = false;
+  /**
+   * Until history lands, `recent` holds only a few live trades: saving them (pagehide, pair
+   * switch) would replace the pair's 30-min cache with seconds, and the next load would warm up
+   * live instead of from the cache.
+   */
+  private historyLanded = false;
   private readonly abort = new AbortController();
   /** The newest unbroken run of emitted trades (by id) within the history window, for the store. */
   private recent: CachedTrade[] = [];
@@ -265,6 +271,7 @@ export class BinanceFuturesFeed implements MarketFeed {
     // lost (sub-second); fetch forward from the last history id if it ever matters.
     const head = this.recent[0];
     if (head && past.at(-1)?.id === head.id - 1) this.recent = [...past, ...this.recent];
+    this.historyLanded = true;
     this.histories.emit(past);
   }
 
@@ -278,7 +285,7 @@ export class BinanceFuturesFeed implements MarketFeed {
 
   private async persist(): Promise<void> {
     const last = this.recent.at(-1);
-    if (!last) return;
+    if (!last || !this.historyLanded) return;
     const cutoff = last.ts - this.historyMs;
     let drop = 0;
     while (drop < this.recent.length && (this.recent[drop] as CachedTrade).ts < cutoff) drop++;
