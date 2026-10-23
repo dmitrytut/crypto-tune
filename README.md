@@ -208,9 +208,11 @@ conventions are in [`AGENTS.md`](AGENTS.md).
 `dist/`). The site lives under `/crypto-tune/`, which is why `vite.config.ts` sets `base`. To redeploy
 by hand: Actions → Deploy to GitHub Pages → Run workflow.
 
-**Link previews.** Open Graph and Twitter card tags in `index.html` point at `public/og.jpg`
-(1200×630). Crawlers need absolute URLs, so those tags hard-code
-`https://dmitrytut.github.io/crypto-tune/`; update them if the site moves.
+**Link previews and search.** Open Graph and Twitter card tags in `index.html` point at
+`public/og.jpg` (1200×630). `index.html` also carries the canonical URL and `WebApplication`
+structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-code
+`https://dmitrytut.github.io/crypto-tune/`; update them if the site moves. The description appears
+three times (meta, Open Graph, JSON-LD): keep them identical.
 
 ## Status
 
