@@ -2,6 +2,8 @@
   "name": "crypto-tune",
   "private": true,
   "version": "0.1.0",
+  "author": "Dmitry Tutykhin <dmitry.tut@gmail.com>",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
