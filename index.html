@@ -51,6 +51,11 @@
         <div class="picker picker-chip" id="pair"></div>
         <div class="top-right">
           <span id="status" class="status" data-state="idle">idle</span>
+          <button id="about-open" class="icon-btn" type="button" aria-label="About">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" />
+            </svg>
+          </button>
           <button id="settings-open" class="icon-btn" type="button" aria-label="Settings">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -98,9 +103,9 @@
       </div>
     </main>
 
-    <dialog id="settings" class="settings" aria-labelledby="settings-title">
-      <form method="dialog" class="settings-body">
-        <header class="settings-head">
+    <dialog id="settings" class="modal settings" aria-labelledby="settings-title">
+      <form method="dialog" class="modal-body">
+        <header class="modal-head">
           <h2 id="settings-title">Settings</h2>
           <button class="icon-btn" type="submit" value="close" aria-label="Close">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
@@ -167,6 +172,31 @@
           <label><input class="visually-hidden" type="radio" name="source" value="live" /> Live</label>
           <label><input class="visually-hidden" type="radio" name="source" value="simulator" /> Simulator</label>
         </fieldset>
+      </form>
+    </dialog>
+
+    <!-- Static on purpose: crawlers that skip JavaScript read what the app does from here. -->
+    <dialog id="about" class="modal about" aria-labelledby="about-title">
+      <form method="dialog" class="modal-body">
+        <header class="modal-head">
+          <h2 id="about-title">About</h2>
+          <button class="icon-btn" type="submit" value="close" aria-label="Close">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
+        </header>
+        <p>
+          Crypto Tune turns a live crypto futures market into calm generative music. Leave it in a
+          background tab and hear what the market is doing without watching a chart.
+        </p>
+        <p>
+          A quiet market is a soft drone with a slow melody and bells. When the price moves sharply,
+          the tempo rises, the filters open and a bass comes in. A rising price lifts the melody, a
+          falling one pulls it down. Liquidations sound as gongs, large trades as plucks.
+        </p>
+        <p>
+          Plays any futures pair, or a simulated market to hear every sound on demand. Free, in the
+          browser, no sign-up. <a href="https://github.com/dmitrytut/crypto-tune">Source on GitHub</a>.
+        </p>
       </form>
     </dialog>
 

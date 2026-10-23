@@ -4,6 +4,7 @@ import { LIMITS, type Settings, type SourceKind, TONICS } from '../../../setting
 import { el } from '../../dom';
 import { durationLabel, usdFmt } from '../../format';
 import { createHint } from '../hint/hint';
+import { type Modal, mountModal } from '../modal/modal';
 import { mountPicker } from '../picker/picker';
 
 /** Threshold slider resolution in decades; values snap to two significant digits. */
@@ -67,11 +68,6 @@ const HELP: Record<string, { label: string; text: string }> = {
   },
 };
 
-/** What the rest of the view may ask the settings dialog. */
-export interface SettingsPanel {
-  isOpen(): boolean;
-}
-
 /**
  * Binds every control in the settings dialog to `update`. The dialog opens
  * from the gear button, closes on ✕, Esc, or a click on the backdrop.
@@ -79,13 +75,9 @@ export interface SettingsPanel {
 export function mountSettingsPanel(
   initial: Settings,
   update: (patch: Partial<Settings>) => void,
-): SettingsPanel {
+): Modal {
   const dialog = el<HTMLDialogElement>('settings');
-  el('settings-open').addEventListener('click', () => dialog.showModal());
-  dialog.addEventListener('click', (e) => {
-    // A click on the dialog element itself (not its content) is a click on the backdrop.
-    if (e.target === dialog) dialog.close();
-  });
+  const modal = mountModal('settings', 'settings-open');
 
   for (const [id, { label, text }] of Object.entries(HELP)) {
     const head = el(id).previousElementSibling;
@@ -195,5 +187,5 @@ export function mountSettingsPanel(
   usdRange('trade-threshold', LIMITS.tradeThresholdUsd, initial.tradeThresholdUsd, (usd) =>
     update({ tradeThresholdUsd: usd }),
   );
-  return { isOpen: () => dialog.open };
+  return modal;
 }
