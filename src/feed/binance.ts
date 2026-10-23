@@ -143,6 +143,8 @@ export class BinanceFuturesFeed implements MarketFeed {
   private readonly saveWhenHidden = () => {
     if (document.visibilityState === 'hidden') void this.persist();
   };
+  /** Reload or close: the 30 s timer may not have run yet, and a reload should find the cache. */
+  private readonly saveOnLeave = () => void this.persist();
 
   private readonly historyMs: number;
   private readonly store: TradeStore;
@@ -163,6 +165,7 @@ export class BinanceFuturesFeed implements MarketFeed {
     this.socket.start();
     this.saveTimer = setInterval(() => void this.persist(), SAVE_EVERY_MS);
     globalThis.document?.addEventListener('visibilitychange', this.saveWhenHidden);
+    globalThis.window?.addEventListener('pagehide', this.saveOnLeave);
   }
 
   /** Final: a feed is single-use (`main.ts` builds a new one per pipeline), so the abort is not reset. */
@@ -171,6 +174,7 @@ export class BinanceFuturesFeed implements MarketFeed {
     this.socket.stop();
     clearInterval(this.saveTimer);
     globalThis.document?.removeEventListener('visibilitychange', this.saveWhenHidden);
+    globalThis.window?.removeEventListener('pagehide', this.saveOnLeave);
     void this.persist();
   }
 

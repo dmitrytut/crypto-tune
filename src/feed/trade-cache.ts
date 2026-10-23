@@ -111,7 +111,10 @@ async function request<T>(
 ): Promise<T> {
   const d = await openDb();
   const { promise, resolve, reject } = Promise.withResolvers<T>();
-  const req = run(d.transaction(STORE, mode).objectStore(STORE));
+  const tx = d.transaction(STORE, mode);
+  const req = run(tx.objectStore(STORE));
+  // Commit now, not when the task ends: a save on pagehide must land before the page is gone.
+  if (mode === 'readwrite') tx.commit();
   req.onsuccess = () => resolve(req.result);
   req.onerror = () => reject(req.error);
   return promise;

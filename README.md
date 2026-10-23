@@ -88,11 +88,11 @@ computation runs in the browser, which talks to Binance directly.
   `forceOrder`). The pair can be picked from the list of trading perpetuals. Live trades show at
   once; meanwhile the last 30 min of trades come from REST (`/fapi/v1/aggTrades`: the newest page,
   then the older ones in one parallel wave, up to 20 requests) and end right before the first live
-  trade by id. The last 30 min per pair live in IndexedDB (written every 30 s and when the tab is
-  hidden), read while the newest page loads, so a reload usually fetches only that one page. When
-  history lands, metrics are rebuilt from it plus the live trades seen so far. If history fails or
-  takes over 15 s, metrics warm up on live data. The socket reconnects with exponential backoff and
-  jitter, and is recreated after 15 s of silence or a stuck connect.
+  trade by id. The last 30 min per pair live in IndexedDB (written every 30 s, when the tab is
+  hidden and when the page is left), read while the newest page loads, so a reload usually fetches
+  only that one page. When history lands, metrics are rebuilt from it plus the live trades seen so
+  far. If history fails or takes over 15 s, metrics warm up on live data. The socket reconnects
+  with exponential backoff and jitter, and is recreated after 15 s of silence or a stuck connect.
 - **SIMULATOR**: a synthetic market. Calm stretches (1.5–5 min) alternate with impulses (15–90 s,
   0.3–1.5 % moves with bursts of volume and liquidations). It hands over 30 min of history at
   start, so no warm-up is needed.
@@ -249,7 +249,7 @@ sound, and Binance covers the pairs that matter.
 2. `pnpm dev` → LIVE in a private window: the price and bubbles appear within a second; the meter
    says `loading recent trades…`, then comes alive with the chart and `… in 15m` within a few
    seconds. DevTools → Network: the older `aggTrades` pages start together after the first one.
-3. Reload after 30 s: the meter is ready almost at once, with a single `aggTrades` request.
+3. Reload a few seconds later: the meter is ready almost at once, with a single `aggTrades` request.
 4. Block `fapi.binance.com/fapi/v1/aggTrades` in DevTools: the price still flows; the meter falls
    back to `calibrating · 5:0x`.
 5. SIMULATOR: the meter is ready at once, with no `loading recent trades…` in between.

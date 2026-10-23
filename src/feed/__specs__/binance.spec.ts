@@ -366,4 +366,22 @@ describe('BinanceFuturesFeed history', () => {
     expect(saved[0]?.id).toBe(3202);
     expect(saved.map((r) => r.id)).toEqual(saved.map((r) => idOf(r)));
   });
+
+  it('saves when the page is left, so a quick reload finds the cache', async () => {
+    stubRest(5000);
+    const page = new EventTarget();
+    vi.stubGlobal('window', page);
+    let saved: readonly CachedTrade[] = [];
+    const { feed, histories, ws } = connect({
+      load: async () => [],
+      save: async (rows) => {
+        saved = rows;
+      },
+    });
+    ws.live(5001);
+    await vi.waitFor(() => expect(histories).toHaveLength(1));
+    page.dispatchEvent(new Event('pagehide'));
+    await vi.waitFor(() => expect(saved.at(-1)?.id).toBe(5001));
+    feed.disconnect();
+  });
 });
