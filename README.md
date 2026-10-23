@@ -1,230 +1,310 @@
-# crypto-tune
+<p align="center">
+  <img src="public/favicon.svg" width="112" height="112" alt="crypto-tune logo: a price line turning into a sound wave, on the app's aura">
+</p>
 
-Сонификация фьючерсного рынка в реальном времени, прямо в браузере. Спокойная фоновая музыка, которая
-нарастает и напрягается при резких движениях цены. Слушать фоном, не глядя в график. Работает с любой
-парой Binance USDⓈ-M perpetual. Ключи и бэкенд не нужны.
+<h1 align="center">crypto-tune</h1>
 
-Онлайн: <https://dmitrytut.github.io/crypto-tune/>
+<p align="center">
+  <b>Hear the market.</b><br>
+  Live crypto futures turned into calm generative music that tightens when price moves.
+</p>
 
-## Запуск
+<p align="center">
+  <a href="https://dmitrytut.github.io/crypto-tune/"><b>▶&nbsp;Open the live demo</b></a>
+  &nbsp;·&nbsp; runs in the browser &nbsp;·&nbsp; no sign-up, no API keys, no backend
+</p>
+
+<p align="center">
+  <a href="https://github.com/dmitrytut/crypto-tune/actions/workflows/deploy.yml"><img src="https://github.com/dmitrytut/crypto-tune/actions/workflows/deploy.yml/badge.svg" alt="Deploy"></a>
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Tone.js-15-f24d8c" alt="Tone.js">
+  <img src="https://img.shields.io/badge/WebGL-aura-5cf2db" alt="WebGL">
+</p>
+
+<p align="center">
+  <a href="https://dmitrytut.github.io/crypto-tune/"><img src="docs/media/hero.webp" width="880" alt="A sell-off in crypto-tune: the aura turns magenta, sell drops rain down, liquidation rings burst from the price"></a><br>
+  <sub>A simulated sell-off. Sound on in the app: here you only see it.</sub>
+</p>
+
+Charts need your eyes. crypto-tune only needs your ears. Leave it in a background tab while you work.
+A quiet market is an ambient drone with slow bells. When price jumps, the music speeds up, the filters
+open and the bass comes in. Liquidations hit like gongs. You hear the shock before you would have
+looked at the chart.
+
+## Highlights
+
+- **Calm by default.** A soft drone drifting through a six-chord cycle, a minor-pentatonic arpeggio
+  and Eno-style bell loops. Pleasant enough to keep on for hours.
+- **Tension you can hear.** Price shocks and volume spikes raise the tempo from 60 to 90 BPM, open
+  the filters and bring in a sub bass and a shaker. Past the red line come double time, a noise riser
+  and a detuned drone.
+- **Direction in the melody.** When price rises, the arpeggio climbs and gets brighter. When it falls,
+  the arpeggio descends and gets darker.
+- **Every whale and every wipe-out.** Liquidations sound as FM gongs, big market trades as plucks.
+  Each sits where it belongs in the stereo field: buys to the right, sells to the left.
+- **A living picture.** A WebGL aura takes its colour from order flow. Buys float up as bubbles, sells
+  sink as drops, and liquidations send shockwaves out of the price. A price and volume strip runs
+  along the bottom, over the period you pick: 1m, 5m, 15m or 1h.
+- **Ready in seconds.** The last 30 minutes of trades load on connect and are cached in IndexedDB,
+  so tension is calibrated almost at once instead of after a five-minute warm-up.
+- **Glanceable.** The tab title reads `▲ 81,305.2 · BTCUSDT · tension 2.6`. After 10 s without input
+  the UI fades out, leaving only the aura, the price and the chart.
+- **Any Binance USDⓈ-M perpetual.** You can also switch to the built-in simulator to hear a sell-off
+  on demand.
+
+| Live BTCUSDT, buyers in control                    | Simulator, liquidation cascade                                 |
+| -------------------------------------------------- | -------------------------------------------------------------- |
+| ![Live BTCUSDT with buy flow](docs/media/live.jpg) | ![Simulated cascade with liquidations](docs/media/selloff.jpg) |
+
+## Quick start
+
+Open **<https://dmitrytut.github.io/crypto-tune/>** and press **Listen**. Browsers only start audio
+after a click.
+
+To run it locally:
 
 ```sh
 pnpm install
 pnpm dev        # http://localhost:5173
 ```
 
-| Команда          | Что делает                                       |
-| ---------------- | ------------------------------------------------ |
-| `pnpm test`      | юнит-тесты (vitest)                              |
-| `pnpm typecheck` | проверка типов                                   |
-| `pnpm check`     | biome: lint + формат                             |
-| `pnpm build`     | typecheck + прод-сборка в `dist/`                |
-| `pnpm preview`   | раздать `dist/` на `localhost:4173/crypto-tune/` |
+## How it works
 
-## Публикация
+```
+Binance WebSocket ─┐                    ┌─► audio: Tone.js layers → reverb → compressor → limiter
+  (aggTrade,       ├─► feed ─► metrics ─┤
+   forceOrder)     │   Trade,   250 ms  └─► view: price, tension meter, WebGL aura, particles, chart
+REST aggTrades ────┘   Liquidation  ticks
+  + IndexedDB cache
+```
 
-Каждый push в `master` собирает сайт и выкладывает его на GitHub Pages
-(`.github/workflows/deploy.yml`: `pnpm check`, `pnpm test`, `pnpm build`, затем `dist/`). Сайт живёт в
-подпапке `/crypto-tune/`, поэтому в `vite.config.ts` задан `base`. В настройках репозитория
-Settings → Pages → Source стоит **GitHub Actions**. Повторить деплой вручную: Actions → Deploy to GitHub
-Pages → Run workflow.
+Plain TypeScript with Vite and no framework. Tone.js handles audio, and the aura is raw WebGL. All
+computation runs in the browser, which talks to Binance directly.
 
-## Источники данных
+### Data sources
 
-- **LIVE**: Binance Futures, публичный WebSocket
-  `wss://fstream.binance.com/market/stream` (aggTrade + forceOrder). Пару можно выбрать из списка
-  торгуемых perpetual-контрактов. При подключении подгружаются последние 30 мин сделок через REST
-  (`/fapi/v1/aggTrades`, до 20 запросов), поэтому метрики готовы через несколько секунд. Автопереподключение
-  с экспоненциальной задержкой и случайным разбросом; если 15 с нет данных или зависло подключение,
-  соединение пересоздаётся.
-- **SIMULATOR**: синтетический рынок, где спокойные участки (1.5–5 мин) чередуются с импульсами
-  (15–90 с, движение 0.3–1.5%, всплеск объёма и ликвидаций). На старте генерирует 30 мин истории,
-  поэтому разогрев не нужен.
+- **LIVE**: Binance Futures public WebSocket `wss://fstream.binance.com/market/stream` (`aggTrade` +
+  `forceOrder`). The pair can be picked from the list of trading perpetuals. On connect the last
+  30 min of trades come from REST (`/fapi/v1/aggTrades`, up to 20 requests) and are stitched to the
+  live stream by trade id. The last 30 min per pair live in IndexedDB (written every 30 s and when the
+  tab is hidden), so a reload usually fetches only the gap, in one request. If neither history nor
+  cache answers within 1.5 s, metrics warm up on live data. The socket reconnects with exponential
+  backoff and jitter, and is recreated after 15 s of silence or a stuck connect.
+- **SIMULATOR**: a synthetic market. Calm stretches (1.5–5 min) alternate with impulses (15–90 s,
+  0.3–1.5 % moves with bursts of volume and liquidations). It generates 30 min of history at start, so
+  no warm-up is needed.
 
-## Метрика напряжения
+### Tension
 
-Пересчёт каждые 250 мс по часам источника:
-`ret = log(p / p[N с назад])`, `z = ret / std(ret за 30 мин)`, `volZ` = z-score объёма за секунду,
-`raw = чувствительность × max(|z|, 0.7·volZ)`. Затем асимметричное сглаживание: быстрая атака 0.4,
-медленный спад 0.03. `direction` — сглаженный `sign(ret)`. Окно N по умолчанию 5 с. Статистику
-сразу наполняет история: на первой живой сделке Binance-адаптер берёт 30 мин `aggTrades` по REST
-(назад по id, ≤ 20 запросов), живые сделки ждут и склеиваются по id. Последние 30 мин сделок пары
-хранятся в IndexedDB (запись раз в 30 с и при скрытии вкладки), поэтому при перезагрузке REST докачивает
-только время после кэша — обычно один запрос. Если REST недоступен, а кэш не отвечает дольше 1.5 с,
-разогрев идёт на живых данных: N + 5 мин, в UI обратный отсчёт `calibrating tension · m:ss`.
-Подробности и принятые решения: [`docs/plan.md`](docs/plan.md).
+Recomputed every 250 ms on the feed clock, never wall time:
+- `ret = log(p / p[N s ago])`, `z = ret / std(ret over 30 min)`; `volZ` is the z-score of per-second
+  volume.
+- `raw = sensitivity × max(|z|, 0.7 · volZ)`, then asymmetric smoothing: fast attack 0.4, slow
+  release 0.03.
+- `direction` is the smoothed `sign(ret)`. The window N defaults to 5 s.
+- Without history, the warm-up lasts N + 5 min and the UI counts it down
+  (`calibrating · m:ss`).
 
-## Звук
+Design notes and decisions: [`docs/plan.md`](docs/plan.md).
 
-Звук включается кнопкой **Listen**: браузер разрешает запуск звука только по действию пользователя.
-- **База** (играет всегда): мягкий дрон на корне и квинте, его фильтр медленно «дышит». Каждые
-  16 тактов дрон переходит к следующему аккорду цикла i → VI → iv → i → III → VII (кроссфейд 6 с,
-  весь цикл ≈ 6 мин). Сверху арпеджио в минорной пентатонике тоники, одна нота на долю, с лёгким
-  эхом; в спокойном рынке оно иногда пропускает слабые доли, с ростом напряжения линия заполняется.
-  Три тихих колокольчика повторяют по одной ноте с периодами 7, 11 и 13 долей (петли в духе Ино:
-  общий рисунок повторяется раз в ~17 мин), и мягкий «пульс» отбивает каждую долю. Всё проходит
-  через длинный реверб, компрессор и лимитер (−1 dBFS).
-- **Регистр арпеджио** следует за `vs EMA 1h`, отклонением цены от часовой EMA в единицах её разброса.
-  Выше EMA ноты выше, ниже EMA ноты ниже, максимум ±3 ступени лада. Небольшой гистерезис не даёт
-  нотам скакать, когда цена топчется у границы.
-- **Напряжение** (по шкале tension):
-  - до 1 звучит только база;
-  - 1–2.5: фильтр арпеджио раскрывается (1 → 6 кГц), темп растёт 60 → 90 BPM (вместе с пульсом),
-    входят пульсирующий саб-бас на тонике и тихий шейкер восьмыми; уже при tension ≈ 1.5 саб звучит
-    на половину громкости;
-  - выше 2.5: шумовой райзер с поднимающейся полосой, вибрато арпеджио, корень дрона уходит вниз
-    против квинты (биения), арпеджио переходит на восьмые со следующей доли.
-- **Скачок**: если tension выросла на 3.5 за ~1 с, звучит шумовая волна: вверх по фильтру при росте
-  цены, вниз при падении. Не чаще раза в 20 с; на спокойном BTCUSDT это ~5 раз в час.
-- **Направление**: при росте арпеджио бежит вверх по ступеням, выше и светлее; при падении бежит вниз,
-  ниже и темнее. Контур меняется со следующей ноты и продолжает линию от последней сыгранной ступени.
-- Все переходы плавные: уровни и фильтры меняются за 0.5 с, темп меняется ступенями по 1 BPM.
-- **События**:
-  - ликвидация выше порога (по умолчанию $20K) звучит как FM-гонг. LONG (принудительная продажа, цена
-    падает) — низкий тёмный гонг на тонике, SHORT — светлый колокол на квинте октавой выше;
-  - крупная рыночная сделка выше порога (по умолчанию $200K) звучит как короткий щипок. BUY выше и
-    справа, SELL ниже и слева;
-  - громкость растёт с размером по логарифму: тихо на пороге, максимум при 100× пороге;
-  - каскад схлопывается: за тик 250 мс звучит не больше одного удара на тип, побеждает сторона с
-    большим суммарным объёмом. Последнее событие видно в UI под шкалой с возрастом (`LIQ LONG $766K (12s ago)`),
-    даже без звука; через минуту надпись плавно гаснет;
-  - пороги одни для всех пар: для мелких пар их стоит опустить.
-- Тоника, громкости трёх слоёв и пороги настраиваются. Смена тоники плавно переводит дрон и саб за 3 с.
+### Sound
 
-## Внешний вид
+- **Base** (always on): a drone on the root and fifth whose filter slowly breathes. Every 16 bars it
+  moves to the next chord of i → VI → iv → i → III → VII (6 s crossfade, about 6 min per cycle). On
+  top runs a minor-pentatonic arpeggio, one note per beat, with a light echo. In a calm market it
+  skips weak beats; the line fills in as tension grows. Three quiet bells repeat one note each every
+  7, 11 and 13 beats (Eno-style loops, so the whole pattern recurs only every ~17 min), and a soft
+  pulse marks each beat. Everything goes through a long reverb, a compressor and a −1 dBFS limiter.
+- **Register** follows `vs EMA 1h`, the price's distance from its hourly EMA in units of its spread:
+  up to ±3 scale steps, with hysteresis so notes don't flicker at a boundary.
+- **Tension zones**:
+  - below 1: base only;
+  - 1–2.5: the arpeggio filter opens (1 → 6 kHz), tempo rises 60 → 90 BPM, a pulsing sub bass on the
+    tonic and a quiet eighth-note shaker come in (the sub is already at half level around 1.5);
+  - above 2.5: a noise riser with a climbing band, arpeggio vibrato, the drone root bends down
+    against the fifth (beating), and the arpeggio switches to eighths from the next beat.
+- **Shock**: when tension rises by 3.5 within ~1 s, a noise swell sweeps up the filter on a rally
+  and down on a drop. At most once per 20 s, about 5 times an hour on a quiet BTCUSDT.
+- **Direction**: on a rise the arpeggio runs up the scale, higher and brighter; on a fall it runs
+  down, lower and darker. The contour changes from the next note and continues from the last step.
+- **Events**:
+  - a liquidation above the threshold (default $20K) is an FM gong: a LONG (forced sell, price
+    falling) is a low dark gong on the tonic, a SHORT is a bright bell on the fifth an octave up;
+  - a market trade above the threshold (default $200K) is a short pluck, BUY high and right, SELL low
+    and left;
+  - loudness grows with log size, from quiet at the threshold to full at 100× the threshold;
+  - cascades collapse to at most one hit per kind per 250 ms tick; the side with more volume wins.
+    The latest event is shown under the meter with its age (`LIQ LONG $766K (12s ago)`), even with
+    sound off, and fades out after a minute;
+  - thresholds are shared by all pairs, so lower them for small pairs.
+- Every change is smooth: levels and filters ramp over 0.5 s, tempo moves in 1 BPM steps, double time
+  lands on the beat and chord changes on bar lines. Tonic, the three layer volumes and both
+  thresholds are configurable; a tonic change glides the drone and sub over 3 s.
 
-Главный экран в духе «сейчас играет» (весь интерфейс на английском): крупная цена, под ней изменение за
-выбранный период (`▼ 0.11% in 15m`), шкала **Tension** с зонами Calm / Tense / Shock (во время
-разогрева справа `calibrating · 4:52`), объём в долларах за тот же период (`vol $90.9M/15m`) и
-последнее событие, кнопка **Listen** / **Stop**. Подсказка у `Tension` (наведение, фокус или тап)
-объясняет, что меряет шкала и как звучит каждая зона. Пока данных нет, строка под шкалой говорит, чего
-ждём (`Connecting to the market…`, `Loading recent trades…`); статус справа вверху словами (`Live`,
-`Connecting…`). Звук, чувствительность и источник спрятаны в настройки (⚙); отладочные метрики видны
-только с `?debug` в адресе. Пару можно сменить в чипе слева вверху: рамка и стрелка видны всегда, клик
-открывает список с поиском. Пара и тоника в настройках — один компонент выпадающего списка
-(`ui/picker.ts`): стрелки и Enter выбирают, Esc или клик мимо закрывают. Видимого заголовка нет, `h1`
-только для скринридеров.
-Стиль: непрозрачные поверхности без blur и свечений, жёлтый акцент только на кнопке звука, иконки Lucide.
-- **Аура** (WebGL-шейдер) реагирует на рынок с первой сделки, без разогрева:
-  - **поток ордеров** (последние ~4 с): перевес покупок красит поле в бирюзовый и поднимает его вверх,
-    перевес продаж — в маджента и янтарный и опускает вниз; чем активнее торгуют относительно последних
-    2 мин, тем быстрее и ярче течёт поле;
-  - **tension** (после разогрева): устойчивое движение рвёт пятна в турбулентность и насыщает цвет;
-  - всплеск объёма делает ярче, цена выше часовой EMA поднимает свечение вверх;
-  - в покое — холодный стальной синий и медленное «дыхание» в такт дрону.
-- **Каждая покупка — пузырь**, всплывающий из графика (бирюзовый, с бликом), **каждая продажа — капля**,
-  оседающая сверху (раскалённая, маджента). Покупки чуть правее, продажи левее — как панорама в звуке.
-  Размер растёт с log(объёма), от 4 px у $1K до 22 px у $1M. Крупные сделки выше порога получают ореол,
-  всплывающую сумму (`+$864K`) и вспышку света в ауре на своём месте. В каскаде мелкие сливаются, кадр
-  не тормозит.
-- **Каждая ликвидация** — двойное кольцо от цены (LONG маджента, SHORT бирюзовая). Выше порога: осколки,
-  подпись `LIQUIDATION LONG $1.2M`, ударная волна, которая физически искривляет ауру, а при 10× пороге —
-  лёгкая тряска экрана. Мелкие ликвидации — бледные кольца, по ним видно, как набирается каскад.
-- **Цена** — тонкие табличные цифры с фиксированной точностью на пару (ширина не прыгает); разделители и
-  дробная часть приглушены. На изменении цветом вспыхивают только изменившиеся цифры. За блоком цены
-  мягкое затемнение, чтобы цифры читались на любой яркости ауры. Поверх всего — тонкое плёночное зерно.
-- **График** внизу за тот же период, подсветка под линией по tension, объём покупок вверх и продаж вниз
-  по 10 с, точки событий. Пока история короче, график растягивается по ней (минимум 30 с).
-- **Период** (настройки → Period): 1m, 5m, 15m или 1h, один на изменение цены, объём и график; запоминается.
-  Пока истории меньше выбранного периода, всё считается по тому, что есть, и подпись показывает реальный
-  отрезок (`in 26m`). История хранится до часа; на LIVE после загрузки её около 30 мин, дальше растёт.
-- **Заголовок вкладки**: `▲ 81,305.2 · BTCUSDT · tension 2.6`, состояние видно, не переключаясь на вкладку.
-- **Режим погружения**: через 10 с без мыши и клавиатуры интерфейс гаснет, остаются аура, цена и график.
-- `prefers-reduced-motion`: аура почти неподвижна; пузырей, колец, волн, тряски и вспышек нет.
+### Visuals
 
-## Статус
+The main screen works like "now playing" (the whole UI is in English): a large price, its change over
+the chosen period below it (`▼ 0.11% in 15m`), the **Tension** meter with Calm / Tense / Shock zones
+(`calibrating · 4:52` on the right during warm-up), dollar volume over the same period
+(`vol $90.9M/15m`), the latest event, and the **Listen** / **Stop** button. The tooltip on `Tension`
+(hover, focus or tap) explains what the meter measures and how each zone sounds. Until data arrives,
+the line under the meter says what it is waiting for (`Connecting to the market…`,
+`Loading recent trades…`), and the status in the top right is in words (`Live`, `Connecting…`).
+Sound, sensitivity and source live in settings (⚙); debug metrics show only with `?debug` in the
+URL. The pair chip in the top left always shows its border and arrow; a click opens a searchable
+list. Pair and tonic share one dropdown component (`ui/picker.ts`): arrows and Enter pick, Esc or a
+click outside closes. There is no visible title; the `h1` is for screen readers only. Style: opaque
+surfaces without blur or glow, the yellow accent only on the sound button, Lucide icons.
+- **Aura** (WebGL shader) reacts from the first trade, with no warm-up:
+  - **order flow** (last ~4 s): buying pressure turns the field teal and lifts it; selling pressure
+    turns it magenta and amber and pushes it down. The busier trading is relative to the last 2 min,
+    the faster and brighter it flows;
+  - **tension** (after warm-up): a sustained move tears the field into turbulence and saturates it;
+  - a volume spike brightens it, and price above the hourly EMA lifts the glow;
+  - at rest: a cool steel blue breathing in time with the drone.
+- **Every buy is a bubble** rising from the chart, **every sell a drop** falling from the top. Buys sit
+  slightly right and sells left, as in the stereo mix. Size grows with log notional, from 4 px at $1K
+  to 22 px at $1M. Trades above the threshold get a halo, a floating amount (`+$864K`) and a flash in
+  the aura. In a cascade small particles merge, so frames don't drop.
+- **Every liquidation** is a double ring from the price (LONG magenta, SHORT teal). Above the
+  threshold it adds shards, a `LIQUIDATION LONG $1.2M` label and a shockwave that bends the aura; at
+  10× the threshold, a light screen shake. Small liquidations leave faint rings, so you can watch a
+  cascade build.
+- **Price** uses thin tabular digits with fixed precision per pair, so the width never jumps. Only the
+  digits that changed flash. Film grain sits over everything.
+- **Chart** over the same period: a glow under the line coloured by tension, buy volume up and sell
+  volume down per 10 s, and event dots. While history is shorter, the chart stretches over what there
+  is (at least 30 s).
+- **Period** (settings → Period): 1m, 5m, 15m or 1h, one for price change, volume and chart; it is
+  remembered. While history is shorter than the period, everything uses what there is and the label
+  shows the real span (`in 26m`). History is kept for up to an hour; on LIVE about 30 min are loaded
+  on connect, and it grows from there.
+- **Tab title**: `▲ 81,305.2 · BTCUSDT · tension 2.6`, so the state is visible without switching tabs.
+- **Immersive mode**: after 10 s without mouse or keyboard the UI fades out, leaving the aura, the
+  price and the chart.
+- `prefers-reduced-motion`: the aura is nearly still, and there are no bubbles, rings, waves, shake
+  or flashes.
 
-- [x] **Этап 1**: feed (Binance, любая пара) + симулятор + метрики + UI с цифрами
-- [x] **Этап 2**: базовый звуковой слой
-- [x] **Этап 3**: слой напряжения
-- [x] **Этап 4**: события (ликвидации, крупные сделки)
-- [x] **Звук v2**: история вместо разогрева, реакция за долю, волна на скачке, дрейф аккордов,
-  колокольчики-петли, пульс
-- [x] **Этап 5**: внешний вид (аура, частицы, график, настройки в модалке)
-- [x] **Чистка дизайна** (по taste-skill): заголовок и подписи, кнопка с текстом, без glass/glow/неона
-- [x] **Публикация**: GitHub Pages через Actions
+## Development
 
-Replay (запись и воспроизведение) и адаптер MEXC решили не делать: для настройки звука хватает
-симулятора, а Binance покрывает нужные пары.
+| Command          | What it does                                   |
+| ---------------- | ---------------------------------------------- |
+| `pnpm dev`       | dev server on `localhost:5173`                 |
+| `pnpm test`      | unit tests (vitest)                            |
+| `pnpm typecheck` | type check (TypeScript 7)                      |
+| `pnpm check`     | Biome lint + format check                      |
+| `pnpm build`     | type check + production bundle in `dist/`      |
+| `pnpm preview`   | serve `dist/` on `localhost:4173/crypto-tune/` |
 
-### Проверка чистки дизайна
+Before committing: `pnpm check && pnpm test && pnpm build`. Code layout, module boundaries and
+conventions are in [`AGENTS.md`](AGENTS.md).
 
-1. `pnpm dev`: на первом экране цена, изменение `… in 15m`, шкала и кнопка **Listen**; пока грузится
-   история, под шкалой текст вместо пустоты.
-2. Наведение или тап на `Tension ⓘ` показывает подсказку с зонами; Esc или тап мимо закрывает.
-3. Чип пары всегда с рамкой и стрелкой; клик открывает список с поиском, `eth` → `ETHUSDT` стрелками и
-   Enter; несуществующая пара даёт `No such pair on Binance Futures`; в симуляторе стрелки нет. Тоника
-   в настройках открывается таким же списком; Esc закрывает список, а не модалку.
-4. Нет размытия под чипом, кнопками и модалкой; у кнопки звука и линии графика нет свечения; в покое
-   аура синяя, не фиолетовая.
-5. В настройках заголовки обычным регистром, источник `Live` / `Simulator`; блок Debug есть только
-   на `/?debug`.
+**Deploy.** Every push to `master` builds the site and publishes it to GitHub Pages
+([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): check, test, build, upload
+`dist/`). The site lives under `/crypto-tune/`, which is why `vite.config.ts` sets `base`. To redeploy
+by hand: Actions → Deploy to GitHub Pages → Run workflow.
 
-### Проверка этапа 5
+## Status
 
-1. `pnpm test`: в том числе история для графика (цена по секундам, объём buy/sell по 10 с, обрезка
-   1 ч), палитра ауры (цвет по направлению, скорость по tension, яркость по объёму) и слияние искр
-   при перегрузке.
-2. `pnpm dev` → LIVE: аура меняет цвет и движение с первых секунд; пузыри покупок всплывают снизу,
-   капли продаж оседают сверху.
-3. ⚙ → SIMULATOR, множитель ×2. На импульсе вниз аура маджента и рвётся, сверху сыплются капли, от цены
-   расходятся кольца с осколками и подписью ликвидации, аура искривляется волной.
-4. Модалка открывается с клавиатуры (Tab → ⚙ → Enter), закрывается по Esc и клику мимо.
-5. Заголовок вкладки показывает цену и направление; через 10 с бездействия интерфейс гаснет.
+- [x] **Stage 1**: feed (Binance, any pair) + simulator + metrics + numeric UI
+- [x] **Stage 2**: base sound layer
+- [x] **Stage 3**: tension layer
+- [x] **Stage 4**: events (liquidations, large trades)
+- [x] **Sound v2**: history instead of warm-up, on-the-beat reactions, shock swell, chord drift, bell
+  loops, pulse
+- [x] **Stage 5**: visuals (aura, particles, chart, settings dialog)
+- [x] **Design cleanup** (per taste-skill): title and labels, a text button, no glass/glow/neon
+- [x] **Publishing**: GitHub Pages via Actions, logo and favicon
 
-### Проверка звука v2
+Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
+sound, and Binance covers the pairs that matter.
 
-1. `pnpm test`: в том числе загрузка истории Binance (порядок по времени, склейка с потоком по id,
-   лимит запросов, откат при ошибке), продолжение контура со следующей ноты, детектор скачка
-   (резкий рост, плавный рост, кулдаун, разрыв в обновлениях), кривые средней зоны.
-2. `pnpm dev` → LIVE BTCUSDT: цена, tension и «warm-up готово» появляются через ~5 с после открытия.
-3. **Start** на SIMULATOR: каждую долю слышен мягкий пульс, раз в несколько секунд — колокольчик;
-   примерно через минуту дрон переходит на другой аккорд без глиссандо.
-4. Во время импульса симулятора: на резком входе — шумовая волна, арпеджио сразу бежит в сторону
-   движения, выше 2.5 удваивается со следующей доли.
-5. **Stop** и сразу **Start**: музыка продолжается (раньше петли замолкали).
+<details>
+<summary><b>Manual checks per stage</b></summary>
 
-### Проверка этапа 4
+### Design cleanup
 
-1. `pnpm test`: схлопывание каскада (сторона с бо́льшим объёмом, отбрасывание старых событий),
-   громкость от размера, расположение голосов (LONG ниже SHORT, BUY выше и правее SELL).
-2. `pnpm dev` → SIMULATOR → **Start**. Во время импульса вниз звучат низкие гонги и щипки слева, в строке
-   событий видны `LIQ LONG …` и `SELL …` красным; при импульсе вверх — наоборот.
-3. LIVE BTCUSDT: крупные сделки от $200K встречаются несколько раз в минуту. Ползунки порогов двигаются
-   по логарифмической шкале ($1K–$1M и $10K–$10M).
-4. Ползунок Events в настройках меняет только гонги и щипки.
+1. `pnpm dev`: the first screen shows the price, the `… in 15m` change, the meter and the **Listen**
+   button; while history loads, text sits under the meter instead of a blank.
+2. Hovering or tapping `Tension ⓘ` shows the tooltip with zones; Esc or a tap outside closes it.
+3. The pair chip always has a border and an arrow; a click opens the list with search, `eth` →
+   `ETHUSDT` with arrows and Enter; an unknown pair gives `No such pair on Binance Futures`; the
+   simulator has no arrow. The tonic in settings opens the same list; Esc closes the list, not the
+   dialog.
+4. No blur under the chip, buttons or dialog; no glow on the sound button or the chart line; at rest
+   the aura is blue, not violet.
+5. Settings headings are in sentence case, the source reads `Live` / `Simulator`; the Debug block
+   appears only on `/?debug`.
 
-### Проверка этапа 3
+### Stage 5
 
-1. `pnpm test`: в том числе отображение tension → параметры звука (зоны, удвоение с гистерезисом,
-   направление, непрерывность без скачков) и контуры арпеджио.
-2. `pnpm dev` → SIMULATOR → чувствительность ×3 → **Start**. Когда шкала уходит за 1, раскрывается фильтр,
-   растёт темп, входят саб и шейкер. За 2.5 появляются шум, «плывущее» арпеджио и удвоение темпа. После
-   импульса всё плавно возвращается к базе.
-3. На импульсе вверх (▲) арпеджио бежит вверх и звучит светлее, на импульсе вниз (▼) — наоборот.
-4. Ползунок Tension в настройках меняет только этот слой.
+1. `pnpm test`: includes chart history (price per second, buy/sell volume per 10 s, 1 h trim),
+   the aura palette (colour by direction, speed by tension, brightness by volume) and particle merging
+   under load.
+2. `pnpm dev` → LIVE: the aura changes colour and motion within seconds; buy bubbles rise from the
+   bottom, sell drops fall from the top.
+3. ⚙ → SIMULATOR, sensitivity ×2. On a down impulse the aura turns magenta and tears, drops rain from
+   the top, rings with shards and a liquidation label spread from the price, and the aura bends with
+   the wave.
+4. The settings dialog opens from the keyboard (Tab → ⚙ → Enter) and closes on Esc and on a click
+   outside.
+5. The tab title shows price and direction; after 10 s of inactivity the UI fades out.
 
-### Проверка этапа 2
+### Sound v2
 
-1. `pnpm test`: в том числе EW-среднее и EW-дисперсия, `emaZ` в движке, лад, паттерн арпеджио,
-   гистерезис регистра.
-2. `pnpm dev` → SIMULATOR → **Start**: звук плавно нарастает за ~3 с; **Stop** затихает за 1.5 с.
-3. Сменить тонику: дрон плавно переходит на новую ноту, без щелчка.
-4. Ползунок громкости базы меняет уровень плавно.
-5. `vs EMA 1h` (Debug, `/?debug`) заметно больше 0 → арпеджио звучит выше, меньше 0 → ниже. На симуляторе это видно
-   после импульса.
-6. На LIVE регистр следует за EMA сразу (история с REST).
+1. `pnpm test`: includes Binance history loading (time order, stitching with the stream by id, request
+   limit, fallback on error), contour continuation from the next note, the shock detector (sharp
+   rise, slow rise, cooldown, gap in updates) and the mid-zone curves.
+2. `pnpm dev` → LIVE BTCUSDT: price, tension and "warm-up done" appear ~5 s after opening.
+3. **Start** on SIMULATOR: a soft pulse on every beat, a bell every few seconds; after about a minute
+   the drone moves to another chord without a glissando.
+4. During a simulator impulse: a noise swell on the sharp entry, the arpeggio immediately runs in the
+   direction of the move and doubles from the next beat above 2.5.
+5. **Stop** then **Start** right away: the music continues (loops used to fall silent).
 
-### Проверка этапа 1
+### Stage 4
 
-1. `pnpm test`: тесты rolling std, z-score, асимметричного сглаживания, tension, движка метрик,
-   парсеров Binance и переподключения.
-2. `pnpm dev`, открыть `/?debug` → LIVE: статус `Live`, цена обновляется; z / volZ / tension появляются через несколько
-   секунд (история с REST; без неё — разогрев ~5 мин).
-3. Сменить пару (например, `ETHUSDT`): подпись и цена переключаются, разогрев начинается заново.
-   Несуществующая пара: в списке пар `No such pair on Binance Futures`.
-4. SIMULATOR: метрики готовы сразу. Импульс начинается раз в 1.5–5 мин, tension поднимается выше
-   1–2.5, а direction показывает его направление.
-5. DevTools → Network → Offline: статус показывает «retrying in Ns» с растущей задержкой. Включить сеть:
-   статус снова `Live`.
-6. Перезагрузить страницу: источник, пара, окно N и чувствительность сохраняются.
+1. `pnpm test`: cascade collapsing (the side with more volume wins, stale events are dropped),
+   loudness by size, voice placement (LONG below SHORT, BUY above and right of SELL).
+2. `pnpm dev` → SIMULATOR → **Start**. On a down impulse low gongs and left-side plucks sound, and the
+   event line shows `LIQ LONG …` and `SELL …` in red; on an up impulse the opposite.
+3. LIVE BTCUSDT: trades above $200K happen several times a minute. Threshold sliders move on a log
+   scale ($1K–$1M and $10K–$10M).
+4. The Events slider changes only gongs and plucks.
+
+### Stage 3
+
+1. `pnpm test`: includes tension → sound parameter mapping (zones, double time with hysteresis,
+   direction, continuity without jumps) and arpeggio contours.
+2. `pnpm dev` → SIMULATOR → sensitivity ×3 → **Start**. Past 1 on the meter the filter opens, tempo
+   rises, sub and shaker come in. Past 2.5 come noise, a wavering arpeggio and double time. After the
+   impulse everything glides back to the base.
+3. On an up impulse (▲) the arpeggio runs up and sounds brighter; on a down impulse (▼) the opposite.
+4. The Tension slider changes only this layer.
+
+### Stage 2
+
+1. `pnpm test`: includes EW mean and EW variance, `emaZ` in the engine, the scale, the arpeggio
+   pattern and register hysteresis.
+2. `pnpm dev` → SIMULATOR → **Start**: sound fades in over ~3 s; **Stop** fades out over 1.5 s.
+3. Change the tonic: the drone glides to the new note without a click.
+4. The base volume slider changes the level smoothly.
+5. `vs EMA 1h` (Debug, `/?debug`) well above 0 → the arpeggio sits higher, below 0 → lower. On the
+   simulator this shows after an impulse.
+6. On LIVE the register follows the EMA immediately (history from REST).
+
+### Stage 1
+
+1. `pnpm test`: rolling std, z-score, asymmetric smoothing, tension, the metrics engine, Binance
+   parsers and reconnection.
+2. `pnpm dev`, open `/?debug` → LIVE: status `Live`, the price updates; z / volZ / tension appear within seconds
+   (history from REST; without it, a ~5 min warm-up).
+3. Change the pair (e.g. `ETHUSDT`): label and price switch, warm-up restarts. An unknown pair: the
+   pair list shows `No such pair on Binance Futures`.
+4. SIMULATOR: metrics are ready at once. An impulse starts every 1.5–5 min, tension climbs above
+   1–2.5, and direction shows its sign.
+5. DevTools → Network → Offline: the status shows "retrying in Ns" with a growing delay. Back online:
+   the status is `Live` again.
+6. Reload the page: source, pair, window N and sensitivity are kept.
+
+</details>
