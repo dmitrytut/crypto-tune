@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/favicon.svg" width="112" height="112" alt="crypto-tune logo: an audio waveform tracing a price line, on the app's aura">
+  <img src="public/favicon.svg" width="112" height="112" alt="crypto-tune logo: a price line turning into a sound wave, on the app's aura">
 </p>
 
 <h1 align="center">crypto-tune</h1>
