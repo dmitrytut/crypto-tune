@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://dmitrytut.github.io/crypto-tune/"><b>▶&nbsp;Open the live demo</b></a>
+  <a href="https://crypto-tune.com/"><b>▶&nbsp;Open the live demo</b></a>
   &nbsp;·&nbsp; runs in the browser &nbsp;·&nbsp; no sign-up, no API keys, no backend
 </p>
 
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <a href="https://dmitrytut.github.io/crypto-tune/"><img src="docs/media/hero.webp" width="880" alt="A sell-off in Crypto Tune: the aura turns magenta, sell drops rain down, liquidation rings burst from the price"></a><br>
+  <a href="https://crypto-tune.com/"><img src="docs/media/hero.webp" width="880" alt="A sell-off in Crypto Tune: the aura turns magenta, sell drops rain down, liquidation rings burst from the price"></a><br>
   <sub>A simulated sell-off. Sound on in the app: here you only see it.</sub>
 </p>
 
@@ -58,7 +58,7 @@ looked at the chart.
 
 ## Quick start
 
-Open **<https://dmitrytut.github.io/crypto-tune/>** and press **Listen**. Browsers only start audio
+Open **<https://crypto-tune.com/>** and press **Listen**. Browsers only start audio
 after a click.
 
 To run it locally:
@@ -191,27 +191,28 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 
 ## Development
 
-| Command          | What it does                                   |
-| ---------------- | ---------------------------------------------- |
-| `pnpm dev`       | dev server on `localhost:5173`                 |
-| `pnpm test`      | unit tests (vitest)                            |
-| `pnpm typecheck` | type check (TypeScript 7)                      |
-| `pnpm check`     | Biome lint + format check                      |
-| `pnpm build`     | type check + production bundle in `dist/`      |
-| `pnpm preview`   | serve `dist/` on `localhost:4173/crypto-tune/` |
+| Command          | What it does                              |
+| ---------------- | ----------------------------------------- |
+| `pnpm dev`       | dev server on `localhost:5173`            |
+| `pnpm test`      | unit tests (vitest)                       |
+| `pnpm typecheck` | type check (TypeScript 7)                 |
+| `pnpm check`     | Biome lint + format check                 |
+| `pnpm build`     | type check + production bundle in `dist/` |
+| `pnpm preview`   | serve `dist/` on `localhost:4173`         |
 
 Before committing: `pnpm check && pnpm test && pnpm build`. Code layout, module boundaries and
 conventions are in [`AGENTS.md`](AGENTS.md).
 
 **Deploy.** Every push to `master` builds the site and publishes it to GitHub Pages
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): check, test, build, upload
-`dist/`). The site lives under `/crypto-tune/`, which is why `vite.config.ts` sets `base`. To redeploy
-by hand: Actions → Deploy to GitHub Pages → Run workflow.
+`dist/`) at the custom domain `crypto-tune.com`, set in Settings → Pages (an Actions deploy needs no
+`CNAME` file). `vite.config.ts` uses a relative `base`, so the build does not depend on the host
+path. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow.
 
 **Link previews and search.** Open Graph and Twitter card tags in `index.html` point at
 `public/og.jpg` (1200×630). `index.html` also carries the canonical URL and `WebApplication`
 structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-code
-`https://dmitrytut.github.io/crypto-tune/`; update them if the site moves. The description appears
+`https://crypto-tune.com/`; update them if the site moves. The description appears
 three times (meta, Open Graph, JSON-LD): keep them identical.
 
 ## Status
