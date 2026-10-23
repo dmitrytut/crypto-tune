@@ -4,6 +4,8 @@
 нарастает и напрягается при резких движениях цены. Слушать фоном, не глядя в график. Работает с любой
 парой Binance USDⓈ-M perpetual. Ключи и бэкенд не нужны.
 
+Онлайн: <https://dmitrytut.github.io/crypto-tune/>
+
 ## Запуск
 
 ```sh
@@ -11,12 +13,21 @@ pnpm install
 pnpm dev        # http://localhost:5173
 ```
 
-| Команда          | Что делает                        |
-| ---------------- | --------------------------------- |
-| `pnpm test`      | юнит-тесты (vitest)               |
-| `pnpm typecheck` | проверка типов                    |
-| `pnpm check`     | biome: lint + формат              |
-| `pnpm build`     | typecheck + прод-сборка в `dist/` |
+| Команда          | Что делает                                       |
+| ---------------- | ------------------------------------------------ |
+| `pnpm test`      | юнит-тесты (vitest)                              |
+| `pnpm typecheck` | проверка типов                                   |
+| `pnpm check`     | biome: lint + формат                             |
+| `pnpm build`     | typecheck + прод-сборка в `dist/`                |
+| `pnpm preview`   | раздать `dist/` на `localhost:4173/crypto-tune/` |
+
+## Публикация
+
+Каждый push в `master` собирает сайт и выкладывает его на GitHub Pages
+(`.github/workflows/deploy.yml`: `pnpm check`, `pnpm test`, `pnpm build`, затем `dist/`). Сайт живёт в
+подпапке `/crypto-tune/`, поэтому в `vite.config.ts` задан `base`. В настройках репозитория
+Settings → Pages → Source стоит **GitHub Actions**. Повторить деплой вручную: Actions → Deploy to GitHub
+Pages → Run workflow.
 
 ## Источники данных
 
@@ -131,6 +142,7 @@ pnpm dev        # http://localhost:5173
   колокольчики-петли, пульс
 - [x] **Этап 5**: внешний вид (аура, частицы, график, настройки в модалке)
 - [x] **Чистка дизайна** (по taste-skill): заголовок и подписи, кнопка с текстом, без glass/glow/неона
+- [x] **Публикация**: GitHub Pages через Actions
 
 Replay (запись и воспроизведение) и адаптер MEXC решили не делать: для настройки звука хватает
 симулятора, а Binance покрывает нужные пары.
