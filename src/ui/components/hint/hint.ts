@@ -71,6 +71,8 @@ export function createHint(
   body.popover = 'manual';
   body.textContent = text;
   button.setAttribute('aria-describedby', body.id);
+  // A click pins the tip open, so the button is a disclosure: it says what it expands.
+  button.setAttribute('aria-controls', body.id);
   button.setAttribute('aria-expanded', 'false');
   root.append(button, body);
 
