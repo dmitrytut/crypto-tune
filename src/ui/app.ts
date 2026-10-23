@@ -11,13 +11,14 @@ import type { EventCue } from '../metrics/events';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
+import { mountChartTip } from './components/chart-tip/chart-tip';
 import { TensionMeter } from './components/meter/meter';
 import { mountPicker } from './components/picker/picker';
 import { PriceReadout } from './components/price-readout/price-readout';
 import { mountSettingsPanel } from './components/settings-panel/settings-panel';
 import { el } from './dom';
 import { FlowMeter } from './flow';
-import { durationLabel, usdFmt } from './format';
+import { durationLabel, eventLabel, usdFmt } from './format';
 import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, UP_COLOR } from './palette';
 import { mountStage } from './scene/stage';
 
@@ -182,6 +183,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       }
     },
   });
+  mountChartTip(el<HTMLCanvasElement>('chart'), el('chart-tip'), (x, y) => chart.markerAt(x, y));
 
   // ── immersive mode ──
   let idleTimer = 0;
@@ -275,9 +277,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     },
     showEvent(e) {
       chartDirty = true;
-      const what = e.kind === 'liquidation' ? `LIQ ${e.side.toUpperCase()}` : e.side.toUpperCase();
       const times = e.count > 1 ? ` ×${e.count}` : '';
-      shownEvent = { text: `${what} ${usdFmt.format(e.usd)}${times}`, at: Date.now() };
+      shownEvent = { text: `${eventLabel(e.kind, e.side, e.usd)}${times}`, at: Date.now() };
       lastEvent.className = isDown(e.side) ? 'down' : 'up';
       paintEvent();
     },

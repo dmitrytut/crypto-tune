@@ -52,7 +52,8 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `<name>.css` imported by the `.ts`, specs in `<name>/__specs__/`; `picker/` one dropdown for every
   list, pair and tonic; `hint/` label with a tip; `meter/` tension meter with zones and its hint;
   `price-readout/` fixed-decimal price with per-digit flash; `settings-panel/` settings
-  `<dialog>`), `scene/` (`stage.ts` creates the layers and
+  `<dialog>`; `chart-tip/` tooltip for chart event markers, hit-tested by `Chart.markerAt`),
+  `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
   trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
   Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no warm-up), `palette.ts` (market +

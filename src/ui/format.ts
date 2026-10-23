@@ -52,3 +52,12 @@ export const usdFmt = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumSignificantDigits: 3,
 });
+
+/**
+ * One wording for a cued event, in the readout and on the chart: `SELL $221K`,
+ * `LIQ LONG $1.2M`.
+ * @package
+ */
+export function eventLabel(kind: 'trade' | 'liquidation', side: string, usd: number): string {
+  return `${kind === 'liquidation' ? 'LIQ ' : ''}${side.toUpperCase()} ${usdFmt.format(usd)}`;
+}
