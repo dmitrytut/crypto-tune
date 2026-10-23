@@ -32,6 +32,26 @@ describe('SimulatorFeed clock', () => {
     expect(last.ts).toBeLessThanOrEqual(feed.now());
     feed.disconnect();
   });
+
+  it('hands its history over once on connect, older than every live trade', () => {
+    const feed = new SimulatorFeed({ historyMs: 60_000 });
+    const histories: (readonly Trade[])[] = [];
+    const live: Trade[] = [];
+    feed.onHistory((h) => histories.push(h));
+    feed.onTrade((t) => live.push(t));
+    feed.connect();
+    expect(histories).toHaveLength(1);
+    const past = histories[0] as readonly Trade[];
+    expect(past.length).toBeGreaterThan(0);
+    expect((past[0] as Trade).ts).toBeGreaterThanOrEqual(Date.now() - 60_000);
+    expect(live).toEqual([]);
+
+    vi.advanceTimersByTime(1_000);
+    expect(live.length).toBeGreaterThan(0);
+    expect((live[0] as Trade).ts).toBeGreaterThan((past.at(-1) as Trade).ts);
+    expect(histories).toHaveLength(1);
+    feed.disconnect();
+  });
 });
 
 describe('MarketSimulator', () => {

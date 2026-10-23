@@ -19,11 +19,13 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 ## Layout
 
 - `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: the Binance adapter
-  (`binance.ts`, which also loads 30 min of REST `aggTrades` on connect so metrics start warm) and
-  `simulator.ts`. `reconnecting-socket.ts` owns backoff and the silence/connect watchdog.
+  (`binance.ts`, which also loads 30 min of REST `aggTrades` in the background so metrics start
+  warm) and `simulator.ts`. `reconnecting-socket.ts` owns backoff and the silence/connect watchdog.
   `trade-cache.ts` is the injected `TradeStore`: recent trades with ids per pair in IndexedDB, so a
-  reload fetches only the gap after the cache. History is emitted before live events, trades always
-  in `ts` order. Any history or storage failure degrades to a plain live start, never blocks the stream.
+  reload fetches only the gap after the cache. Live trades are emitted from the first one; history
+  arrives once via `onHistory`, all older than the first live trade, and `main.ts` rebuilds metrics
+  from history + live seen so far. Any history or storage failure degrades to a plain live start,
+  never blocks the stream.
   `symbol-cache.ts` caches the pair list in localStorage.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`, and `events.ts`
@@ -64,8 +66,8 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no warm-up), `palette.ts` (market +
   flow → aura colours/motion; the one source of side and tension colours, CSS included),
   `scene/spawn.ts` (merging, bubble start state). Visuals are wall-clock animation; anything older
-  than 2 s is not animated (history replays, filtered in the view). Every motion effect respects
-  `prefers-reduced-motion`.
+  than 2 s is not animated (a throttled tab's catch-up, filtered in the view). Every motion effect
+  respects `prefers-reduced-motion`.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 

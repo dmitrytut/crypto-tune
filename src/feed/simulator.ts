@@ -215,16 +215,17 @@ export class MarketSimulator {
 
 export interface SimulatorFeedOptions {
   params?: SimulatorParams;
-  /** Pre-generated history so metrics are warm immediately: the metrics stats window. */
+  /** History handed over on connect so metrics are warm immediately: the metrics stats window. */
   historyMs: number;
 }
 
 const STEP_MS = 100;
 
-/** Runs MarketSimulator against the wall clock; emits history synchronously on connect. */
+/** Runs MarketSimulator against the wall clock; hands its history over synchronously on connect. */
 export class SimulatorFeed implements MarketFeed {
   readonly label = 'Simulator';
   private readonly trades = new Emitter<Trade>();
+  private readonly histories = new Emitter<readonly Trade[]>();
   private readonly liquidations = new Emitter<Liquidation>();
   private readonly status = new Emitter<FeedStatus>();
   private sim: MarketSimulator | null = null;
@@ -239,7 +240,15 @@ export class SimulatorFeed implements MarketFeed {
     const now = Date.now();
     this.sim = new MarketSimulator(now - this.opts.historyMs, this.opts.params);
     this.status.emit({ state: 'open' });
-    this.pump();
+    const past: Trade[] = [];
+    // Past liquidations are not news; the live adapter has no liquidation history either.
+    this.sim.advance(
+      now,
+      (t) => past.push(t),
+      () => {},
+    );
+    this.emittedUntil = now;
+    this.histories.emit(past);
     this.timer = setInterval(() => this.pump(), STEP_MS);
   }
 
@@ -257,6 +266,10 @@ export class SimulatorFeed implements MarketFeed {
 
   onTrade(cb: (t: Trade) => void): Unsubscribe {
     return this.trades.on(cb);
+  }
+
+  onHistory(cb: (trades: readonly Trade[]) => void): Unsubscribe {
+    return this.histories.on(cb);
   }
 
   onLiquidation(cb: (l: Liquidation) => void): Unsubscribe {

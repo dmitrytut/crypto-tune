@@ -35,8 +35,8 @@ export type Unsubscribe = () => void;
 /**
  * Exchange-agnostic market data source. The Binance adapter and the simulator
  * implement this so metrics and audio never know the origin.
- * A source may first emit recent history (events with `ts` in the past) so
- * metrics start warm; trades always arrive in `ts` order, history before live.
+ * Live trades flow from the first one, in `ts` order. Recent history arrives
+ * separately, once, so the view never waits for it.
  */
 export interface MarketFeed {
   /** Human-readable source label, e.g. `Binance BTCUSDT`. */
@@ -52,6 +52,11 @@ export interface MarketFeed {
    */
   now(): number;
   onTrade(cb: (t: Trade) => void): Unsubscribe;
+  /**
+   * Once per connect: trades older than the first live one, in `ts` order, so metrics can be
+   * rebuilt warm. Empty when there is no history (failure, timeout). Never after disconnect().
+   */
+  onHistory(cb: (trades: readonly Trade[]) => void): Unsubscribe;
   onLiquidation(cb: (l: Liquidation) => void): Unsubscribe;
   onStatus(cb: (s: FeedStatus) => void): Unsubscribe;
 }

@@ -18,8 +18,8 @@ const METER_ZONES = [
 
 /**
  * The tension meter in index.html (`#tension-*`): a track coloured by tension, threshold marks
- * with zone names, a hint explaining what it measures, and the calibration countdown while
- * tension is still warming up. Mounted once for the page's lifetime.
+ * with zone names, a hint explaining what it measures, and, while tension is still warming up,
+ * either the wait for history or the calibration countdown. Mounted once for the page's lifetime.
  */
 export class TensionMeter {
   private readonly track = el('tension-track');
@@ -75,13 +75,22 @@ export class TensionMeter {
     this.help.body.replaceChildren(intro, zones, tune);
   }
 
-  render(s: Pick<MetricsSnapshot, 'ready' | 'tension' | 'warmup' | 'warmupLeftSec'>): void {
+  render(
+    s: Pick<MetricsSnapshot, 'ready' | 'tension' | 'warmup' | 'warmupLeftSec'>,
+    loadingHistory: boolean,
+  ): void {
     if (s.ready) {
       this.fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
       this.fill.style.backgroundColor = css(tensionColor(s.tension));
       this.value.textContent = '';
       const zone = METER_ZONES.findLast(({ from }) => s.tension >= from) ?? METER_ZONES[0];
       this.setReading(s.tension, `${zone.name}, ${s.tension.toFixed(1)}`);
+    } else if (loadingHistory) {
+      // History is on its way: a warm-up countdown would promise minutes that never come.
+      this.fill.style.width = '0';
+      this.fill.style.backgroundColor = '';
+      this.value.textContent = 'loading recent trades…';
+      this.setReading(0, 'Loading recent trades');
     } else {
       // Tension needs a few minutes of this market's own statistics before it means anything.
       this.fill.style.width = `${Math.floor(s.warmup * 100)}%`;
