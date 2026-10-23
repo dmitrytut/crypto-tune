@@ -36,7 +36,7 @@ export class PriceReadout {
       for (const [i, ch] of [...chars].entries()) {
         const c = document.createElement('span');
         if (ch === ',' || ch === '.') c.className = 'sep';
-        else if (flash && prev[offset + i] !== ch) c.className = up ? 'chg up' : 'chg down';
+        else if (flash && prev[offset + i] !== ch) c.className = up ? 'chg-up' : 'chg-down';
         c.textContent = ch;
         box.append(c);
       }

@@ -1,0 +1,307 @@
+/* Global styles: cascade order, base, the page in index.html and utilities. Each widget keeps its
+ * own stylesheet in components/<name>/<name>.css, inside @layer components.
+ * app.ts imports this file before any component, so this statement fixes the layer order:
+ * later layers win regardless of selector specificity. */
+@layer base, page, components, utilities;
+
+@import "@fontsource-variable/onest";
+@import "./tokens.css";
+
+@layer base {
+  :root {
+    font-family: var(--font-sans);
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Fallback when WebGL is unavailable; the aura canvas covers it otherwise. */
+  body {
+    background: var(--bg);
+
+    /* Film grain over everything: kills gradient banding and gives the glow a printed texture. */
+    &::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-grain);
+      pointer-events: none;
+      opacity: 0.09;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+  }
+
+  /* Controls speak the page font; each one sets its own size, colour and box. */
+  :where(button, input) {
+    font: inherit;
+  }
+
+  /* One focus ring for every keyboard stop. A control that shows focus its own way sets
+   * `outline: none` and draws it (picker search: border; segmented: its label). */
+  :where(button, input, summary, [tabindex]):focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
+
+  /* Stroke icons (Lucide). */
+  .icon {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+@layer page {
+  .layer {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .stage {
+    position: relative;
+    z-index: var(--z-stage);
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 20px var(--gutter) 16px;
+  }
+
+  /* ── immersive mode: chrome fades, price and chart stay ── */
+  /* Before every .fades element's own rules: a component that sets its own transition list
+   * includes opacity in it (see .play). */
+  .fades {
+    transition: opacity var(--duration-fade) ease;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+  body.idle {
+    cursor: none;
+
+    & .fades {
+      opacity: 0;
+    }
+  }
+
+  /* ── top bar ── */
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .top-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+  .status {
+    font-size: var(--font-size-sm);
+    color: var(--muted);
+
+    &::before {
+      content: "● ";
+    }
+    &[data-state="open"]::before {
+      color: var(--up);
+    }
+    &[data-state="connecting"]::before,
+    &[data-state="reconnecting"]::before {
+      color: var(--warn);
+    }
+    &[data-state="error"]::before {
+      color: var(--down);
+    }
+  }
+  .icon-btn {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+
+    & svg {
+      width: 20px;
+      height: 20px;
+    }
+    &:hover {
+      background: var(--surface-strong);
+    }
+  }
+
+  /* ── hero ── */
+  .hero {
+    position: relative;
+    align-self: center;
+    justify-self: center;
+    width: min(560px, 100%);
+    display: grid;
+    justify-items: center;
+    gap: var(--space-xl);
+    /* Particles start here; keep it above the chart. */
+    grid-row: 2;
+
+    /* Soft dark pool behind the readout: the aura can blaze without swallowing the numbers. */
+    &::before {
+      content: "";
+      position: absolute;
+      inset: -12% -22%;
+      z-index: -1;
+      pointer-events: none;
+      background: radial-gradient(
+        closest-side,
+        rgb(0 0 0 / 0.5),
+        rgb(0 0 0 / 0.28) 55%,
+        transparent
+      );
+    }
+  }
+  .change {
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-shadow: var(--text-shadow-legible);
+  }
+  .info {
+    font-size: var(--font-size-md);
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-sm);
+    font-variant-numeric: tabular-nums;
+    text-shadow: var(--text-shadow-legible);
+
+    /* An old event fades out together with its separator, then the view clears it. */
+    & .dot {
+      transition: opacity 1s ease;
+    }
+    &:has(#last-event.faded) .dot {
+      opacity: 0;
+    }
+    &:has(#last-event:empty) .dot {
+      display: none;
+    }
+  }
+  #last-event {
+    transition: opacity 1s ease;
+
+    &.faded {
+      opacity: 0;
+    }
+  }
+
+  .play {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-md);
+    height: 56px;
+    margin-top: var(--space-xs);
+    padding: 0 28px 0 22px;
+    border-radius: var(--radius-pill);
+    border: none;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    cursor: pointer;
+    /* Opacity too: the button is .fades chrome, and this list replaces that transition. */
+    transition:
+      opacity var(--duration-fade) ease,
+      transform var(--duration-fast),
+      background-color 0.3s;
+
+    & svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+    & .icon-stop {
+      display: none;
+    }
+    &:hover {
+      transform: scale(1.03);
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: progress;
+    }
+    /* While playing, the button breathes slowly: a quiet "on air" sign. */
+    &[data-state="running"] {
+      background: var(--surface-strong);
+      color: var(--text);
+      box-shadow: 0 0 0 0 rgb(255 255 255 / 0.25);
+      animation: breathe 4s ease-in-out infinite;
+
+      & .icon-play {
+        display: none;
+      }
+      & .icon-stop {
+        display: block;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+
+      /* Nested so it outranks &[data-state="running"]. */
+      &,
+      &[data-state="running"] {
+        animation: none;
+      }
+    }
+  }
+  @keyframes breathe {
+    50% {
+      box-shadow: 0 0 0 14px rgb(255 255 255 / 0);
+    }
+  }
+
+  .chart {
+    grid-row: 3;
+    width: 100%;
+    height: 150px;
+  }
+}
+
+@layer utilities {
+  /* Side colours: text that names a buy/up or sell/down move. */
+  .up {
+    color: var(--up);
+  }
+  .down {
+    color: var(--down);
+  }
+
+  /* Visually hidden but still focusable and in the accessibility tree. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

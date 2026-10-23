@@ -46,10 +46,12 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   with `start(0)` (or tick strings like `` `${n}i` ``) and let transport start/stop drive them;
   never pass `Tone.now()`. `transport.nextSubdivision` returns context time: convert with
   `getTicksAtTime` before scheduling on the transport.
-- `src/ui/` — DOM view; `index.html` holds the static markup, `styles.css` the global tokens and page
-  layout. `app.ts` (composes the view: readouts, immersive mode, tab title; implements
-  `AppView`), `components/` (self-contained DOM widgets, one folder each: `<name>/<name>.ts`, its
-  `<name>.css` imported by the `.ts`, specs in `<name>/__specs__/`; `picker/` one dropdown for every
+- `src/ui/` — DOM view; `index.html` holds the static markup, `styles/` the global stylesheets
+  (`tokens.css` design tokens; `styles.css` cascade layer order, base, page layout and utilities,
+  imports the tokens). `app.ts` (composes the view: readouts, immersive mode, tab title;
+  implements `AppView`), `components/` (self-contained DOM widgets, one folder each:
+  `<name>/<name>.ts`, its `<name>.css` imported by the `.ts`, specs in `<name>/__specs__/`;
+  `picker/` one dropdown for every
   list, pair and tonic; `hint/` label with a tip; `meter/` tension meter with zones and its hint;
   `price-readout/` fixed-decimal price with per-digit flash; `settings-panel/` settings
   `<dialog>`; `chart-tip/` tooltip for chart event markers, hit-tested by `Chart.markerAt`),
@@ -101,6 +103,19 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
   - Magic numbers: name a value when its meaning is not obvious at the use site or it appears
     twice; model coefficients belong in the params object. Self-evident literals (`1000` ms/s, `0.5`
     in a jitter formula) stay inline. Put units in the name or doc (`_MS`, `_SEC`, `Usd`).
+- **Styles: native CSS, tokens and cascade layers.** No preprocessor, no utility framework.
+  - Order is `@layer base, page, components, utilities`, declared first in `styles/styles.css`,
+    which `app.ts` imports before any component. Each `components/<name>/<name>.css` wraps its
+    rules in `@layer components` and nests with `&`. A later layer wins regardless of specificity.
+  - Colours, font family and sizes, spacing, radii, borders, shadows, focus ring, durations and
+    z-index come from `styles/tokens.css`. A token is a value two or more rules share or a step of
+    a scale; a value one rule uses stays a literal there, commented when not self-evident. Side
+    colours are the exception: `--up`/`--down` are set at mount from `palette.ts`.
+  - One focus ring for every control (`base`). A control that shows focus its own way sets
+    `outline: none` and draws it (picker search: border; segmented: its label).
+  - `.up`/`.down`/`.visually-hidden` are utilities and beat component rules: never reuse those
+    class names for component state (price digits flash with `chg-up`/`chg-down`).
+  - Canvas text takes the font from the canvas's computed style, never a duplicated font string.
 
 ## Conventions
 

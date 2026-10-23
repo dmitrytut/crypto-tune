@@ -1,0 +1,75 @@
+/* Design tokens: the one place for colour, type, spacing, shape, elevation, motion and stacking.
+ * A token is a value two or more rules share, or a step of a scale; a value one rule uses stays a
+ * literal in that rule. --up and --down are not here: app.ts sets them at mount from palette.ts
+ * (UP_COLOR / DOWN_COLOR), the one source of side colours. */
+:root {
+  /* ── palette ── */
+  --bg: #08090b;
+  /* Opaque control surfaces, one tone step apart: no glass, no blur. */
+  --surface: #16171b;
+  --surface-strong: #23252b;
+  /* Menus, tips and the dialog: a shade under the controls they hold. */
+  --surface-overlay: #141519;
+  --text: #f2f3f5;
+  --muted: color-mix(in srgb, var(--text) 66%, transparent);
+  --line: rgb(255 255 255 / 0.14);
+  /* Hover, open and focus edges. */
+  --line-strong: rgb(255 255 255 / 0.36);
+  /* The accent belongs to the one action: the Listen button. */
+  --accent: #f4ec5a;
+  --on-accent: #111;
+  --warn: #e0af68;
+  /* Dark veil: dialog backdrop, menu shadow, meter notches. */
+  --scrim: rgb(0 0 0 / 0.45);
+
+  /* ── typography ── */
+  --font-sans: "Onest Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 15px;
+  --font-size-xl: 17px;
+  --font-size-2xl: 18px;
+  /* Bold short labels (pair chip, change) breathe a little. */
+  --tracking-label: 0.01em;
+
+  /* ── spacing ── */
+  --space-xs: 6px;
+  --space-sm: 8px;
+  --space-md: 10px;
+  --space-lg: 12px;
+  --space-xl: 14px;
+  /* Side margin of the page; floating panels keep it to the window edge. */
+  --gutter: 24px;
+
+  /* ── shape ── */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+  --border: 1px solid var(--line);
+
+  /* ── elevation ── */
+  --shadow-pop: 0 10px 30px var(--scrim);
+  /* Keeps small text readable over a bright aura. */
+  --text-shadow-legible: 0 1px 12px rgb(0 0 0 / 0.7);
+
+  /* ── focus ── */
+  --focus-ring: 2px solid var(--text);
+  --focus-offset: 3px;
+
+  /* ── motion ── */
+  --duration-fast: 0.15s;
+  /* Immersive mode: chrome fades out and back. */
+  --duration-fade: 1.2s;
+
+  /* ── stacking ── */
+  /* Page level: the stage sits under the film grain. */
+  --z-stage: 1;
+  --z-grain: 2;
+  /* Inside the stage: the tension hint, then menus, then the chart tooltip on top. */
+  --z-hint: 3;
+  --z-menu: 4;
+  --z-tooltip: 5;
+}
