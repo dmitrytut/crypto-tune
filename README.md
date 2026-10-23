@@ -189,12 +189,14 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 
 ### Accessibility
 
-Audited for WCAG 2.2 AA: Lighthouse and axe-core, plus keyboard, zoom, hover and contrast checks
-over the live aura that the tools cannot do. What that changed:
+Audited for WCAG 2.2 AA: Lighthouse and axe-core, keyboard, zoom, hover and contrast checks over the
+live aura that the tools cannot do, then a control-by-control review of names, keyboard, focus,
+ARIA and motion. What that changed:
 - Screen readers get the tension meter as a `meter` with its zone in words (`Tense, 2.4`), settings
   sliders with their value and unit (`-6 dB`, `$20K`), and hear the connection status and an empty
   pair search as they change.
-- ⓘ tips stay open while the pointer moves from the button onto the tip.
+- ⓘ tips stay open while the pointer moves from the button onto the tip; Esc closes them and the
+  chart marker tip alike.
 - The dark pool under the readout keeps the sell colour at 4.5:1 or better over a bright aura.
 - A short window or a zoomed page (up to 400%) scrolls instead of cutting off the controls.
 
@@ -257,7 +259,8 @@ sound, and Binance covers the pairs that matter.
    slider reads `$22K`, not `4.35`; `Period` and `Source` headings are read once, without
    `About …`.
 3. Typing `zzzz` in the pair search announces `No such pair on Binance Futures`.
-4. Hover an ⓘ and move onto its tip: it stays open; leave it and it closes.
+4. Hover an ⓘ and move onto its tip: it stays open; leave it and it closes. Hover a chart marker
+   and press Esc: its tip hides.
 5. Tab to ⚙ and wait 10 s: the top bar stays while it has focus, the rest fades.
 6. Zoom to 400% (or a 320×256 window): the page scrolls down to Listen and the chart.
 
