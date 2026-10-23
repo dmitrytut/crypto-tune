@@ -313,6 +313,15 @@ body::after {
   opacity: 0.55;
   margin-left: 0.04em;
 }
+/* An old event fades out together with its separator, then the view clears it. */
+#last-event,
+.info .dot {
+  transition: opacity 1s ease;
+}
+#last-event.faded,
+.info:has(#last-event.faded) .dot {
+  opacity: 0;
+}
 .info:has(#last-event:empty) .dot {
   display: none;
 }

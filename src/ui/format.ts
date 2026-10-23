@@ -33,12 +33,12 @@ export function clock(seconds: number): string {
 }
 
 /**
- * Compact USD, e.g. $766.3K.
+ * Compact USD to three significant digits, e.g. $221K, $5.5M, $1.23M.
  * @package
  */
 export const usdFmt = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
   notation: 'compact',
-  maximumFractionDigits: 1,
+  maximumSignificantDigits: 3,
 });

@@ -30,6 +30,8 @@ const VISUAL_MAX_AGE_MS = 2_000;
 const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
 /** The volume readout is USD traded over about this long (whole 10 s buckets). */
 const VOLUME_SPAN_MS = 60_000;
+/** The last big trade or liquidation stays readable this long, then fades out. */
+const EVENT_SHOW_MS = 60_000;
 
 export interface AppHandlers {
   /** Called with the full updated settings after any control change. */
@@ -171,6 +173,29 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   el('debug').hidden = !new URLSearchParams(location.search).has('debug');
   const vol = el('vol');
   const lastEvent = el('last-event');
+  // Last big event and when it arrived (wall clock: the "ago" is for the listener's eyes).
+  let shownEvent: { text: string; at: number } | null = null;
+  const clearEvent = () => {
+    shownEvent = null;
+    lastEvent.textContent = '';
+    lastEvent.className = '';
+  };
+  /** Writes "SELL $221K (12s ago)", or fades the readout out once it is old. */
+  const paintEvent = () => {
+    if (!shownEvent || lastEvent.classList.contains('faded')) return;
+    const ageMs = Date.now() - shownEvent.at;
+    if (ageMs >= EVENT_SHOW_MS) {
+      // The text is cleared when the fade ends; without motion there is no fade to wait for.
+      if (reducedMotion.matches) clearEvent();
+      else lastEvent.classList.add('faded');
+      return;
+    }
+    const age = Math.floor(ageMs / 1000);
+    lastEvent.textContent = `${shownEvent.text} (${age > 0 ? `${age}s ago` : 'just now'})`;
+  };
+  lastEvent.addEventListener('transitionend', () => {
+    if (lastEvent.classList.contains('faded')) clearEvent();
+  });
   const audioToggle = el<HTMLButtonElement>('audio-toggle');
   const pair = mountPicker(el('pair'), {
     label: 'Pair',
@@ -274,8 +299,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       }
       if (history) {
         const usd = history.volumeUsdSince(s.ts - VOLUME_SPAN_MS);
-        vol.textContent = `${usdFmt.format(usd)} traded per min`;
+        vol.textContent = `vol ${usdFmt.format(usd)}/m`;
       }
+      paintEvent();
       if (s.ready) {
         fill.style.width = `${Math.min(100, (s.tension / METER_MAX) * 100)}%`;
         fill.style.backgroundColor = css(tensionColor(s.tension));
@@ -307,9 +333,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       vol.textContent = '—';
       tensionValue.textContent = '';
       for (const node of Object.values(debug)) node.textContent = '—';
-      lastEvent.textContent = '';
       change.textContent = '\u00a0';
-      lastEvent.className = '';
+      clearEvent();
       fill.style.width = '0';
       fill.style.backgroundColor = '';
       fx.clear();
@@ -334,8 +359,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       chartDirty = true;
       const what = e.kind === 'liquidation' ? `LIQ ${e.side.toUpperCase()}` : e.side.toUpperCase();
       const times = e.count > 1 ? ` ×${e.count}` : '';
-      lastEvent.textContent = `${what} ${usdFmt.format(e.usd)}${times}`;
+      shownEvent = { text: `${what} ${usdFmt.format(e.usd)}${times}`, at: Date.now() };
       lastEvent.className = isDown(e.side) ? 'down' : 'up';
+      paintEvent();
     },
     trade(t) {
       if (!fresh(t.ts)) return;
