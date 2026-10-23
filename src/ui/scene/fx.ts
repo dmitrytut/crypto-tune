@@ -14,7 +14,10 @@ const FADE_IN_SEC = 0.35;
 const FADE_OUT_SHARE = 0.4;
 const RING_SEC = 1.8;
 const SHARD_SEC = 1.1;
-const LABEL_SEC = 2.4;
+const TRADE_LABEL_SEC = 2.4;
+/** Liquidation labels stay at full opacity for the hold, then fade out over the rest. */
+const LIQ_LABEL_SEC = 5;
+const LIQ_LABEL_HOLD_SEC = 1.5;
 
 /**
  * Side effects outside the overlay: the aura reacts where the event happened.
@@ -65,6 +68,10 @@ interface Label {
   text: string;
   color: Rgb;
   size: number;
+  /** Total lifetime, s. */
+  life: number;
+  /** Time at full opacity before the fade starts, s. */
+  hold: number;
 }
 
 /** A sprite square filled with a radial gradient through `stops` (offset, CSS colour). */
@@ -186,6 +193,8 @@ export class Fx {
       text: `LIQUIDATION ${side.toUpperCase()} ${usdFmt.format(usd)}`,
       color,
       size: 15,
+      life: LIQ_LABEL_SEC,
+      hold: LIQ_LABEL_HOLD_SEC,
     });
     this.hooks.shock(x, y, Math.min(1, 0.55 + 0.25 * above));
     if (above >= 1) this.hooks.shake(Math.min(1, above / 2));
@@ -241,6 +250,8 @@ export class Fx {
           text: `${sign}${usdFmt.format(s.usd)}`,
           color,
           size: 13,
+          life: TRADE_LABEL_SEC,
+          hold: 0,
         });
         this.hooks.bloom(b.x, b.y, color, 0.45 + 0.25 * Math.log10(s.usd / bigTradeUsd + 1));
       }
@@ -328,9 +339,10 @@ export class Fx {
     ctx.textAlign = 'center';
     for (const l of this.labels) {
       l.age += dt;
-      if (l.age >= LABEL_SEC) continue;
-      const t = l.age / LABEL_SEC;
-      ctx.globalAlpha = Math.min(1, l.age / 0.15) * (1 - t) ** 1.5;
+      if (l.age >= l.life) continue;
+      const t = l.age / l.life;
+      const fade = l.age < l.hold ? 1 : 1 - (l.age - l.hold) / (l.life - l.hold);
+      ctx.globalAlpha = Math.min(1, l.age / 0.15) * fade ** 1.5;
       ctx.font = `700 ${l.size}px ${this.fontFamily}`;
       // Side-coloured text over a neutral dark scrim: readable on any aura, no glow.
       ctx.fillStyle = css(l.color, 1);
