@@ -54,8 +54,10 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `picker/` one dropdown for every
   list, pair and tonic; `hint/` ⓘ label with a tip in the top layer (popover), one open at a time;
   `meter/` tension meter with zones and its hint; `price-readout/` fixed-decimal price with
-  per-digit flash; `settings-panel/` settings `<dialog>`, a hint per setting from its `HELP`
-  texts; `chart-tip/` tooltip for chart event markers, hit-tested by `Chart.markerAt`),
+  per-digit flash; `modal/` the `<dialog>` shell and open/close for every modal; `settings-panel/`
+  settings modal, a hint per setting from its `HELP` texts; `about/` About modal, static text in
+  `index.html` so crawlers without JS read it; `chart-tip/` tooltip for chart event markers,
+  hit-tested by `Chart.markerAt`),
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
   trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).

@@ -213,7 +213,8 @@ path. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow.
 `public/og.jpg` (1200×630). `index.html` also carries the canonical URL and `WebApplication`
 structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-code
 `https://crypto-tune.com/`; update them if the site moves. The description appears
-three times (meta, Open Graph, JSON-LD): keep them identical.
+three times (meta, Open Graph, JSON-LD): keep them identical. The About dialog (the ? button next to
+the gear) is static HTML on purpose: AI crawlers that skip JavaScript read what the app does from it.
 
 **Analytics.** Cloudflare Web Analytics (cookieless, no consent banner): the beacon at the end of
 `index.html`. Visits, referrers, countries and Core Web Vitals are in the Cloudflare dashboard →

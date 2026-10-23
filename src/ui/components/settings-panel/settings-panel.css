@@ -1,21 +1,6 @@
-/* Settings dialog (settings-panel.ts). */
+/* Settings dialog (settings-panel.ts); the dialog shell is .modal (modal.css). */
 @layer components {
   .settings {
-    width: min(440px, calc(100% - 32px));
-    max-height: calc(100% - 48px);
-    padding: 0;
-    border: var(--border);
-    border-radius: var(--radius-xl);
-    background: var(--surface-overlay);
-    color: var(--text);
-
-    &::backdrop {
-      background: var(--scrim);
-    }
-    & h2 {
-      font-size: var(--font-size-2xl);
-      margin: 0;
-    }
     & h3 {
       font-size: var(--font-size-md);
       font-weight: 600;
@@ -28,16 +13,6 @@
       align-items: center;
       gap: var(--space-xs);
     }
-  }
-  .settings-body {
-    display: grid;
-    gap: var(--space-lg);
-    padding: 18px 22px 22px;
-  }
-  .settings-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
   }
 
   .field {

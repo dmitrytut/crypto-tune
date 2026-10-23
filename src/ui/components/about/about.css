@@ -1,0 +1,21 @@
+/* About dialog (about.ts): static text in index.html. */
+@layer components {
+  .about {
+    & p {
+      margin: 0;
+      font-size: var(--font-size-md);
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    & a {
+      color: var(--text);
+      text-underline-offset: 3px;
+
+      &:focus-visible {
+        outline: var(--focus-ring);
+        outline-offset: var(--focus-offset);
+        border-radius: 2px;
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@ import type { EventCue } from '../metrics/events';
 import type { HistorySeries } from '../metrics/history';
 import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
+import { mountAbout } from './components/about/about';
 import { mountChartTip } from './components/chart-tip/chart-tip';
 import { isHintOpen } from './components/hint/hint';
 import { TensionMeter } from './components/meter/meter';
@@ -93,6 +94,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     handlers.onSettings(settings);
   };
   const panel = mountSettingsPanel(initial, update);
+  const about = mountAbout();
   // CSS reads the side colours from the palette, so text and canvas never drift apart.
   document.documentElement.style.setProperty('--up', css(UP_COLOR));
   document.documentElement.style.setProperty('--down', css(DOWN_COLOR));
@@ -179,7 +181,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => {
       // Never fade the chrome out from under an open dialog or a tip someone is reading.
-      if (!panel.isOpen() && !isHintOpen()) document.body.classList.add('idle');
+      if (!panel.isOpen() && !about.isOpen() && !isHintOpen()) document.body.classList.add('idle');
     }, IDLE_MS);
   };
   for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const) {

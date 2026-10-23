@@ -1,0 +1,30 @@
+/* Modal dialog shell (modal.ts): Settings and About. */
+@layer components {
+  .modal {
+    width: min(440px, calc(100% - 32px));
+    max-height: calc(100% - 48px);
+    padding: 0;
+    border: var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--surface-overlay);
+    color: var(--text);
+
+    &::backdrop {
+      background: var(--scrim);
+    }
+    & h2 {
+      font-size: var(--font-size-2xl);
+      margin: 0;
+    }
+  }
+  .modal-body {
+    display: grid;
+    gap: var(--space-lg);
+    padding: 18px 22px 22px;
+  }
+  .modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
