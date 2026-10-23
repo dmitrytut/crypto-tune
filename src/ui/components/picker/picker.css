@@ -31,6 +31,10 @@
     color: var(--muted);
     transition: rotate var(--duration-fast);
 
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+
     .picker-btn[aria-expanded="true"] & {
       rotate: 180deg;
     }
