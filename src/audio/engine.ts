@@ -65,6 +65,10 @@ export class AudioEngine {
     try {
       await Tone.start();
       const g = this.graph ?? (await this.build());
+      // shortcut: a failed reverb impulse is not retried; every later start rejects here until
+      // a reload. Tone keeps the rejected `ready` (a new generate() awaits it first) and the
+      // layers have no dispose, so a rebuild would double the transport loops. An offline
+      // render failing is very unlikely; a real report would justify a disposable graph.
       await g.mixer.ready;
       // A restart before the last stop's teardown would be undone by it: Tone ignores
       // transport.start while the pending stop still reads "started", then stops.
