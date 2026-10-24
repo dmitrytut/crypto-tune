@@ -21,6 +21,7 @@ import { mountSettingsPanel } from './components/settings-panel/settings-panel';
 import { el } from './dom';
 import { FlowMeter } from './flow';
 import { durationLabel, eventLabel, usdFmt } from './format';
+import { mountMediaKeys } from './media-session';
 import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, UP_COLOR } from './palette';
 import { mountStage } from './scene/stage';
 
@@ -150,11 +151,22 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let pairList: readonly string[] = [];
 
   audioToggle.addEventListener('click', () => handlers.onToggleAudio());
+  let playback: PlaybackView = 'stopped';
+  // Media keys and the OS controls act like the button, but never toggle the wrong way.
+  const mediaKeys = mountMediaKeys({
+    play: () => {
+      if (playback === 'stopped') handlers.onToggleAudio();
+    },
+    pause: () => {
+      if (playback === 'running') handlers.onToggleAudio();
+    },
+  });
 
   const syncPair = () => {
     const live = settings.source === 'live';
     if (live) pair.set(settings.symbol);
     else pair.disable('Simulator');
+    mediaKeys.setTitle(live ? settings.symbol : 'Simulator');
   };
   syncPair();
 
@@ -265,10 +277,13 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       if (!last && s.state === 'open') vol.textContent = 'Waiting for trades…';
     },
     setPlayback(state) {
+      playback = state;
       audioToggle.dataset.state = state;
       audioToggle.disabled = state === 'starting';
       audioLabel.textContent =
         state === 'running' ? 'Stop' : state === 'starting' ? 'Starting…' : 'Listen';
+      if (state === 'starting') mediaKeys.play();
+      if (state === 'stopped') mediaKeys.pause();
     },
     showEvent(e) {
       chartDirty = true;

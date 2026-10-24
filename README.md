@@ -60,7 +60,8 @@ looked at the chart.
 ## Quick start
 
 Open **<https://crypto-tune.com/>** and press **Listen**. Browsers only start audio
-after a click.
+after a click. After that the play/pause media key, a headset button and the system media
+controls (macOS Now Playing, the lock screen on phones) stop and resume it, from any tab or app.
 
 To run it locally:
 
@@ -250,12 +251,21 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Accessibility**: WCAG 2.2 AA pass (names and values, live regions, hover tips, reflow)
 - [x] **Live-first loading**: the live market at once, history in the background
 - [x] **Responsiveness**: Listen and the pair list stay quick on slow phones, stylesheet inlined
+- [x] **Media keys**: play/pause from the keyboard, headset and system media controls
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Media keys
+
+1. `pnpm dev`, press **Listen**, switch to another tab or app: the play/pause key (F8 on a Mac)
+   stops the music with its fade, pressing it again resumes; the button follows.
+2. macOS Control Centre → Now Playing shows the pair as the title, `Crypto Tune` and the logo;
+   its button does the same. Change the pair: the title follows.
+3. Before the first **Listen** the keys do nothing here: browsers start audio only after a click.
 
 ### Responsiveness
 
