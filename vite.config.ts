@@ -25,12 +25,13 @@ function inlineCss(): Plugin {
         const href = `\\./${name.replaceAll('.', '\\.')}`;
         const link = new RegExp(`<link rel="stylesheet"[^>]*href="${href}"[^>]*>`);
         const source = String(file.source);
-        // Only `./file` references can be rebased; a bundled file (font) the CSS names any
-        // other way would break once the CSS moves into the page.
-        const unrebasable = Object.keys(bundle).some((other) => {
-          const base = other.slice(other.lastIndexOf('/') + 1);
-          return source.includes(base) && !source.includes(`./${base}`);
-        });
+        // Only `url(./file)` can be rebased. A bundled file (font) the CSS still names once
+        // those are taken out is referenced another way (`file`, `../file`) and would break
+        // once the CSS moves into the page.
+        const rest = source.replace(/url\(['"]?\.\/[^'")]*/g, '');
+        const unrebasable = Object.keys(bundle).some((other) =>
+          rest.includes(other.slice(other.lastIndexOf('/') + 1)),
+        );
         if (!link.test(page) || unrebasable) {
           this.warn(`${name} left as a file: no matching <link> or a url() it cannot rebase`);
           continue;
