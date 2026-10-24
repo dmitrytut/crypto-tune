@@ -101,9 +101,10 @@
       font-weight: 500;
       cursor: pointer;
       /* Hundreds of pairs: only rows in view get laid out and shaped, so the first open is
-       * not one long task. 34px is one row (padding plus a line of text). */
+       * not one long task. A row not laid out yet keeps its padding around one line of text
+       * (the intrinsic size is the content box), so the scroll height matches. */
       content-visibility: auto;
-      contain-intrinsic-size: auto 34px;
+      contain-intrinsic-block-size: auto 1lh;
     }
     & [data-active] {
       background: var(--surface-strong);
