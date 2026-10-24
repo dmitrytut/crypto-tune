@@ -125,13 +125,6 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     row.textContent = value;
     return row;
   };
-  const markSelected = () => {
-    selected?.setAttribute('aria-selected', 'false');
-    // A typed value outside the list has a row made for it on the spot.
-    selected =
-      rows.get(current) ?? [...list.children].find((r) => r.textContent === current) ?? null;
-    selected?.setAttribute('aria-selected', 'true');
-  };
 
   const highlight = (i: number) => {
     list.children[active]?.removeAttribute('data-active');
@@ -158,11 +151,14 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
       list.replaceChildren(...shown.map((v) => rows.get(v) ?? makeRow(v)));
       listFull = !query;
     }
-    markSelected();
+    // The rows are `shown` in order, so the current value's row is at its index.
+    const at = shown.indexOf(current);
+    selected?.setAttribute('aria-selected', 'false');
+    selected = list.children[at] ?? null;
+    selected?.setAttribute('aria-selected', 'true');
     empty.textContent = shown.length > 0 ? '' : (cfg.search?.empty ?? '');
     active = -1;
-    const at = onCurrent ? shown.indexOf(current) : -1;
-    highlight(at >= 0 ? at : shown.length > 0 ? 0 : -1);
+    highlight(onCurrent && at >= 0 ? at : shown.length > 0 ? 0 : -1);
   };
 
   const close = (refocus: boolean) => {
