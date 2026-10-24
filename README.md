@@ -245,8 +245,7 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Stage 5**: visuals (aura, particles, chart, settings dialog)
 - [x] **Design cleanup** (per taste-skill): title and labels, a text button, no glass/glow/neon
 - [x] **Publishing**: GitHub Pages via Actions, logo and favicon
-- [x] **Accessibility**: WCAG 2.2 AA pass (names and values, live regions, hover tips, contrast,
-  reflow)
+- [x] **Accessibility**: WCAG 2.2 AA pass (names and values, live regions, hover tips, reflow)
 - [x] **Live-first loading**: the live market at once, history in the background
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
