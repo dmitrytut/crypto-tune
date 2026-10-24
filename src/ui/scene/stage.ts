@@ -16,7 +16,7 @@ export interface StageOptions {
   onFrame(): void;
 }
 
-/** The visual layers: WebGL aura (null without WebGL), event overlay and history chart. */
+/** The visual layers: WebGL aura (null without hardware WebGL), event overlay and history chart. */
 export interface Stage {
   aura: Aura | null;
   fx: Fx;

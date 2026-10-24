@@ -132,7 +132,7 @@ type UniformName =
  * Full-screen flowing aura. Targets come from `auraTarget()`; every value
  * glides toward its target so a jumpy market never makes the background jump.
  * Events land as shocks (liquidations) and blooms (large trades) at their
- * screen positions. `create` returns null without WebGL (the CSS gradient stays).
+ * screen positions. `create` returns null without hardware WebGL (the CSS gradient stays).
  * @package
  */
 export class Aura {
@@ -177,7 +177,13 @@ export class Aura {
   }
 
   static create(canvas: HTMLCanvasElement, initial: AuraTarget): Aura | null {
-    const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+    // A software renderer (no GPU or a blocklisted one; Chrome falls back to SwiftShader) draws
+    // this shader on the CPU: tens of ms every frame, competing with audio. Plain background then.
+    const gl = canvas.getContext('webgl', {
+      antialias: false,
+      alpha: false,
+      failIfMajorPerformanceCaveat: true,
+    });
     if (!gl) return null;
     const program = link(gl);
     if (!program) return null;

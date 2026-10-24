@@ -63,8 +63,9 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `index.html` so crawlers without JS read it; `chart-tip/` tooltip for chart event markers,
   hit-tested by `Chart.markerAt`),
   `scene/` (`stage.ts` creates the layers and
-  runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
-  trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
+  runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, off on
+  software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation
+  bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
   `media-session.ts`: media keys and OS media controls. Browsers grant them only to a playing
   `<audio>`/`<video>` (Web Audio does not count; Chrome ignores media under 5 s), so a looped
   10 s silent WAV plays while Listen runs; play/pause follow the Listen button state.

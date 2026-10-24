@@ -168,6 +168,8 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   - **tension** (after warm-up): a sustained move tears the field into turbulence and saturates it;
   - a volume spike brightens it, and price above the hourly EMA lifts the glow;
   - at rest: a cool steel blue breathing in time with the drone.
+  - without a hardware GPU (software WebGL such as SwiftShader) the aura is off and the background
+    stays plain: drawn on the CPU it costs tens of ms per frame.
 - **Every buy is a bubble** rising from the chart, **every sell a drop** falling from the top. Buys sit
   slightly right and sells left, as in the stereo mix. Size grows with log notional, from 4 px at $1K
   to 22 px at $1M. Trades above the threshold get a halo, a floating amount (`+$864K`) and a flash in
