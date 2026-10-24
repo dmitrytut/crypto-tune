@@ -65,6 +65,9 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
   trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
+  `media-session.ts`: media keys and OS media controls. Browsers grant them only to a playing
+  `<audio>`/`<video>` (Web Audio does not count; Chrome ignores media under 5 s), so a looped
+  10 s silent WAV plays while Listen runs; play/pause follow the Listen button state.
   Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no warm-up), `palette.ts` (market +
   flow → aura colours/motion; the one source of side and tension colours, CSS included),
   `scene/spawn.ts` (merging, bubble start state). Visuals are wall-clock animation; anything older
