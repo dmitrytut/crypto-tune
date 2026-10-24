@@ -63,8 +63,9 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `index.html` so crawlers without JS read it; `chart-tip/` tooltip for chart event markers,
   hit-tested by `Chart.markerAt`),
   `scene/` (`stage.ts` creates the layers and
-  runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, `fx.ts`
-  trade bubbles/drops and liquidation bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
+  runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, off on
+  software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation
+  bursts, `chart.ts` price/volume strip, `canvas.ts` DPR fit).
   Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no warm-up), `palette.ts` (market +
   flow → aura colours/motion; the one source of side and tension colours, CSS included),
   `scene/spawn.ts` (merging, bubble start state). Visuals are wall-clock animation; anything older
