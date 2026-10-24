@@ -69,11 +69,7 @@ export class AudioEngine {
       // A restart before the last stop's teardown would be undone by it: Tone ignores
       // transport.start while the pending stop still reads "started", then stops.
       const pending = this.stopAt - Tone.now();
-      if (pending > 0) {
-        const { promise, resolve } = Promise.withResolvers<void>();
-        setTimeout(resolve, pending * 1000);
-        await promise;
-      }
+      if (pending > 0) await wait(pending * 1000);
       const transport = Tone.getTransport();
       // Resume at the market's current tempo: update() keeps tracking it while stopped,
       // so restarting mid-move does not drop to calm and jump back on the next tick.
@@ -165,16 +161,17 @@ export class AudioEngine {
    */
   private async build(): Promise<Graph> {
     const p = this.params;
-    await yieldToMain();
+    // Each wait(0) ends the task, so the browser can paint and handle input between steps.
+    await wait(0);
     const mixer = new Mixer();
     const baseChannel = mixer.createChannel(p.baseVolumeDb);
     const tensionChannel = mixer.createChannel(p.tensionVolumeDb);
     const eventsChannel = mixer.createChannel(p.eventsVolumeDb);
-    await yieldToMain();
+    await wait(0);
     const base = new BaseLayer(baseChannel, p.tonicPc);
-    await yieldToMain();
+    await wait(0);
     const ambience = new AmbienceLayer(baseChannel, p.tonicPc);
-    await yieldToMain();
+    await wait(0);
     const tension = new TensionLayer(tensionChannel, p.tonicPc);
     const events = new EventsLayer(eventsChannel, p.tonicPc);
     this.graph = {
@@ -195,9 +192,9 @@ export class AudioEngine {
   }
 }
 
-/** Ends the current task so the browser can paint and handle input before the next step. */
-function yieldToMain(): Promise<void> {
+/** Resolves after `ms` in a new task. */
+function wait(ms: number): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, 0);
+  setTimeout(resolve, ms);
   return promise;
 }
