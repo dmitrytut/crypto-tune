@@ -62,27 +62,33 @@ export class AudioEngine {
   async start(): Promise<void> {
     if (this.state !== 'stopped') return;
     this.state = 'starting';
-    await Tone.start();
-    const g = this.graph ?? (await this.build());
-    await g.mixer.ready;
-    // A restart before the last stop's teardown would be undone by it: Tone ignores
-    // transport.start while the pending stop still reads "started", then stops.
-    const pending = this.stopAt - Tone.now();
-    if (pending > 0) {
-      const { promise, resolve } = Promise.withResolvers<void>();
-      setTimeout(resolve, pending * 1000);
-      await promise;
+    try {
+      await Tone.start();
+      const g = this.graph ?? (await this.build());
+      await g.mixer.ready;
+      // A restart before the last stop's teardown would be undone by it: Tone ignores
+      // transport.start while the pending stop still reads "started", then stops.
+      const pending = this.stopAt - Tone.now();
+      if (pending > 0) {
+        const { promise, resolve } = Promise.withResolvers<void>();
+        setTimeout(resolve, pending * 1000);
+        await promise;
+      }
+      const transport = Tone.getTransport();
+      // Resume at the market's current tempo: update() keeps tracking it while stopped,
+      // so restarting mid-move does not drop to calm and jump back on the next tick.
+      transport.bpm.value = this.bpm;
+      const t = Tone.now() + LOOKAHEAD_SEC;
+      g.base.start(t);
+      g.tension.start(t);
+      transport.start(t);
+      g.mixer.fadeMaster(MASTER_DB, FADE_IN_SEC);
+      this.state = 'running';
+    } catch (err) {
+      // Left "starting", every later press would return at once and report a silent start.
+      this.state = 'stopped';
+      throw err;
     }
-    const transport = Tone.getTransport();
-    // Resume at the market's current tempo: update() keeps tracking it while stopped,
-    // so restarting mid-move does not drop to calm and jump back on the next tick.
-    transport.bpm.value = this.bpm;
-    const t = Tone.now() + LOOKAHEAD_SEC;
-    g.base.start(t);
-    g.tension.start(t);
-    transport.start(t);
-    g.mixer.fadeMaster(MASTER_DB, FADE_IN_SEC);
-    this.state = 'running';
   }
 
   stop(): void {
