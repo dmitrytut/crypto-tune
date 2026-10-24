@@ -201,7 +201,6 @@ ARIA and motion. What that changed:
   pair search as they change.
 - ⓘ tips stay open while the pointer moves from the button onto the tip; Esc closes them and the
   chart marker tip alike.
-- The dark pool under the readout keeps the sell colour at 4.5:1 or better over a bright aura.
 - A short window or a zoomed page (up to 400%) scrolls instead of cutting off the controls.
 
 ## Development
