@@ -63,7 +63,7 @@ export class AudioEngine {
     if (this.state !== 'stopped') return;
     this.state = 'starting';
     await Tone.start();
-    const g = this.graph ?? this.build();
+    const g = this.graph ?? (await this.build());
     await g.mixer.ready;
     // A restart before the last stop's teardown would be undone by it: Tone ignores
     // transport.start while the pending stop still reads "started", then stops.
@@ -151,21 +151,47 @@ export class AudioEngine {
     }
   }
 
-  private build(): Graph {
+  /**
+   * Builds the graph a layer per task: built in one go it is a single long task right after
+   * the Listen press (~150 ms at 4× CPU throttling), which delays the paint of "Starting…".
+   * Every layer is built with the params as they were when the build began; a change made
+   * meanwhile is applied once the graph exists.
+   */
+  private async build(): Promise<Graph> {
+    const p = this.params;
+    await yieldToMain();
     const mixer = new Mixer();
-    const baseChannel = mixer.createChannel(this.params.baseVolumeDb);
-    const tensionChannel = mixer.createChannel(this.params.tensionVolumeDb);
-    const eventsChannel = mixer.createChannel(this.params.eventsVolumeDb);
+    const baseChannel = mixer.createChannel(p.baseVolumeDb);
+    const tensionChannel = mixer.createChannel(p.tensionVolumeDb);
+    const eventsChannel = mixer.createChannel(p.eventsVolumeDb);
+    await yieldToMain();
+    const base = new BaseLayer(baseChannel, p.tonicPc);
+    await yieldToMain();
+    const ambience = new AmbienceLayer(baseChannel, p.tonicPc);
+    await yieldToMain();
+    const tension = new TensionLayer(tensionChannel, p.tonicPc);
+    const events = new EventsLayer(eventsChannel, p.tonicPc);
     this.graph = {
       mixer,
       baseChannel,
       tensionChannel,
       eventsChannel,
-      base: new BaseLayer(baseChannel, this.params.tonicPc),
-      ambience: new AmbienceLayer(baseChannel, this.params.tonicPc),
-      tension: new TensionLayer(tensionChannel, this.params.tonicPc),
-      events: new EventsLayer(eventsChannel, this.params.tonicPc),
+      base,
+      ambience,
+      tension,
+      events,
     };
+    // Settings changed while building: setParams diffs against what the layers were built with.
+    const latest = this.params;
+    this.params = p;
+    this.setParams(latest);
     return this.graph;
   }
+}
+
+/** Ends the current task so the browser can paint and handle input before the next step. */
+function yieldToMain(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, 0);
+  return promise;
 }

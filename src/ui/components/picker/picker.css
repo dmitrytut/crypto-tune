@@ -100,6 +100,10 @@
       font-size: var(--font-size-md);
       font-weight: 500;
       cursor: pointer;
+      /* Hundreds of pairs: only rows in view get laid out and shaped, so the first open is
+       * not one long task. 34px is one row (padding plus a line of text). */
+      content-visibility: auto;
+      contain-intrinsic-size: auto 34px;
     }
     & [data-active] {
       background: var(--surface-strong);
