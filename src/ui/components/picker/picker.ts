@@ -107,9 +107,24 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   const keys: HTMLElement = search ?? list;
 
   let options: readonly string[] = [];
+  /** One row per option, made once per list: opening an unfiltered menu creates nothing. */
+  let rows = new Map<string, HTMLElement>();
+  /** The list holds every option in order, as an empty query shows it. */
+  let listFull = false;
+  let selected: Element | null = null;
   let current = '';
   let shown: string[] = [];
   let active = -1;
+  let nextRow = 0;
+
+  const makeRow = (value: string) => {
+    const row = document.createElement('div');
+    row.id = `${id}-opt-${nextRow++}`;
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', 'false');
+    row.textContent = value;
+    return row;
+  };
 
   const highlight = (i: number) => {
     list.children[active]?.removeAttribute('data-active');
@@ -124,27 +139,26 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     row.scrollIntoView({ block: 'nearest' });
   };
 
-  /** Rebuilds the rows; the highlight lands on the current value or on the best match. */
+  /** Shows the rows matching the query; highlights the current value or the best match. */
   const render = (onCurrent: boolean) => {
+    // Rows outlive a render: drop the old highlight before the list changes under it.
+    list.children[active]?.removeAttribute('data-active');
     const query = search?.value.trim() ?? '';
     shown = matchOptions(options, query);
     const typed = shown.length === 0 && query ? cfg.search?.fallback?.(query) : null;
     if (typed) shown = [typed];
-    list.replaceChildren(
-      ...shown.map((v, i) => {
-        const row = document.createElement('div');
-        row.id = `${id}-opt-${i}`;
-        row.setAttribute('role', 'option');
-        row.setAttribute('aria-selected', String(v === current));
-        row.dataset.index = String(i);
-        row.textContent = v;
-        return row;
-      }),
-    );
+    if (query || !listFull) {
+      list.replaceChildren(...shown.map((v) => rows.get(v) ?? makeRow(v)));
+      listFull = !query;
+    }
+    // The rows are `shown` in order, so the current value's row is at its index.
+    const at = shown.indexOf(current);
+    selected?.setAttribute('aria-selected', 'false');
+    selected = list.children[at] ?? null;
+    selected?.setAttribute('aria-selected', 'true');
     empty.textContent = shown.length > 0 ? '' : (cfg.search?.empty ?? '');
     active = -1;
-    const at = onCurrent ? shown.indexOf(current) : -1;
-    highlight(at >= 0 ? at : shown.length > 0 ? 0 : -1);
+    highlight(onCurrent && at >= 0 ? at : shown.length > 0 ? 0 : -1);
   };
 
   const close = (refocus: boolean) => {
@@ -177,7 +191,7 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   const rowIndex = (e: Event) => {
     const row =
       e.target instanceof Element ? e.target.closest<HTMLElement>('[role="option"]') : null;
-    return row ? Number(row.dataset.index) : -1;
+    return row ? Array.prototype.indexOf.call(list.children, row) : -1;
   };
 
   button.addEventListener('click', () => (menu.hidden ? open() : close(false)));
@@ -218,6 +232,10 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   return {
     setOptions(values) {
       options = values;
+      rows = new Map(values.map((v) => [v, makeRow(v)]));
+      // Built now, usually while the menu is hidden, rather than inside the click that opens it.
+      list.replaceChildren(...rows.values());
+      listFull = true;
       if (!menu.hidden) render(false);
     },
     set: show,

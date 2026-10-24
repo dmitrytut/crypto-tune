@@ -247,12 +247,23 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Publishing**: GitHub Pages via Actions, logo and favicon
 - [x] **Accessibility**: WCAG 2.2 AA pass (names and values, live regions, hover tips, reflow)
 - [x] **Live-first loading**: the live market at once, history in the background
+- [x] **Responsiveness**: Listen and the pair list stay quick on slow phones, stylesheet inlined
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Responsiveness
+
+1. `pnpm build && pnpm preview`, DevTools → Performance with 4× CPU slowdown: press **Listen**.
+   "Starting…" paints at once; the audio graph then builds over four tasks, the longest ~60 ms
+   (it was one ~170 ms task). The reverb impulse that follows is still one ~90 ms task.
+2. Open the pair list for the first time: under 100 ms at 4× (was ~136 ms); only rows in view are
+   laid out.
+3. `dist/index.html` has the CSS in a `<style>` and no `<link rel="stylesheet">`; fonts load from
+   `assets/`. Network → Slow 4G: no render-blocking request before the first paint.
 
 ### Live-first loading
 

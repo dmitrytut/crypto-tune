@@ -100,6 +100,11 @@
       font-size: var(--font-size-md);
       font-weight: 500;
       cursor: pointer;
+      /* Hundreds of pairs: only rows in view get laid out and shaped, so the first open is
+       * not one long task. A row not laid out yet keeps its padding around one line of text
+       * (the intrinsic size is the content box), so the scroll height matches. */
+      content-visibility: auto;
+      contain-intrinsic-block-size: auto 1lh;
     }
     & [data-active] {
       background: var(--surface-strong);

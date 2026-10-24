@@ -32,7 +32,8 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   (`EventBuffer`: trades and liquidations above their thresholds collapse to at most one
   `EventCue` per kind per tick, stale replays dropped; audio, readout and chart all use the cues).
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
-  first user gesture), `mixer.ts` (layers → reverb → compressor → limiter → master),
+  first user gesture over a few tasks, a layer or two each, so the press stays responsive),
+  `mixer.ts` (layers → reverb → compressor → limiter → master),
   `base-layer.ts` (drone with chord drift + arpeggio), `ambience-layer.ts` (Eno bell loops + pulse,
   base channel), `tension-layer.ts` (sub, percussion, riser, shock swell), `events-layer.ts`
   (liquidation gongs, trade plucks). Pure, spec-covered: `scale.ts`, `arp-pattern.ts`,
@@ -54,7 +55,8 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   implements `AppView`), `components/` (self-contained DOM widgets, one folder each:
   `<name>/<name>.ts`, its `<name>.css` imported by the `.ts`, specs in `<name>/__specs__/`;
   `picker/` one dropdown for every
-  list, pair and tonic; `hint/` ⓘ label with a tip in the top layer (popover), one open at a time;
+  list, pair and tonic (rows made once per list, offscreen rows skip layout);
+  `hint/` ⓘ label with a tip in the top layer (popover), one open at a time;
   `meter/` tension meter with zones and its hint; `price-readout/` fixed-decimal price with
   per-digit flash; `modal/` the `<dialog>` shell and open/close for every modal; `settings-panel/`
   settings modal, a hint per setting from its `HELP` texts; `about/` About modal, static text in
@@ -112,6 +114,7 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
   - Order is `@layer base, page, components, utilities`, declared first in `styles/styles.css`,
     which `app.ts` imports before any component. Each `components/<name>/<name>.css` wraps its
     rules in `@layer components` and nests with `&`. A later layer wins regardless of specificity.
+    The build inlines the stylesheet into `index.html` (`inlineCss` in `vite.config.ts`).
   - Colours, font family and sizes, spacing, radii, borders, shadows, focus ring, durations and
     z-index come from `styles/tokens.css`. A token is a value two or more rules share or a step of
     a scale; a value one rule uses stays a literal there, commented when not self-evident. Side
