@@ -259,7 +259,7 @@ sound, and Binance covers the pairs that matter.
 ### Responsiveness
 
 1. `pnpm build && pnpm preview`, DevTools → Performance with 4× CPU slowdown: press **Listen**.
-   "Starting…" paints at once; the audio graph then builds one layer per task, the longest ~60 ms
+   "Starting…" paints at once; the audio graph then builds over four tasks, the longest ~60 ms
    (it was one ~170 ms task). The reverb impulse that follows is still one ~90 ms task.
 2. Open the pair list for the first time: under 100 ms at 4× (was ~136 ms); only rows in view are
    laid out.

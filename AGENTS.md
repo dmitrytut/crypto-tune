@@ -32,8 +32,8 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   (`EventBuffer`: trades and liquidations above their thresholds collapse to at most one
   `EventCue` per kind per tick, stale replays dropped; audio, readout and chart all use the cues).
 - `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
-  first user gesture, one layer per task so the press stays responsive), `mixer.ts` (layers →
-  reverb → compressor → limiter → master),
+  first user gesture over a few tasks, a layer or two each, so the press stays responsive),
+  `mixer.ts` (layers → reverb → compressor → limiter → master),
   `base-layer.ts` (drone with chord drift + arpeggio), `ambience-layer.ts` (Eno bell loops + pulse,
   base channel), `tension-layer.ts` (sub, percussion, riser, shock swell), `events-layer.ts`
   (liquidation gongs, trade plucks). Pure, spec-covered: `scale.ts`, `arp-pattern.ts`,
