@@ -210,6 +210,8 @@ ARIA and motion. What that changed:
 - ⓘ tips stay open while the pointer moves from the button onto the tip; Esc closes them and the
   chart marker tip alike.
 - A short window or a zoomed page (up to 400%) scrolls instead of cutting off the controls.
+- On phones the page reloads with the browser's own pull-to-refresh: the document is the scroller,
+  no script involved.
 
 ## Development
 
@@ -257,6 +259,7 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Live-first loading**: the live market at once, history in the background
 - [x] **Responsiveness**: Listen and the pair list stay quick on slow phones, stylesheet inlined
 - [x] **Media keys**: play/pause from the keyboard, headset and system media controls
+- [x] **Pull to refresh**: native browser pull-to-refresh on phones, no library
 - [x] **COIN-M**: USDⓈ-M and COIN-M perpetuals, a tab per market in the pair list
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
@@ -265,6 +268,12 @@ sound, and Binance covers the pairs that matter.
 <details>
 <summary><b>Manual checks per stage</b></summary>
 
+### Pull to refresh
+
+1. `pnpm dev --host`, open the page on a phone (Chrome on Android, Safari on iOS) and pull down from
+   the top: the browser's refresh spinner appears and the page reloads.
+2. A short window or zoom still scrolls vertically, never sideways; the pair list and dialogs scroll
+   on their own without reloading the page.
 ### COIN-M
 
 1. `pnpm dev`, open the pair list: tabs `USDⓈ-M | COIN-M` above the search, the current market's

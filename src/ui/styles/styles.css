@@ -24,12 +24,13 @@
     height: 100%;
   }
   html {
-    overflow: hidden;
+    /* One screen by default; a short window or a zoomed page scrolls instead of cutting the
+     * controls off (WCAG 1.4.10). The document scrolls, not body: mobile browsers offer native
+     * pull-to-refresh only on the root scroller. Never sideways: the screen shake nudges the
+     * stage past the edge. */
+    overflow: hidden auto;
   }
   body {
-    /* One screen by default; a short window or a zoomed page scrolls instead of cutting the
-     * controls off (WCAG 1.4.10). Never sideways: the screen shake nudges the stage past the edge. */
-    overflow: hidden auto;
     /* Fallback when WebGL is unavailable; the aura canvas covers it otherwise. */
     background: var(--bg);
 
