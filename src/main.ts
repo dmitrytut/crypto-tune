@@ -1,5 +1,10 @@
 import { AudioEngine, type AudioParams } from './audio/engine';
-import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
+import {
+  BINANCE_MARKETS,
+  BinanceFuturesFeed,
+  type BinanceMarket,
+  fetchBinanceSymbols,
+} from './feed/binance';
 import type { MarketFeed, Trade, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
 import { cachedSymbols } from './feed/symbol-cache';
@@ -50,6 +55,7 @@ const view = mountApp(settings, {
     settings = next;
     if (
       next.source !== prev.source ||
+      next.market !== prev.market ||
       next.symbol !== prev.symbol ||
       next.windowSec !== prev.windowSec
     ) {
@@ -89,7 +95,7 @@ function startPipeline(): void {
   const f: MarketFeed =
     settings.source === 'simulator'
       ? new SimulatorFeed({ historyMs: HISTORY_MS })
-      : new BinanceFuturesFeed(settings.symbol, {
+      : new BinanceFuturesFeed(settings.market, settings.symbol, {
           historyMs: HISTORY_MS,
           store: indexedDbTradeStore(`binance:${settings.symbol}`),
         });
@@ -176,14 +182,14 @@ window.setInterval(() => {
   }
 }, TICK_MS);
 
-async function loadSymbols(): Promise<void> {
+async function loadSymbols(market: BinanceMarket): Promise<void> {
   try {
-    view.setSymbols(await cachedSymbols(fetchBinanceSymbols));
+    view.setSymbols(market, await cachedSymbols(market, () => fetchBinanceSymbols(market)));
   } catch (err) {
     // Symbol input still accepts any well-formed ticker without the list.
-    console.warn('Binance symbol list unavailable', err);
+    console.warn(`Binance ${market} symbol list unavailable`, err);
   }
 }
 
 startPipeline();
-void loadSymbols();
+for (const market of BINANCE_MARKETS) void loadSymbols(market);

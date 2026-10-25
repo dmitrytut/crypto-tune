@@ -1,3 +1,4 @@
+import { BINANCE_MARKETS, type BinanceMarket } from './feed/binance';
 import { DEFAULT_METRICS_CONFIG } from './metrics/engine';
 import { HISTORY_PERIODS_MIN, type HistoryPeriodMin } from './metrics/history';
 import { DEFAULT_TENSION_PARAMS } from './metrics/tension';
@@ -10,7 +11,9 @@ export type Tonic = (typeof TONICS)[number];
 
 export interface Settings {
   source: SourceKind;
-  /** Exchange symbol, upper case, e.g. BTCUSDT. */
+  /** Binance futures market the live pair trades on. */
+  market: BinanceMarket;
+  /** Exchange symbol of `market`, upper case, e.g. BTCUSDT or BTCUSD_PERP. */
   symbol: string;
   /** Return horizon N, seconds. */
   windowSec: number;
@@ -31,9 +34,16 @@ export interface Settings {
   periodMin: HistoryPeriodMin;
 }
 
+/** Each market's first pair, and the fallback for a stored symbol that does not validate. */
+const DEFAULT_SYMBOLS: Record<BinanceMarket, string> = {
+  usdm: 'BTCUSDT',
+  coinm: 'BTCUSD_PERP',
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   source: 'live',
-  symbol: 'BTCUSDT',
+  market: 'usdm',
+  symbol: DEFAULT_SYMBOLS.usdm,
   // The metrics own these defaults; settings only persist the user's override.
   windowSec: DEFAULT_METRICS_CONFIG.windowSec,
   sensitivity: DEFAULT_TENSION_PARAMS.sensitivity,
@@ -58,10 +68,10 @@ export const LIMITS = {
 const KEY = 'crypto-tune.settings.v1';
 
 /**
- * Exchange symbol: letters (any script — Binance lists e.g. `币安人生USDT`) and
- * digits only, which also rules out URL separators in the stream path.
+ * Exchange symbol: letters (any script — Binance lists e.g. `币安人生USDT`), digits and `_`
+ * (COIN-M `BTCUSD_PERP`) only, which also rules out URL separators in the stream path.
  */
-export const SYMBOL_PATTERN = /^[\p{L}\p{N}]{2,30}$/u;
+export const SYMBOL_PATTERN = /^[\p{L}\p{N}_]{2,30}$/u;
 
 const clamp = (v: number, { min, max }: { min: number; max: number }) =>
   Math.min(max, Math.max(min, v));
@@ -70,12 +80,14 @@ const clamp = (v: number, { min, max }: { min: number; max: number }) =>
 export function parseSettings(raw: unknown): Settings {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  const market = BINANCE_MARKETS.find((m) => m === o.market) ?? DEFAULT_SETTINGS.market;
   return {
     source: o.source === 'live' || o.source === 'simulator' ? o.source : DEFAULT_SETTINGS.source,
+    market,
     symbol:
       typeof o.symbol === 'string' && SYMBOL_PATTERN.test(o.symbol)
         ? o.symbol
-        : DEFAULT_SETTINGS.symbol,
+        : DEFAULT_SYMBOLS[market],
     windowSec: clamp(num(o.windowSec, DEFAULT_SETTINGS.windowSec), LIMITS.windowSec),
     sensitivity: clamp(num(o.sensitivity, DEFAULT_SETTINGS.sensitivity), LIMITS.sensitivity),
     tonic: TONICS.find((t) => t === o.tonic) ?? DEFAULT_SETTINGS.tonic,

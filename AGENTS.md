@@ -20,13 +20,16 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 
 - `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: the Binance adapter
   (`binance.ts`, which also loads 30 min of REST `aggTrades` in the background so metrics start
-  warm) and `simulator.ts`. `reconnecting-socket.ts` owns backoff and the silence/connect watchdog.
+  warm) and `simulator.ts`. The adapter serves both `BINANCE_MARKETS`: USDⓈ-M (`fapi`/`fstream`)
+  and COIN-M (`dapi`/`dstream`); COIN-M quantities are USD-face contracts, so the adapter reads
+  `contractSize` from `exchangeInfo` before opening the stream and emits base quantity like USDⓈ-M.
+  `reconnecting-socket.ts` owns backoff and the silence/connect watchdog.
   `trade-cache.ts` is the injected `TradeStore`: recent trades with ids per pair in IndexedDB, so a
   reload fetches only the gap after the cache. Live trades are emitted from the first one; history
   arrives once via `onHistory`, all older than the first live trade, and `main.ts` rebuilds metrics
   from history + live seen so far. Any history or storage failure degrades to a plain live start,
   never blocks the stream.
-  `symbol-cache.ts` caches the pair list in localStorage.
+  `symbol-cache.ts` caches each market's pair list in localStorage.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`, and `events.ts`
   (`EventBuffer`: trades and liquidations above their thresholds collapse to at most one
@@ -55,7 +58,8 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   implements `AppView`), `components/` (self-contained DOM widgets, one folder each:
   `<name>/<name>.ts`, its `<name>.css` imported by the `.ts`, specs in `<name>/__specs__/`;
   `picker/` one dropdown for every
-  list, pair and tonic (rows made once per list, offscreen rows skip layout);
+  list, pair and tonic (rows made once per list, offscreen rows skip layout; optional tabs over
+  several lists: the pair's market, a tab browses, a pick reports its tab);
   `hint/` ⓘ label with a tip in the top layer (popover), one open at a time;
   `meter/` tension meter with zones and its hint; `price-readout/` fixed-decimal price with
   per-digit flash; `modal/` the `<dialog>` shell and open/close for every modal; `settings-panel/`
