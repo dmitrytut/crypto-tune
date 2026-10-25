@@ -1,5 +1,10 @@
 /* Dropdown list (picker.ts): chip and field looks share one menu. */
 @layer components {
+  /* A drag inside the open list never reaches the page's native pull-to-refresh. */
+  html:has(.picker-btn[aria-expanded="true"]) {
+    overscroll-behavior-y: none;
+  }
+
   .picker {
     position: relative;
   }

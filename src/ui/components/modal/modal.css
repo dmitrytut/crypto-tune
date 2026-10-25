@@ -1,5 +1,10 @@
 /* Modal dialog shell (modal.ts): Settings and About. */
 @layer components {
+  /* A drag inside an open dialog never reaches the page's native pull-to-refresh. */
+  html:has(.modal:modal) {
+    overscroll-behavior-y: none;
+  }
+
   .modal {
     width: min(440px, calc(100% - 32px));
     max-height: calc(100% - 48px);
