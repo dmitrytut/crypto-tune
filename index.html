@@ -9,8 +9,10 @@
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Crypto Tune: the market, played as sound</title>
-    <!-- One page: query strings (?debug, share-tracking params) must not become duplicates. -->
+    <!-- Query strings (?debug, share-tracking params) must not become duplicates. Pair pages
+         (/bitcoin/ …) get their own canonical, title and description at build: vite.config.ts. -->
     <link rel="canonical" href="https://crypto-tune.com/" />
     <!-- Link previews (Telegram, Slack, X, Discord). Crawlers need absolute URLs. -->
     <meta property="og:type" content="website" />
@@ -198,6 +200,7 @@
           Crypto Tune turns a live crypto futures market into calm generative music. Leave it in a
           background tab and hear what the market is doing without watching a chart.
         </p>
+        <!-- pair-pages:intro -->
         <p>
           A quiet market is a soft drone with a slow melody and bells. When the price moves sharply,
           the tempo rises, the filters open and a bass comes in. A rising price lifts the melody, a
@@ -207,11 +210,13 @@
           Plays any futures pair, or a simulated market to hear every sound on demand. Free, in the
           browser, no sign-up. <a href="https://github.com/dmitrytut/crypto-tune">Source on GitHub</a>.
         </p>
+        <!-- pair-pages:links -->
       </form>
     </dialog>
 
     <script type="module" src="/src/main.ts"></script>
-    <!-- Cloudflare Web Analytics: cookieless visit counts. The token is public by design. -->
-    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "3d4e0ffef4f44fbe9cc3839ceab45ea7"}'></script>
+    <!-- Umami Cloud (EU): cookieless visits, Listen events and Core Web Vitals; dev and preview
+         hosts are not counted. The website id is public by design. -->
+    <script defer src="https://cloud.umami.is/script.js" data-website-id="86b6c90c-326c-4905-acdb-f652ab320c51" data-domains="crypto-tune.com" data-performance="true"></script>
   </body>
 </html>

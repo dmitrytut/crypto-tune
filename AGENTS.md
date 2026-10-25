@@ -79,6 +79,16 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   than 2 s is not animated (a throttled tab's catch-up, filtered in the view). Every motion effect
   respects `prefers-reduced-motion`.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
+- `src/pair-pages.ts` — popular USDⓈ-M pairs with their own page (`/bitcoin/` …): slug and symbol
+  only, what the app needs. Their words (name, ticker, intro) live in `pair-page-texts.ts`, keyed
+  by slug and imported only by `vite.config.ts`, so they stay out of the app bundle; never import
+  it from app code. The build (`pairPages`) writes a page per entry from the built `index.html` by
+  exact string replacement (a miss fails the build) plus `sitemap.xml` and `robots.txt`; `main.ts`
+  opens the pair from the path without saving it, and `replaceState`s the path on a pair change.
+  Page texts land in attributes and JSON-LD: no `&<>"\`.
+- `src/analytics.ts` — Umami events `listen` / `listen_10m` (beacon in `index.html`, counts only
+  on the production host). No identifiers: returning listeners come from a day counter in
+  localStorage. Wired in `main.ts` around audio start/stop.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 
 ## Code organization
