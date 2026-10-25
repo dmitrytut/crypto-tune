@@ -18,26 +18,45 @@ declare global {
 const ENGAGED_MS = 10 * 60_000;
 const KEY = 'crypto-tune.listen-days.v1';
 
-/** Local calendar day, `YYYY-MM-DD`: a listener's day, not UTC's. */
-function localDay(d = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** The part of `Storage` the day counter needs; specs pass an in-memory one. */
+type DayStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
+/** `localStorage`, or null where reading it throws (storage disabled, sandboxed frame). */
+function localStore(): DayStorage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
 }
 
-/** Distinct days this browser has listened, today included; 1 when storage is unavailable. */
-function countListenDay(): number {
+/**
+ * Distinct days this browser has listened, `now`'s day included, and records it. Days are local
+ * calendar days (a listener's evening is one day, not two UTC ones). Unavailable storage counts
+ * as a first day; a corrupt entry starts the count over.
+ * @package
+ */
+export function countListenDay(
+  storage: DayStorage | null = localStore(),
+  now: Date = new Date(),
+): number {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  let prev: { day?: unknown; days?: unknown } | null = null;
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    const prev =
-      raw && typeof raw === 'object' && 'day' in raw && 'days' in raw ? raw : { day: '', days: 0 };
-    const day = localDay();
-    const count = Number.isInteger(prev.days) ? Number(prev.days) : 0;
-    const days = prev.day === day ? Math.max(count, 1) : count + 1;
-    localStorage.setItem(KEY, JSON.stringify({ day, days }));
-    return days;
+    const raw: unknown = JSON.parse(storage?.getItem(KEY) ?? 'null');
+    if (raw && typeof raw === 'object') prev = raw;
   } catch {
-    return 1;
+    // Unreadable or corrupt: counted as a first day and overwritten below.
   }
+  const count = Number.isInteger(prev?.days) ? Math.max(0, Number(prev?.days)) : 0;
+  const days = prev?.day === day ? Math.max(count, 1) : count + 1;
+  try {
+    storage?.setItem(KEY, JSON.stringify({ day, days }));
+  } catch {
+    // Storage full or disabled: the next start counts from what is stored.
+  }
+  return days;
 }
 
 export class ListenTracker {

@@ -17,11 +17,19 @@ import { pagePath, pairPageAt, pairPageOf } from './pair-pages';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { mountApp } from './ui/app';
 
-/** A pair page (/bitcoin/) opens its pair over the stored one; saved once the user changes a setting. */
+const stored = loadSettings();
+/** A pair page (/bitcoin/) plays its pair over the stored one. */
 const landing = pairPageAt(location.pathname);
 let settings: Settings = landing
-  ? { ...loadSettings(), source: 'live', market: 'usdm', symbol: landing.symbol }
-  : loadSettings();
+  ? { ...stored, source: 'live', market: 'usdm', symbol: landing.symbol }
+  : stored;
+/**
+ * The pair to save while the page's pair plays: the user's own, until they pick one. Coming in by
+ * a link and turning the volume down must not replace the pair `/` opens.
+ */
+let savedPair: Pick<Settings, 'source' | 'market' | 'symbol'> | null = landing
+  ? { source: stored.source, market: stored.market, symbol: stored.symbol }
+  : null;
 let feed: MarketFeed | null = null;
 let engine: MetricsEngine | null = null;
 let history: MarketHistory | null = null;
@@ -73,12 +81,10 @@ const view = mountApp(settings, {
   onSettings(next) {
     const prev = settings;
     settings = next;
-    if (
-      next.source !== prev.source ||
-      next.market !== prev.market ||
-      next.symbol !== prev.symbol ||
-      next.windowSec !== prev.windowSec
-    ) {
+    const pairChanged =
+      next.source !== prev.source || next.market !== prev.market || next.symbol !== prev.symbol;
+    if (pairChanged) savedPair = null;
+    if (pairChanged || next.windowSec !== prev.windowSec) {
       startPipeline();
       syncPath(next);
     } else if (next.sensitivity !== prev.sensitivity) {
@@ -86,7 +92,7 @@ const view = mountApp(settings, {
     }
     audio.setParams(audioParams(next));
     events?.setThresholds(eventThresholds(next));
-    saveSettings(next);
+    saveSettings(savedPair ? { ...next, ...savedPair } : next);
   },
   onToggleAudio() {
     if (audio.current === 'running') {

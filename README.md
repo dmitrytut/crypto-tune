@@ -244,27 +244,41 @@ structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-cod
 three times (meta, Open Graph, JSON-LD): keep them identical. The About dialog (the ? button next to
 the gear) is static HTML on purpose: AI crawlers that skip JavaScript read what the app does from it.
 
-**Pair pages.** `src/pair-pages.ts` lists twelve popular USDⓈ-M pairs. For each, the build
-(`pairPages` in `vite.config.ts`) writes `/<slug>/index.html` from the home page with its own
-title, description, canonical URL, `h1` and an intro paragraph in About, and it writes
-`sitemap.xml` (home + pair pages) and `robots.txt`. The site URL, title and description come from
-`index.html`; if the template changes so that a replacement no longer matches exactly, the build
-fails instead of shipping a copy of the home page. Every page's About links to all pair pages.
-A pair page opens its pair over the saved one; picking a pair moves the address to its page
-(`/` for a pair without one) with `history.replaceState`.
+**Pair pages.** `src/pair-pages.ts` lists twelve popular USDⓈ-M pairs (slug and symbol: all the
+app needs); their words (name, ticker, intro) are in `src/pair-page-texts.ts`, which only the
+build imports, so they stay out of the app bundle. For each pair the build (`pairPages` in
+`vite.config.ts`) writes `/<slug>/index.html` from the home page with its own title, description,
+canonical URL, `h1` and an intro paragraph in About, and it writes `sitemap.xml` (home + pair
+pages) and `robots.txt`. The site URL, title and description come from `index.html`; if the
+template changes so that a replacement no longer matches exactly, the build fails instead of
+shipping a copy of the home page. Every page's About links to all pair pages.
+A pair page plays its pair over the saved one but does not save it: settings changed there keep
+the user's own pair for `/` until they pick a pair. Picking a pair moves the address to its page
+(`/` for COIN-M, the simulator or a pair without a page) with `history.replaceState`.
+After a deploy that changes these pages, check one in Search Console → URL Inspection: if the
+"Google-selected canonical" is `/` instead of the page itself, Google sees the pages as
+duplicates (their own text is a hidden `h1` and the About dialog) and the intro has to move into
+visible content.
 
 **Analytics.** Umami Cloud (EU region, cookieless, no consent banner): the beacon at the end of
-`index.html`, counting only on `crypto-tune.com`. Visits, referrers, countries and Core Web Vitals
-(Performance tab) are in the Umami dashboard. `src/analytics.ts` sends two events:
+`index.html`, counting only on `crypto-tune.com`. Visits, referrers and countries are in the Umami
+dashboard. `src/analytics.ts` sends two events:
 
-| Event        | When                                          | Data                                                        |
-| ------------ | --------------------------------------------- | ----------------------------------------------------------- |
-| `listen`     | audio starts (button, media key)              | `pair` (symbol or `simulator`), `days`: distinct days this browser has listened, today included |
-| `listen_10m` | audio keeps running 10 min, once per page load | `pair`                                                      |
+| Event        | When                                                               | Data                                                                                            |
+| ------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `listen`     | audio starts (button, media key)                                   | `pair` (symbol or `simulator`), `days`: distinct days this browser has listened, today included |
+| `listen_10m` | 10 minutes without a stop since the last start, once per page load | `pair` as it was at that start                                                                  |
 
 Daily listeners are the unique visitors of `listen` per day; returning listeners are those with
-`days` ≥ 2. Nothing identifies a visitor: `days` is a counter in localStorage. A pair switch
-changes the address, which Umami counts as a pageview of that pair's page.
+`days` ≥ 2. Nothing identifies a visitor: `days` is a counter in localStorage. A stop resets the
+10-minute timer, and a pair switch while playing does not change the `listen_10m` pair.
+
+The Performance tab is a rough guide to the first seconds of a page, not field Core Web Vitals:
+Umami sends one report per page, 10 s after load or when the tab is hidden, whichever comes
+first, so Listen, settings and the pair list after that never reach INP, nor late shifts CLS.
+Umami also wraps `history.replaceState`, so a pair switch counts as a pageview of that pair's page
+and ends the measurement early, opening a new window without LCP or FCP. Field CWV come from
+Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 
 ## Status
 

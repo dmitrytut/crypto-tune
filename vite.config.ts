@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
-import { PAIR_PAGES, type PairPage, pagePath, pairPageOf } from './src/pair-pages.ts';
+import { PAIR_PAGE_TEXTS } from './src/pair-page-texts.ts';
+import { PAIR_PAGES, pagePath, pairPageOf } from './src/pair-pages.ts';
 
 /**
  * Puts the stylesheet into index.html as a `<style>`: one network round trip fewer before the
@@ -66,13 +67,14 @@ function pick(html: string, pattern: RegExp, what: string): string {
 }
 
 /** Title, description and heading of a pair page; checked because they land in attributes and JSON-LD. */
-function pageTexts(p: PairPage) {
-  const label = p.name === p.ticker ? p.name : `${p.name} (${p.ticker})`;
+function pageTexts(p: (typeof PAIR_PAGES)[number]) {
+  const { name, ticker, intro } = PAIR_PAGE_TEXTS[p.slug];
+  const label = name === ticker ? name : `${name} (${ticker})`;
   const texts = {
-    title: `Listen to ${p.name} live: ${p.symbol} as music · Crypto Tune`,
+    title: `Listen to ${name} live: ${p.symbol} as music · Crypto Tune`,
     description: `Hear ${label} perpetual futures as calm generative music: live trades and liquidations from Binance set the tempo, the melody and the gongs. Free, in the browser.`,
     heading: `${label} futures, played as sound`,
-    intro: p.intro,
+    intro,
   };
   for (const text of Object.values(texts)) {
     if (/[&<>"\\]/.test(text)) throw new Error(`pair pages: unescaped character in ${text}`);
@@ -85,7 +87,9 @@ function pairLinks(): Plugin {
   return {
     name: 'pair-links',
     transformIndexHtml(html) {
-      const links = PAIR_PAGES.map((p) => `<a href="${pagePath(p)}">${p.name}</a>`).join(', ');
+      const links = PAIR_PAGES.map(
+        (p) => `<a href="${pagePath(p)}">${PAIR_PAGE_TEXTS[p.slug].name}</a>`,
+      ).join(', ');
       return swap(html, LINKS_MARK, `<p>Hear a single pair: ${links}.</p>`);
     },
   };
