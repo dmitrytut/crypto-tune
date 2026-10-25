@@ -57,7 +57,8 @@ export interface AppView {
   /** History arrived (or never will): the chart switches to `history`, the meter stops waiting. */
   historyReady(history: HistorySeries): void;
   setStatus(s: FeedStatus): void;
-  setSymbols(symbols: string[]): void;
+  /** The tradable pairs of one market, for the pair picker. */
+  setSymbols(market: Settings['market'], symbols: string[]): void;
   setPlayback(state: PlaybackView): void;
   /** Last event that crossed its threshold (shown even while audio is stopped). */
   showEvent(e: EventReadout): void;
@@ -87,8 +88,13 @@ function statusText(s: FeedStatus, source: Settings['source']): string {
 const arrowOf = (d: number) =>
   d > DIRECTION_ARROW_MIN ? '▲' : d < -DIRECTION_ARROW_MIN ? '▼' : '•';
 
+/** Tabs of the pair list, one per Binance futures market. */
+const MARKET_LABELS: Record<Settings['market'], string> = { usdm: 'USDⓈ-M', coinm: 'COIN-M' };
+
 export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let settings = initial;
+  /** Markets whose pair list has loaded; the others let the search take any symbol as typed. */
+  const listed = new Set<string>();
   const update = (patch: Partial<Settings>) => {
     settings = { ...settings, ...patch };
     if ('source' in patch || 'symbol' in patch) syncPair();
@@ -137,18 +143,22 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   const audioToggle = el<HTMLButtonElement>('audio-toggle');
   const pair = mountPicker(el('pair'), {
     label: 'Pair',
+    scopes: {
+      label: 'Market',
+      choices: Object.entries(MARKET_LABELS).map(([value, text]) => ({ value, text })),
+    },
     search: {
       placeholder: 'Search pairs',
       empty: 'No such pair on Binance Futures',
       // Without a loaded list (REST unreachable) any well-formed symbol can be tried as typed.
-      fallback: (query) => {
+      fallback: (query, market) => {
         const s = query.toUpperCase();
-        return pairList.length === 0 && SYMBOL_PATTERN.test(s) ? s : null;
+        return !listed.has(market) && SYMBOL_PATTERN.test(s) ? s : null;
       },
     },
-    onPick: (symbol) => update({ symbol }),
+    // Scopes are MARKET_LABELS keys: a pick always reports a market.
+    onPick: (symbol, market) => update({ market: market as Settings['market'], symbol }),
   });
-  let pairList: readonly string[] = [];
 
   audioToggle.addEventListener('click', () => handlers.onToggleAudio());
   let playback: PlaybackView = 'stopped';
@@ -164,7 +174,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
 
   const syncPair = () => {
     const live = settings.source === 'live';
-    if (live) pair.set(settings.symbol);
+    if (live) pair.set(settings.symbol, settings.market);
     else pair.disable('Simulator');
     mediaKeys.setTitle(live ? settings.symbol : 'Simulator');
   };
@@ -303,9 +313,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       fx.liquidation(l.side, l.usd, settings.liqThresholdUsd);
       if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(0.35);
     },
-    setSymbols(list) {
-      pairList = list;
-      pair.setOptions(list);
+    setSymbols(market, list) {
+      if (list.length > 0) listed.add(market);
+      pair.setOptions(list, market);
     },
   };
 }

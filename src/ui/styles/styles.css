@@ -110,19 +110,37 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: var(--space-sm);
   }
   .top-right {
+    flex: 1;
     display: flex;
     align-items: center;
     gap: var(--space-md);
+
+    @media (max-width: 480px) {
+      gap: var(--space-sm);
+    }
   }
+  /* Takes the room the pair leaves. Dot and words are two flex items on one visible line: when
+   * the words do not fit, they wrap to a clipped second line and only the dot stays. Width 0
+   * keeps the words from widening the page (the stage grid sizes to its content). */
   .status {
+    flex: 1;
+    width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    height: 1lh;
+    overflow: hidden;
+    white-space: nowrap;
     font-size: var(--font-size-sm);
     color: var(--muted);
 
     /* Decoration: the alt text after "/" keeps screen readers from saying "black circle". */
     &::before {
-      content: "● " / "";
+      content: "●" / "";
+      margin-right: 0.3em;
     }
     &[data-state="open"]::before {
       color: var(--up);

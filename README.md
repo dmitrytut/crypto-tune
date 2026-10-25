@@ -50,8 +50,8 @@ looked at the chart.
   reload), and tension calibrates as soon as they land instead of after a five-minute warm-up.
 - **Glanceable.** The tab title reads `▲ 81,305.2 · BTCUSDT · tension 2.6`. After 10 s without input
   the UI fades out, leaving only the aura, the price and the chart.
-- **Any Binance USDⓈ-M perpetual.** You can also switch to the built-in simulator to hear a sell-off
-  on demand.
+- **Any Binance futures perpetual**, USDⓈ-M (`BTCUSDT`) or COIN-M (`BTCUSD_PERP`). You can also
+  switch to the built-in simulator to hear a sell-off on demand.
 
 | Live BTCUSDT, buyers in control                    | Simulator, liquidation cascade                                 |
 | -------------------------------------------------- | -------------------------------------------------------------- |
@@ -85,9 +85,14 @@ computation runs in the browser, which talks to Binance directly.
 
 ### Data sources
 
-- **LIVE**: Binance Futures public WebSocket `wss://fstream.binance.com/market/stream` (`aggTrade` +
-  `forceOrder`). The pair can be picked from the list of trading perpetuals. Live trades show at
-  once; meanwhile the last 30 min of trades come from REST (`/fapi/v1/aggTrades`: the newest page,
+- **LIVE**: Binance Futures public WebSocket (`aggTrade` + `forceOrder`): USDⓈ-M at
+  `wss://fstream.binance.com/market/stream`, COIN-M at `wss://dstream.binance.com/stream`. The pair
+  list has a tab per market; a tab only browses, picking a pair switches the stream.
+  COIN-M quantities count USD-face contracts ($100 for BTC, $10 for the rest, read from
+  `/dapi/v1/exchangeInfo` before the stream opens), so the feed converts them to coins and volume,
+  thresholds and events stay in USD. The pair can be picked from the market's list of trading
+  perpetuals. Live trades show at once; meanwhile the last 30 min of trades come from REST
+  (`/fapi/v1/aggTrades` or `/dapi/v1/aggTrades`: the newest page,
   then the older ones in one parallel wave, up to 20 requests) and end right before the first live
   trade by id. The last 30 min per pair live in IndexedDB (written every 30 s, when the tab is
   hidden and when the page is left), read while the newest page loads, so a reload usually fetches
@@ -155,7 +160,7 @@ the line under the meter says what it is waiting for (`Connecting to the market�
 `Waiting for trades…`), and the status in the top right is in words (`Live`, `Connecting…`).
 Sound, sensitivity and source live in settings (⚙); every setting has an ⓘ tip that says in a line
 what it is and what it changes. The pair chip in the top left always shows its border and arrow; a click opens a searchable
-list. Pair and tonic share one dropdown component (`ui/components/picker/`): arrows and Enter pick, Esc or a
+list with a tab per market (USDⓈ-M, COIN-M). Pair and tonic share one dropdown component (`ui/components/picker/`): arrows and Enter pick, Esc, Tab out or a
 click outside closes. There is no visible title; the `h1` is for screen readers only. Style: opaque
 surfaces without blur or glow, the yellow accent only on the sound button, Lucide icons, one white
 focus ring on every control. Plain CSS: design tokens (palette, type scale, spacing, radii,
@@ -252,12 +257,25 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Live-first loading**: the live market at once, history in the background
 - [x] **Responsiveness**: Listen and the pair list stay quick on slow phones, stylesheet inlined
 - [x] **Media keys**: play/pause from the keyboard, headset and system media controls
+- [x] **COIN-M**: USDⓈ-M and COIN-M perpetuals, a tab per market in the pair list
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### COIN-M
+
+1. `pnpm dev`, open the pair list: tabs `USDⓈ-M | COIN-M` above the search, the current market's
+   tab chosen. Click **COIN-M**: the list shows only `…USD_PERP` pairs, the stream does not change.
+2. Pick `BTCUSD_PERP`: the status goes back to `Live`, and the price matches Binance's COIN-M
+   BTCUSD Perpetual, not the USDⓈ-M one. Reopen the list: the COIN-M tab is chosen.
+3. The 15 min volume is in USD and close to the sum of `q × 100` over the last
+   `/dapi/v1/aggTrades` rows for that span (a few $M for BTC, far below USDⓈ-M).
+4. Type `eth`, switch tabs: the query stays (`ETHUSDT` ⇄ `ETHUSD_PERP`). Shift+Tab from the
+   search reaches the tabs, arrows switch them; Esc closes; Tab from the search closes.
+5. Reload: market and pair are kept.
 
 ### Media keys
 

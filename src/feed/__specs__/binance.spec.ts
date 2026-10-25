@@ -28,6 +28,13 @@ describe('parseAggTrade', () => {
     });
     expect(parseAggTrade({ ...msg, m: false }).side).toBe('buy');
   });
+
+  // Captured from wss://dstream.binance.com/stream (2026-10): `q` counts $100 contracts.
+  it('converts COIN-M contracts to base quantity at the trade price', () => {
+    const t = parseAggTrade({ T: 1792861560061, p: '80000', q: '51', m: true }, 100);
+    expect(t.qty).toBeCloseTo(0.06375, 12);
+    expect(t.price * t.qty).toBeCloseTo(5100, 9);
+  });
 });
 
 describe('parseForceOrder', () => {
@@ -49,12 +56,27 @@ describe('parseForceOrder', () => {
     expect(l.qty).toBe(532);
     expect(l.usd).toBeCloseTo(298.2392, 9);
   });
+
+  it('values COIN-M liquidations at their contracts face value', () => {
+    const l = parseForceOrder(
+      { ...order('SELL'), o: { ...order('SELL').o, ap: '2.5', z: '30' } },
+      10,
+    );
+    expect(l.usd).toBeCloseTo(300, 9);
+    expect(l.qty).toBeCloseTo(120, 9);
+  });
 });
 
 describe('binanceStreamUrl', () => {
-  it('lowercases the symbol on the routed /market endpoint', () => {
-    expect(binanceStreamUrl('ETHUSDT')).toBe(
+  it('lowercases the symbol on the routed USDⓈ-M /market endpoint', () => {
+    expect(binanceStreamUrl('usdm', 'ETHUSDT')).toBe(
       'wss://fstream.binance.com/market/stream?streams=ethusdt@aggTrade/ethusdt@forceOrder/ethusdt@markPrice@1s',
+    );
+  });
+
+  it('uses the COIN-M combined stream', () => {
+    expect(binanceStreamUrl('coinm', 'BTCUSD_PERP')).toBe(
+      'wss://dstream.binance.com/stream?streams=btcusd_perp@aggTrade/btcusd_perp@forceOrder/btcusd_perp@markPrice@1s',
     );
   });
 });
@@ -162,7 +184,7 @@ describe('BinanceFuturesFeed history', () => {
   }
 
   function connect(store?: TradeStore, historyMs = 30 * 60_000) {
-    const feed = new BinanceFuturesFeed('BTCUSDT', { historyMs, store });
+    const feed = new BinanceFuturesFeed('usdm', 'BTCUSDT', { historyMs, store });
     const live: number[] = [];
     const histories: (readonly Trade[])[] = [];
     feed.onTrade((t) => live.push(idOf(t)));
@@ -402,5 +424,56 @@ describe('BinanceFuturesFeed history', () => {
     feed.disconnect();
     await Promise.resolve();
     expect(save).not.toHaveBeenCalled();
+  });
+
+  describe('on COIN-M', () => {
+    const exchangeInfo = {
+      symbols: [{ symbol: 'BTCUSD_PERP', contractType: 'PERPETUAL', contractSize: 100 }],
+    };
+
+    function coinM(symbol: string) {
+      FakeWebSocket.last = null;
+      const feed = new BinanceFuturesFeed('coinm', symbol, { historyMs: 30 * 60_000 });
+      const trades: Trade[] = [];
+      const statuses: string[] = [];
+      feed.onTrade((t) => trades.push(t));
+      feed.onStatus((s) => statuses.push(s.state));
+      feed.connect();
+      return { feed, trades, statuses };
+    }
+
+    it('opens the stream once contract specs arrive, and reports base quantity', async () => {
+      const specs = Promise.withResolvers<unknown>();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) =>
+          url.includes('/exchangeInfo')
+            ? { ok: true, status: 200, json: () => specs.promise }
+            : Promise.withResolvers<never>().promise,
+        ),
+      );
+      const { feed, trades } = coinM('BTCUSD_PERP');
+      // No socket before the contract size is known: a trade could not be valued.
+      expect(FakeWebSocket.last).toBeNull();
+      specs.resolve(exchangeInfo);
+      await vi.waitFor(() => expect(FakeWebSocket.last).not.toBeNull());
+      (FakeWebSocket.last as FakeWebSocket).live(5001);
+      // row(): price 100, 1 contract of $100 → 1 coin.
+      expect(trades[0]?.price).toBe(100);
+      expect(trades[0]?.qty).toBe(1);
+      feed.disconnect();
+    });
+
+    it('reports an error and opens no stream for an unlisted symbol', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({ ok: true, status: 200, json: async () => exchangeInfo })),
+      );
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { feed, statuses } = coinM('BTCUSDT');
+      await vi.waitFor(() => expect(statuses.at(-1)).toBe('error'));
+      expect(FakeWebSocket.last).toBeNull();
+      feed.disconnect();
+    });
   });
 });
