@@ -25,22 +25,28 @@ export function matchOptions(list: readonly string[], query: string): string[] {
 export interface PickerConfig {
   /** Names the control for assistive tech: "<label>: <value>". */
   label: string;
+  /**
+   * Tabs over separate option lists (the pair's market), above the search. A tab only browses;
+   * a pick reports the tab it came from. Without tabs there is one list, scope `''`.
+   */
+  scopes?: { label: string; choices: readonly { value: string; text: string }[] };
   /** A search field over the options; without it the menu is a plain list. */
   search?: {
     placeholder: string;
     /** Shown when nothing matches. */
     empty: string;
-    /** An unlisted query that may still be picked as typed, or null. */
-    fallback?: (query: string) => string | null;
+    /** An unlisted query that may still be picked as typed in `scope`, or null. */
+    fallback?: (query: string, scope: string) => string | null;
   };
-  onPick(value: string): void;
+  onPick(value: string, scope: string): void;
 }
 
 /** What the owner may change on a mounted picker. */
 export interface Picker {
-  setOptions(values: readonly string[]): void;
-  /** Shows `value` as chosen and enables the control. */
-  set(value: string): void;
+  /** The options of `scope` (of the one list without scopes). */
+  setOptions(values: readonly string[], scope?: string): void;
+  /** Shows `value` of `scope` as chosen and enables the control. */
+  set(value: string, scope?: string): void;
   /** Disables the control, showing `text` in place of a value. */
   disable(text: string): void;
 }
@@ -52,10 +58,11 @@ let nextId = 0;
 
 /**
  * Dropdown list built into `host`: a button showing the value and a menu of options,
- * optionally with a search field filtering as you type. Arrows and Enter pick, Esc or
- * a press outside close. One component for every list in the UI, so they look and
- * behave alike; `host` classes choose the look (`picker-chip`, `picker-field`). Its
- * outside-press listener lives on `document` with no teardown: mount once per page.
+ * optionally with tabs over several lists and a search field filtering as you type. Arrows
+ * and Enter pick, Esc, Tab out or a press outside close. One component for every list in the
+ * UI, so they look and behave alike; `host` classes choose the look (`picker-chip`,
+ * `picker-field`). Its outside-press listener lives on `document` with no teardown: mount
+ * once per page.
  */
 export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   const id = `picker-${nextId++}`;
@@ -84,6 +91,24 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   empty.className = 'picker-empty';
   empty.setAttribute('role', 'status');
 
+  // Tabs are a radio group: arrows switch them natively, Tab moves on to the search.
+  let tabs: HTMLFieldSetElement | null = null;
+  if (cfg.scopes) {
+    tabs = document.createElement('fieldset');
+    tabs.className = 'picker-scopes';
+    tabs.setAttribute('aria-label', cfg.scopes.label);
+    for (const { value, text } of cfg.scopes.choices) {
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = `${id}-scope`;
+      radio.value = value;
+      radio.className = 'visually-hidden';
+      const label = document.createElement('label');
+      label.append(radio, text);
+      tabs.append(label);
+    }
+    menu.append(tabs);
+  }
   let search: HTMLInputElement | null = null;
   if (cfg.search) {
     search = document.createElement('input');
@@ -106,13 +131,19 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   host.append(button, menu);
   const keys: HTMLElement = search ?? list;
 
-  let options: readonly string[] = [];
-  /** One row per option, made once per list: opening an unfiltered menu creates nothing. */
-  let rows = new Map<string, HTMLElement>();
-  /** The list holds every option in order, as an empty query shows it. */
-  let listFull = false;
+  /** Each scope's options with one row per option, made once per list. */
+  const lists = new Map<string, { options: readonly string[]; rows: Map<string, HTMLElement> }>();
+  /**
+   * The scope whose rows the list holds in full and in order, as an empty query shows them,
+   * so opening an unfiltered menu creates nothing; null while filtered.
+   */
+  let fullScope: string | null = null;
   let selected: Element | null = null;
   let current = '';
+  /** Scope of `current`. */
+  let scope = '';
+  /** Scope of the tab on show. */
+  let view = '';
   let shown: string[] = [];
   let active = -1;
   let nextRow = 0;
@@ -144,15 +175,16 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     // Rows outlive a render: drop the old highlight before the list changes under it.
     list.children[active]?.removeAttribute('data-active');
     const query = search?.value.trim() ?? '';
-    shown = matchOptions(options, query);
-    const typed = shown.length === 0 && query ? cfg.search?.fallback?.(query) : null;
+    const of = lists.get(view);
+    shown = matchOptions(of?.options ?? [], query);
+    const typed = shown.length === 0 && query ? cfg.search?.fallback?.(query, view) : null;
     if (typed) shown = [typed];
-    if (query || !listFull) {
-      list.replaceChildren(...shown.map((v) => rows.get(v) ?? makeRow(v)));
-      listFull = !query;
+    if (query || fullScope !== view) {
+      list.replaceChildren(...shown.map((v) => of?.rows.get(v) ?? makeRow(v)));
+      fullScope = query ? null : view;
     }
     // The rows are `shown` in order, so the current value's row is at its index.
-    const at = shown.indexOf(current);
+    const at = view === scope ? shown.indexOf(current) : -1;
     selected?.setAttribute('aria-selected', 'false');
     selected = list.children[at] ?? null;
     selected?.setAttribute('aria-selected', 'true');
@@ -171,12 +203,15 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     menu.hidden = false;
     button.setAttribute('aria-expanded', 'true');
     if (search) search.value = '';
+    view = scope;
+    for (const radio of tabs?.querySelectorAll('input') ?? []) radio.checked = radio.value === view;
     render(true);
     list.children[active]?.scrollIntoView({ block: 'center' });
     keys.focus();
   };
-  const show = (value: string) => {
+  const show = (value: string, of = '') => {
     current = value;
+    scope = of;
     button.disabled = false;
     valueNode.textContent = value;
     button.setAttribute('aria-label', `${cfg.label}: ${value}`);
@@ -184,9 +219,9 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   const pick = (value: string | undefined) => {
     if (value === undefined) return;
     close(true);
-    if (value === current) return;
-    show(value);
-    cfg.onPick(value);
+    if (value === current && view === scope) return;
+    show(value, view);
+    cfg.onPick(value, view);
   };
   const rowIndex = (e: Event) => {
     const row =
@@ -196,29 +231,39 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
 
   button.addEventListener('click', () => (menu.hidden ? open() : close(false)));
   search?.addEventListener('input', () => render(false));
+  // A tab keeps the query: `eth` on USDⓈ-M, then COIN-M, shows ETHUSD_PERP.
+  tabs?.addEventListener('change', (e) => {
+    if (!(e.target instanceof HTMLInputElement)) return;
+    view = e.target.value;
+    render(true);
+    // A pressed tab hands focus back to the search, so typing and arrows go on working the
+    // list; a tab reached by keyboard (focus-visible) keeps it, its arrows switch tabs.
+    if (!e.target.matches(':focus-visible')) keys.focus();
+  });
   keys.addEventListener('keydown', (e) => {
-    switch (e.key) {
-      case 'ArrowDown':
-      case 'ArrowUp': {
-        e.preventDefault();
-        if (shown.length === 0) return;
-        const step = e.key === 'ArrowDown' ? 1 : -1;
-        highlight((active + step + shown.length) % shown.length);
-        return;
-      }
-      case 'Enter':
-        e.preventDefault();
-        pick(shown[active]);
-        return;
-      case 'Escape':
-        // Inside the settings dialog Esc closes only the menu, not the dialog.
-        e.preventDefault();
-        e.stopPropagation();
-        close(true);
-        return;
-      case 'Tab':
-        close(false);
+    // Forward Tab leaves the menu, past the list (Chrome lets a scrolling box take focus).
+    if (e.key === 'Tab' && !e.shiftKey) close(false);
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Enter') return;
+    e.preventDefault();
+    if (e.key === 'Enter') {
+      pick(shown[active]);
+      return;
     }
+    if (shown.length === 0) return;
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    highlight((active + step + shown.length) % shown.length);
+  });
+  menu.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    // Inside the settings dialog Esc closes only the menu, not the dialog.
+    e.preventDefault();
+    e.stopPropagation();
+    close(true);
+  });
+  // Focus tabbing out of the menu, either way, closes it. A press on a row moves focus to
+  // nothing (relatedTarget null): that one is a pick, not a leave.
+  menu.addEventListener('focusout', (e) => {
+    if (e.relatedTarget instanceof Node && !menu.contains(e.relatedTarget)) close(false);
   });
   list.addEventListener('mouseover', (e) => {
     const i = rowIndex(e);
@@ -230,12 +275,14 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   });
 
   return {
-    setOptions(values) {
-      options = values;
-      rows = new Map(values.map((v) => [v, makeRow(v)]));
-      // Built now, usually while the menu is hidden, rather than inside the click that opens it.
+    setOptions(values, of = '') {
+      const rows = new Map(values.map((v) => [v, makeRow(v)]));
+      lists.set(of, { options: values, rows });
+      // The list the menu shows, or will show on open: built now, usually while the menu is
+      // hidden, rather than inside the click that opens it.
+      if (of !== (menu.hidden ? scope : view)) return;
       list.replaceChildren(...rows.values());
-      listFull = true;
+      fullScope = of;
       if (!menu.hidden) render(false);
     },
     set: show,
