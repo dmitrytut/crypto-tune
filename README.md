@@ -62,6 +62,9 @@ looked at the chart.
 Open **<https://crypto-tune.com/>** and press **Listen**. Browsers only start audio
 after a click. After that the play/pause media key, a headset button and the system media
 controls (macOS Now Playing, the lock screen on phones) stop and resume it, from any tab or app.
+A popular pair has its own address that opens it directly, e.g. <https://crypto-tune.com/bitcoin/>
+or `/ethereum/`, `/solana/`; the address follows the pair you pick. Chrome and Edge can install
+the site as an app (the install icon in the address bar), so it opens from the dock.
 
 To run it locally:
 
@@ -230,8 +233,9 @@ conventions are in [`AGENTS.md`](AGENTS.md).
 **Deploy.** Every push to `master` builds the site and publishes it to GitHub Pages
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): check, test, build, upload
 `dist/`) at the custom domain `crypto-tune.com`, set in Settings → Pages (an Actions deploy needs no
-`CNAME` file). `vite.config.ts` uses a relative `base`, so the build does not depend on the host
-path. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow.
+`CNAME` file). `vite.config.ts` uses an absolute `base` (`/`), so the pair pages under `/<slug>/`
+load the same `/assets/`; the old `dmitrytut.github.io/crypto-tune/` address redirects to the
+domain. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow.
 
 **Link previews and search.** Open Graph and Twitter card tags in `index.html` point at
 `public/og.jpg` (1200×630). `index.html` also carries the canonical URL and `WebApplication`
@@ -240,9 +244,27 @@ structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-cod
 three times (meta, Open Graph, JSON-LD): keep them identical. The About dialog (the ? button next to
 the gear) is static HTML on purpose: AI crawlers that skip JavaScript read what the app does from it.
 
-**Analytics.** Cloudflare Web Analytics (cookieless, no consent banner): the beacon at the end of
-`index.html`. Visits, referrers, countries and Core Web Vitals are in the Cloudflare dashboard →
-Web Analytics → `crypto-tune.com`. No custom events: it does not count presses of Listen.
+**Pair pages.** `src/pair-pages.ts` lists twelve popular USDⓈ-M pairs. For each, the build
+(`pairPages` in `vite.config.ts`) writes `/<slug>/index.html` from the home page with its own
+title, description, canonical URL, `h1` and an intro paragraph in About, and it writes
+`sitemap.xml` (home + pair pages) and `robots.txt`. The site URL, title and description come from
+`index.html`; if the template changes so that a replacement no longer matches exactly, the build
+fails instead of shipping a copy of the home page. Every page's About links to all pair pages.
+A pair page opens its pair over the saved one; picking a pair moves the address to its page
+(`/` for a pair without one) with `history.replaceState`.
+
+**Analytics.** Umami Cloud (EU region, cookieless, no consent banner): the beacon at the end of
+`index.html`, counting only on `crypto-tune.com`. Visits, referrers, countries and Core Web Vitals
+(Performance tab) are in the Umami dashboard. `src/analytics.ts` sends two events:
+
+| Event        | When                                          | Data                                                        |
+| ------------ | --------------------------------------------- | ----------------------------------------------------------- |
+| `listen`     | audio starts (button, media key)              | `pair` (symbol or `simulator`), `days`: distinct days this browser has listened, today included |
+| `listen_10m` | audio keeps running 10 min, once per page load | `pair`                                                      |
+
+Daily listeners are the unique visitors of `listen` per day; returning listeners are those with
+`days` ≥ 2. Nothing identifies a visitor: `days` is a counter in localStorage. A pair switch
+changes the address, which Umami counts as a pageview of that pair's page.
 
 ## Status
 
@@ -261,12 +283,24 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Media keys**: play/pause from the keyboard, headset and system media controls
 - [x] **Pull to refresh**: native browser pull-to-refresh on phones, no library
 - [x] **COIN-M**: USDⓈ-M and COIN-M perpetuals, a tab per market in the pair list
+- [x] **Search and analytics**: pair pages, sitemap and robots, Umami with listening events,
+  installable app (web manifest)
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Search and analytics
+
+1. `pnpm build`: `dist/` has `sitemap.xml`, `robots.txt` and `<slug>/index.html` per pair page,
+   each with its own `<title>`, description, canonical and an inlined `<style>`.
+2. `pnpm preview`, open `/bitcoin/`: BTCUSDT plays whatever pair was saved. Pick SOLUSDT: the
+   address becomes `/solana/`; pick a pair without a page: `/`. Back does not step through pairs.
+3. Open `/`: the saved pair, address unchanged. About lists the pair pages.
+4. DevTools → Application → Manifest: no errors, the install icon shows in the address bar.
+5. On `crypto-tune.com`, press **Listen**: Umami → Events shows `listen` with `pair` and `days`.
 
 ### Pull to refresh
 

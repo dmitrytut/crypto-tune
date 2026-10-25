@@ -1,3 +1,4 @@
+import { ListenTracker } from './analytics';
 import { AudioEngine, type AudioParams } from './audio/engine';
 import {
   BINANCE_MARKETS,
@@ -12,10 +13,15 @@ import { indexedDbTradeStore } from './feed/trade-cache';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
 import { EventBuffer, type EventThresholds } from './metrics/events';
 import { MarketHistory } from './metrics/history';
+import { pagePath, pairPageAt, pairPageOf } from './pair-pages';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { mountApp } from './ui/app';
 
-let settings = loadSettings();
+/** A pair page (/bitcoin/) opens its pair over the stored one; saved once the user changes a setting. */
+const landing = pairPageAt(location.pathname);
+let settings: Settings = landing
+  ? { ...loadSettings(), source: 'live', market: 'usdm', symbol: landing.symbol }
+  : loadSettings();
 let feed: MarketFeed | null = null;
 let engine: MetricsEngine | null = null;
 let history: MarketHistory | null = null;
@@ -47,7 +53,21 @@ const metricsEngine = (s: Settings) =>
     tension: tensionParams(s),
   });
 
+/**
+ * Puts the address on the page of the pair being played (`/` for one without a page), so a reload
+ * or a copied link opens it. Replaces the entry: switching pairs must not fill the back button.
+ */
+function syncPath(s: Settings): void {
+  const page = s.source === 'live' && s.market === 'usdm' ? pairPageOf(s.symbol) : undefined;
+  const path = pagePath(page);
+  if (path !== location.pathname) {
+    // `window.`: the module's `history` is the chart's MarketHistory.
+    window.history.replaceState(window.history.state, '', path + location.search + location.hash);
+  }
+}
+
 const audio = new AudioEngine(audioParams(settings));
+const listens = new ListenTracker();
 
 const view = mountApp(settings, {
   onSettings(next) {
@@ -60,6 +80,7 @@ const view = mountApp(settings, {
       next.windowSec !== prev.windowSec
     ) {
       startPipeline();
+      syncPath(next);
     } else if (next.sensitivity !== prev.sensitivity) {
       engine?.setTensionParams(tensionParams(next));
     }
@@ -70,12 +91,16 @@ const view = mountApp(settings, {
   onToggleAudio() {
     if (audio.current === 'running') {
       audio.stop();
+      listens.stopped();
       view.setPlayback('stopped');
       return;
     }
     view.setPlayback('starting');
     audio.start().then(
-      () => view.setPlayback('running'),
+      () => {
+        view.setPlayback('running');
+        listens.started(settings.source === 'simulator' ? 'simulator' : settings.symbol);
+      },
       (err: unknown) => {
         console.error('Audio failed to start', err);
         view.setPlayback('stopped');
