@@ -52,6 +52,8 @@ looked at the chart.
   the UI fades out, leaving only the aura, the price and the chart.
 - **Any Binance futures perpetual**, USDⓈ-M (`BTCUSDT`) or COIN-M (`BTCUSD_PERP`). You can also
   switch to the built-in simulator to hear a sell-off on demand.
+- **Favorite pairs first.** Star pairs directly in the picker: each market keeps its own favorites
+  above the rest, with BTC, ETH and SOL pinned by default. Saved in this browser, no extra tab.
 
 | Live BTCUSDT, buyers in control                    | Simulator, liquidation cascade                                 |
 | -------------------------------------------------- | -------------------------------------------------------------- |
@@ -299,12 +301,27 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **COIN-M**: USDⓈ-M and COIN-M perpetuals, a tab per market in the pair list
 - [x] **Search and analytics**: pair pages, sitemap and robots, Umami with listening events,
   installable app (web manifest)
+- [x] **Favorites**: per-market starred pairs, pinned above the list and saved locally
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Favorites
+
+1. With no saved favorites, open each market: BTC, ETH and SOL lead its list. Reopening starts
+   at the top, even if the selected pair is further down.
+2. Click a star: the pair moves between favorites and the rest without selecting it or closing
+   the menu. Switch markets and reload: favorites are independent; removed defaults stay removed.
+3. Search still covers every pair, with exact and prefix matches ahead of less relevant favorites.
+4. From the search, arrows highlight a row; Tab reaches its star, Space toggles it. Left/right
+   moves between star and pair, up/down between rows; Enter on the pair selects it. Esc closes
+   and returns focus to the picker. After a toggle, focus follows the same pair.
+5. On a first visit with a slow symbol-list request, type a pair and Tab to its star before
+   the list arrives. When it loads, focus returns to the search; Esc still closes the menu.
+6. Settings → Tonic: hovering a different note highlights it, and Enter selects that note.
 
 ### Search and analytics
 
@@ -331,7 +348,7 @@ sound, and Binance covers the pairs that matter.
 3. The 15 min volume is in USD and close to the sum of `q × 100` over the last
    `/dapi/v1/aggTrades` rows for that span (a few $M for BTC, far below USDⓈ-M).
 4. Type `eth`, switch tabs: the query stays (`ETHUSDT` ⇄ `ETHUSD_PERP`). Shift+Tab from the
-   search reaches the tabs, arrows switch them; Esc closes; Tab from the search closes.
+   search reaches the tabs, arrows switch them; Esc closes; Tab reaches the active row's star.
 5. Reload: market and pair are kept.
 
 ### Media keys

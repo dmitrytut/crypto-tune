@@ -21,4 +21,24 @@ describe('matchOptions', () => {
   it('returns nothing when no option contains the query', () => {
     expect(matchOptions(PAIRS, 'xyz')).toEqual([]);
   });
+
+  it('pins favorites without duplicating options or adding unavailable symbols', () => {
+    expect(matchOptions(PAIRS, '', new Set(['SOLUSDT', 'ETHUSDT', 'MISSING']))).toEqual([
+      'ETHUSDT',
+      'SOLUSDT',
+      'BTCUSDT',
+      'ETHBTC',
+      'WBTCUSDT',
+    ]);
+  });
+
+  it('keeps exact and prefix search relevance ahead of favorite status', () => {
+    expect(
+      matchOptions(
+        ['WBTCUSDT', 'BTCUSDT', 'BTC', 'BTCUSD'],
+        'btc',
+        new Set(['WBTCUSDT', 'BTCUSD']),
+      ),
+    ).toEqual(['BTC', 'BTCUSD', 'BTCUSDT', 'WBTCUSDT']);
+  });
 });

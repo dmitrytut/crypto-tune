@@ -41,6 +41,8 @@
   --space-xl: 14px;
   /* Side margin of the page; floating panels keep it to the window edge. */
   --gutter: 24px;
+  /* Favorite row controls and the placeholder height for offscreen picker rows. */
+  --picker-row-height: 40px;
 
   /* ── shape ── */
   --radius-sm: 8px;

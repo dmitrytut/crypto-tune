@@ -130,7 +130,8 @@
     &:empty {
       display: none;
     }
-    & [role="option"] {
+    & [role="option"],
+    & [role="row"] {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -145,6 +146,16 @@
        * (the intrinsic size is the content box), so the scroll height matches. */
       content-visibility: auto;
       contain-intrinsic-block-size: auto 1lh;
+    }
+    & [role="row"] {
+      padding: 0 var(--space-xs);
+      /* Match the buttons' minimum height before offscreen rows are laid out. */
+      contain-intrinsic-block-size: auto var(--picker-row-height);
+
+      & [role="gridcell"]:nth-child(2) {
+        flex: 1;
+        min-width: 0;
+      }
     }
     & [data-active] {
       background: var(--surface-strong);
@@ -163,6 +174,43 @@
         background: currentColor;
       }
     }
+  }
+  .picker-favorite,
+  .picker-choice {
+    min-height: var(--picker-row-height);
+    padding: var(--space-sm) var(--space-xs);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline-offset: calc(-1 * var(--focus-offset));
+    }
+  }
+  .picker-favorite {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+
+    & .icon {
+      width: 18px;
+      height: 18px;
+    }
+    &[aria-pressed="true"] {
+      color: var(--text);
+
+      & .icon {
+        fill: currentColor;
+      }
+    }
+  }
+  .picker-choice {
+    width: 100%;
+    text-align: left;
   }
   /* A live region, so it stays rendered: an empty note takes no room. */
   .picker-empty {

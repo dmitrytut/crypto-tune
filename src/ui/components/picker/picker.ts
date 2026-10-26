@@ -1,24 +1,31 @@
 import './picker.css';
 
 /**
- * Options matching a typed query, case-insensitively: an exact match first, then
- * prefix matches, then the rest that contain it, each group in list order. An empty
- * query keeps the whole list.
+ * Options matching a typed query, case-insensitively: exact, prefix, then contains.
+ * Favorites lead each group; otherwise list order is preserved. An empty query
+ * shows all favorites first, followed by the rest.
  * @package
  */
-export function matchOptions(list: readonly string[], query: string): string[] {
+export function matchOptions(
+  list: readonly string[],
+  query: string,
+  favorites?: ReadonlySet<string>,
+): string[] {
   const q = query.trim().toUpperCase();
-  if (!q) return [...list];
+  if (!q && !favorites?.size) return [...list];
   const exact: string[] = [];
   const starts: string[] = [];
   const contains: string[] = [];
+  const favoriteStarts: string[] = [];
+  const favoriteContains: string[] = [];
   for (const s of list) {
     const u = s.toUpperCase();
+    const favorite = favorites?.has(s);
     if (u === q) exact.push(s);
-    else if (u.startsWith(q)) starts.push(s);
-    else if (u.includes(q)) contains.push(s);
+    else if (u.startsWith(q)) (favorite ? favoriteStarts : starts).push(s);
+    else if (u.includes(q)) (favorite ? favoriteContains : contains).push(s);
   }
-  return exact.concat(starts, contains);
+  return exact.concat(favoriteStarts, starts, favoriteContains, contains);
 }
 
 /** What a picker shows and what happens on a pick. */
@@ -38,6 +45,11 @@ export interface PickerConfig {
     /** An unlisted query that may still be picked as typed in `scope`, or null. */
     fallback?: (query: string, scope: string) => string | null;
   };
+  /** Optional per-scope pinning. The owner persists changes, independently of picking. */
+  favorites?: {
+    values(scope: string): readonly string[];
+    onChange(values: string[], scope: string): void;
+  };
   onPick(value: string, scope: string): void;
 }
 
@@ -54,6 +66,9 @@ export interface Picker {
 /** Chevron (Lucide, ISC). */
 const CHEVRON =
   '<svg class="icon picker-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+/** Star (Lucide, ISC). */
+const STAR =
+  '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg>';
 let nextId = 0;
 
 /**
@@ -66,12 +81,15 @@ let nextId = 0;
  */
 export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   const id = `picker-${nextId++}`;
+  // A grid permits two independent controls per row; a listbox option cannot contain buttons.
+  const listRole = cfg.favorites ? 'grid' : 'listbox';
+  const rowRole = cfg.favorites ? 'row' : 'option';
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'picker-btn';
-  button.setAttribute('aria-haspopup', 'listbox');
+  button.setAttribute('aria-haspopup', listRole);
   button.setAttribute('aria-expanded', 'false');
-  // aria-haspopup says a listbox opens: point at the listbox, not the menu wrapping it.
+  // Point at the popup's composite widget, not its menu wrapper.
   button.setAttribute('aria-controls', `${id}-list`);
   const valueNode = document.createElement('span');
   button.append(valueNode);
@@ -84,9 +102,9 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   const list = document.createElement('div');
   list.className = 'picker-list';
   list.id = `${id}-list`;
-  list.setAttribute('role', 'listbox');
+  list.setAttribute('role', listRole);
   list.setAttribute('aria-label', cfg.label);
-  // "No such pair" is announced as it appears; it lives outside the listbox and needs no focus.
+  // "No such pair" is announced as it appears; it lives outside the list and needs no focus.
   const empty = document.createElement('p');
   empty.className = 'picker-empty';
   empty.setAttribute('role', 'status');
@@ -118,6 +136,7 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     search.autocomplete = 'off';
     search.spellcheck = false;
     search.setAttribute('role', 'combobox');
+    search.setAttribute('aria-haspopup', listRole);
     search.setAttribute('aria-label', cfg.search.placeholder);
     search.setAttribute('aria-controls', list.id);
     search.setAttribute('aria-expanded', 'true');
@@ -148,16 +167,39 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   let active = -1;
   let nextRow = 0;
 
-  const makeRow = (value: string) => {
+  const makeRow = (value: string, of: string) => {
     const row = document.createElement('div');
     row.id = `${id}-opt-${nextRow++}`;
-    row.setAttribute('role', 'option');
+    row.setAttribute('role', rowRole);
     row.setAttribute('aria-selected', 'false');
-    row.textContent = value;
+    if (cfg.favorites) {
+      for (const favorite of [true, false]) {
+        const cell = document.createElement('div');
+        cell.setAttribute('role', 'gridcell');
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.tabIndex = -1;
+        control.className = favorite ? 'picker-favorite' : 'picker-choice';
+        if (favorite) {
+          control.innerHTML = STAR;
+          control.setAttribute('aria-label', `Favorite ${value}`);
+          control.setAttribute('aria-pressed', String(cfg.favorites.values(of).includes(value)));
+        } else {
+          control.textContent = value;
+        }
+        cell.append(control);
+        row.append(cell);
+      }
+    } else {
+      row.textContent = value;
+    }
     return row;
   };
 
   const highlight = (i: number) => {
+    for (const control of list.children[active]?.querySelectorAll('button') ?? []) {
+      control.tabIndex = -1;
+    }
     list.children[active]?.removeAttribute('data-active');
     active = i;
     const row = list.children[i];
@@ -165,6 +207,7 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
       keys.removeAttribute('aria-activedescendant');
       return;
     }
+    for (const control of row.querySelectorAll('button')) control.tabIndex = 0;
     row.setAttribute('data-active', '');
     keys.setAttribute('aria-activedescendant', row.id);
     row.scrollIntoView({ block: 'nearest' });
@@ -173,14 +216,21 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   /** Shows the rows matching the query; highlights the current value or the best match. */
   const render = (onCurrent: boolean) => {
     // Rows outlive a render: drop the old highlight before the list changes under it.
+    for (const control of list.children[active]?.querySelectorAll('button') ?? []) {
+      control.tabIndex = -1;
+    }
     list.children[active]?.removeAttribute('data-active');
     const query = search?.value.trim() ?? '';
     const of = lists.get(view);
-    shown = matchOptions(of?.options ?? [], query);
+    shown = matchOptions(
+      of?.options ?? [],
+      query,
+      cfg.favorites ? new Set(cfg.favorites.values(view)) : undefined,
+    );
     const typed = shown.length === 0 && query ? cfg.search?.fallback?.(query, view) : null;
     if (typed) shown = [typed];
     if (query || fullScope !== view) {
-      list.replaceChildren(...shown.map((v) => of?.rows.get(v) ?? makeRow(v)));
+      list.replaceChildren(...shown.map((v) => of?.rows.get(v) ?? makeRow(v, view)));
       fullScope = query ? null : view;
     }
     // The rows are `shown` in order, so the current value's row is at its index.
@@ -205,8 +255,9 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     if (search) search.value = '';
     view = scope;
     for (const radio of tabs?.querySelectorAll('input') ?? []) radio.checked = radio.value === view;
-    render(true);
-    list.children[active]?.scrollIntoView({ block: 'center' });
+    render(!cfg.favorites);
+    if (cfg.favorites) list.scrollTop = 0;
+    else list.children[active]?.scrollIntoView({ block: 'center' });
     keys.focus();
   };
   const show = (value: string, of = '') => {
@@ -225,7 +276,7 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   };
   const rowIndex = (e: Event) => {
     const row =
-      e.target instanceof Element ? e.target.closest<HTMLElement>('[role="option"]') : null;
+      e.target instanceof Element ? e.target.closest<HTMLElement>(`[role="${rowRole}"]`) : null;
     return row ? Array.prototype.indexOf.call(list.children, row) : -1;
   };
 
@@ -235,14 +286,14 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   tabs?.addEventListener('change', (e) => {
     if (!(e.target instanceof HTMLInputElement)) return;
     view = e.target.value;
-    render(true);
+    render(!cfg.favorites);
     // A pressed tab hands focus back to the search, so typing and arrows go on working the
     // list; a tab reached by keyboard (focus-visible) keeps it, its arrows switch tabs.
     if (!e.target.matches(':focus-visible')) keys.focus();
   });
   keys.addEventListener('keydown', (e) => {
-    // Forward Tab leaves the menu, past the list (Chrome lets a scrolling box take focus).
-    if (e.key === 'Tab' && !e.shiftKey) close(false);
+    // Plain lists leave on Tab; grids let Tab reach the active row's controls.
+    if (e.key === 'Tab' && !e.shiftKey && !cfg.favorites) close(false);
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Enter') return;
     e.preventDefault();
     if (e.key === 'Enter') {
@@ -252,6 +303,25 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     if (shown.length === 0) return;
     const step = e.key === 'ArrowDown' ? 1 : -1;
     highlight((active + step + shown.length) % shown.length);
+  });
+  list.addEventListener('keydown', (e) => {
+    if (!(e.target instanceof HTMLButtonElement)) return;
+    const column = e.target.classList.contains('picker-favorite') ? 0 : 1;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      highlight((rowIndex(e) + step + shown.length) % shown.length);
+      list.children[active]?.querySelectorAll('button')[column]?.focus();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      list.children[rowIndex(e)]
+        ?.querySelectorAll('button')
+        [e.key === 'ArrowLeft' ? 0 : 1]?.focus();
+    }
+  });
+  list.addEventListener('focusin', (e) => {
+    const i = rowIndex(e);
+    if (i >= 0 && i !== active) highlight(i);
   });
   menu.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
@@ -267,23 +337,50 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   });
   list.addEventListener('mouseover', (e) => {
     const i = rowIndex(e);
-    if (i >= 0 && i !== active) highlight(i);
+    if (i >= 0 && i !== active && (!cfg.favorites || !list.contains(document.activeElement))) {
+      highlight(i);
+    }
   });
-  list.addEventListener('click', (e) => pick(shown[rowIndex(e)]));
+  list.addEventListener('click', (e) => {
+    const value = shown[rowIndex(e)];
+    if (value === undefined) return;
+    const star = e.target instanceof Element ? e.target.closest('.picker-favorite') : null;
+    if (!star || !cfg.favorites) {
+      pick(value);
+      return;
+    }
+    const favorites = new Set(cfg.favorites.values(view));
+    if (favorites.has(value)) favorites.delete(value);
+    else favorites.add(value);
+    cfg.favorites.onChange([...favorites], view);
+    star.setAttribute('aria-pressed', String(favorites.has(value)));
+    // Reordering must keep keyboard focus on the same pair, not its former neighbour.
+    const focused = list.contains(document.activeElement);
+    fullScope = null;
+    render(false);
+    highlight(shown.indexOf(value));
+    if (focused)
+      list.children[active]?.querySelector<HTMLButtonElement>('.picker-favorite')?.focus();
+  });
   document.addEventListener('pointerdown', (e) => {
     if (!(e.target instanceof Node && host.contains(e.target))) close(false);
   });
 
   return {
     setOptions(values, of = '') {
-      const rows = new Map(values.map((v) => [v, makeRow(v)]));
+      const hadFocus = list.contains(document.activeElement);
+      const rows = new Map(values.map((v) => [v, makeRow(v, of)]));
       lists.set(of, { options: values, rows });
       // The list the menu shows, or will show on open: built now, usually while the menu is
       // hidden, rather than inside the click that opens it.
       if (of !== (menu.hidden ? scope : view)) return;
       list.replaceChildren(...rows.values());
-      fullScope = of;
-      if (!menu.hidden) render(false);
+      fullScope = cfg.favorites ? null : of;
+      if (!menu.hidden) {
+        render(false);
+        // A delayed symbol list can replace a focused button in the typed fallback row.
+        if (hadFocus) keys.focus();
+      }
     },
     set: show,
     disable(text) {
