@@ -156,6 +156,11 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
         return !listed.has(market) && SYMBOL_PATTERN.test(s) ? s : null;
       },
     },
+    favorites: {
+      values: (market) => settings.favorites[market as Settings['market']],
+      onChange: (values, market) =>
+        update({ favorites: { ...settings.favorites, [market]: values } }),
+    },
     // Scopes are MARKET_LABELS keys: a pick always reports a market.
     onPick: (symbol, market) => update({ market: market as Settings['market'], symbol }),
   });
