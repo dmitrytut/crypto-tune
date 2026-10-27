@@ -2,6 +2,7 @@ import type { LiquidationSide, TradeSide } from '../../feed/market-feed';
 import { usdFmt } from '../format';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
+import { popDroplets, popHeight } from './pop';
 import { bubbleStart, planSpawns, sizeDecades } from './spawn';
 import { bubbleSprite, dropSprite, haloSprite } from './sprites';
 
@@ -10,7 +11,7 @@ const MAX_BUBBLES = 1_500;
 /** Bubbles created per frame; a burst beyond this merges into larger ones. */
 const SPAWN_BUDGET = 120;
 const FADE_IN_SEC = 0.35;
-/** Last share of a bubble's life spent fading out. */
+/** Last share of a drop's life spent fading out; bubbles never fade, they pop. */
 const FADE_OUT_SHARE = 0.4;
 const RING_SEC = 1.8;
 const SHARD_SEC = 1.1;
@@ -18,6 +19,16 @@ const TRADE_LABEL_SEC = 2.4;
 /** Liquidation labels stay at full opacity for the hold, then fade out over the rest. */
 const LIQ_LABEL_SEC = 5;
 const LIQ_LABEL_HOLD_SEC = 1.5;
+/** Bubble pop: the torn film snaps outward over FILM_SNAP_SEC, the ring spreads over POP_SEC. */
+const FILM_SNAP_SEC = 0.12;
+const POP_SEC = 0.45;
+/** Pops per frame that throw droplets; past it a cascade pops with the ring only. */
+const MAX_SPRAYS_PER_FRAME = 30;
+/** Droplets fall back, px/s², and slow in the air, 1/s. */
+const DROPLET_GRAVITY = 260;
+const DROPLET_DRAG = 2.4;
+/** Aura flash where a big-trade bubble pops. */
+const BIG_POP_BLOOM = 0.3;
 
 /**
  * Side effects outside the overlay: the aura reacts where the event happened.
@@ -39,6 +50,8 @@ interface Bubble {
   age: number;
   life: number;
   phase: number;
+  /** Height a buy bubble pops at, CSS px from the top; null for drops. */
+  popY: number | null;
   sprite: HTMLCanvasElement;
   halo: HTMLCanvasElement | null;
 }
@@ -59,6 +72,24 @@ interface Shard {
   vy: number;
   age: number;
   color: Rgb;
+}
+
+interface Pop {
+  x: number;
+  y: number;
+  r: number;
+  age: number;
+  sprite: HTMLCanvasElement;
+}
+
+interface Spray {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  age: number;
+  lifeSec: number;
+  sizePx: number;
 }
 
 interface Label {
@@ -90,6 +121,10 @@ export class Fx {
   private bubbles: Bubble[] = [];
   private rings: Ring[] = [];
   private shards: Shard[] = [];
+  private pops: Pop[] = [];
+  private sprays: Spray[] = [];
+  /** Droplets glow like tiny teal embers. */
+  private readonly droplet = dropSprite(UP_COLOR);
   private labels: Label[] = [];
   private queued: { side: TradeSide; usd: number }[] = [];
   private origin = { x: 0, y: 0 };
@@ -156,6 +191,8 @@ export class Fx {
     this.bubbles = [];
     this.rings = [];
     this.shards = [];
+    this.pops = [];
+    this.sprays = [];
     this.labels = [];
   }
 
@@ -170,6 +207,8 @@ export class Fx {
     ctx.clearRect(0, 0, w, h);
     ctx.globalCompositeOperation = 'lighter';
     this.drawBubbles(dt, h);
+    this.drawPops(dt);
+    this.drawSprays(dt);
     this.drawRings(dt);
     this.drawShards(dt);
     ctx.globalCompositeOperation = 'source-over';
@@ -187,6 +226,7 @@ export class Fx {
         ...b,
         age: 0,
         phase: Math.random() * Math.PI * 2,
+        popY: s.side === 'buy' ? popHeight(h, Math.random) : null,
         sprite: this.sprites[s.side],
         halo: s.big ? this.halos[s.side] : null,
       });
@@ -213,17 +253,24 @@ export class Fx {
 
   private drawBubbles(dt: number, h: number): void {
     const { ctx } = this;
+    let sprays = 0;
     let alive = 0;
     for (const b of this.bubbles) {
       b.age += dt;
-      if (b.age >= b.life || b.y < -b.r * 4 || b.y > h + b.r * 4) continue;
+      if (b.y < -b.r * 4 || b.y > h + b.r * 4) continue;
+      // A bubble rises until its pop height; a drop cools and fades with age.
+      if (b.popY === null ? b.age >= b.life : b.y <= b.popY) {
+        if (b.popY !== null) this.pop(b, sprays++ < MAX_SPRAYS_PER_FRAME);
+        continue;
+      }
       b.vy += b.ay * dt;
       // Gentle sideways sway; bigger bubbles sway slower and wider, like real ones.
       b.x += (b.vx + Math.sin(b.age * (2.6 - b.r * 0.05) + b.phase) * (8 + b.r)) * dt;
       b.y += b.vy * dt;
       const fadeIn = Math.min(1, b.age / FADE_IN_SEC);
       const outStart = b.life * (1 - FADE_OUT_SHARE);
-      const fadeOut = b.age < outStart ? 1 : 1 - (b.age - outStart) / (b.life - outStart);
+      const fadeOut =
+        b.popY !== null || b.age < outStart ? 1 : 1 - (b.age - outStart) / (b.life - outStart);
       const a = fadeIn * fadeOut;
       if (b.halo) {
         ctx.globalAlpha = a * (0.7 + 0.3 * Math.sin(b.age * 5));
@@ -235,6 +282,65 @@ export class Fx {
       this.bubbles[alive++] = b;
     }
     this.bubbles.length = alive;
+  }
+
+  /** A bubble bursts: its film snaps away, a ring spreads and, within budget, droplets fly. */
+  private pop(b: Bubble, spray: boolean): void {
+    this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
+    if (spray) {
+      for (const d of popDroplets(b.r, Math.random)) {
+        // Droplets fly off the film, so they start on the rim, heading outward.
+        const k = b.r / Math.hypot(d.vx, d.vy);
+        this.sprays.push({ x: b.x + d.vx * k, y: b.y + d.vy * k, age: 0, ...d });
+      }
+    }
+    if (b.halo) this.hooks.bloom(b.x, b.y, UP_COLOR, BIG_POP_BLOOM);
+  }
+
+  private drawPops(dt: number): void {
+    const { ctx } = this;
+    let alive = 0;
+    ctx.strokeStyle = css(UP_COLOR, 1);
+    for (const p of this.pops) {
+      p.age += dt;
+      const t = p.age / POP_SEC;
+      if (t >= 1) continue;
+      // The torn film snaps outward and is gone.
+      const snap = p.age / FILM_SNAP_SEC;
+      if (snap < 1) {
+        const s = p.r * (1 + 0.35 * snap);
+        ctx.globalAlpha = 1 - snap;
+        ctx.drawImage(p.sprite, p.x - s, p.y - s, s * 2, s * 2);
+      }
+      ctx.globalAlpha = 0.75 * (1 - t) ** 1.5;
+      ctx.lineWidth = Math.max(0.5, 1.6 * (1 - t));
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (1 + 1.4 * (1 - (1 - t) ** 3)), 0, Math.PI * 2);
+      ctx.stroke();
+      this.pops[alive++] = p;
+    }
+    this.pops.length = alive;
+  }
+
+  private drawSprays(dt: number): void {
+    const { ctx } = this;
+    const drag = Math.exp(-DROPLET_DRAG * dt);
+    let alive = 0;
+    for (const s of this.sprays) {
+      s.age += dt;
+      if (s.age >= s.lifeSec) continue;
+      s.vx *= drag;
+      s.vy = s.vy * drag + DROPLET_GRAVITY * dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      const k = 1 - s.age / s.lifeSec;
+      // The ember sprite's bright core is about a third of its size.
+      const r = s.sizePx * 3 * (0.5 + 0.5 * k);
+      ctx.globalAlpha = k;
+      ctx.drawImage(this.droplet, s.x - r, s.y - r, r * 2, r * 2);
+      this.sprays[alive++] = s;
+    }
+    this.sprays.length = alive;
   }
 
   private drawRings(dt: number): void {

@@ -1,0 +1,42 @@
+import { describe, expect, it } from 'vitest';
+import { popDroplets, popHeight } from '../pop';
+
+const seeded = (seed: number) => {
+  let s = seed;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return s / 2147483647;
+  };
+};
+
+describe('popHeight', () => {
+  it('pops in the upper part of the screen, above where bubbles are born', () => {
+    const H = 800;
+    expect(popHeight(H, () => 0)).toBeCloseTo(0.08 * H, 9);
+    expect(popHeight(H, () => 0.999_999)).toBeCloseTo(0.45 * H, 3);
+    // bubbleStart puts buys at 62 % of the height or lower.
+    expect(popHeight(H, () => 0.999_999)).toBeLessThan(0.62 * H);
+  });
+});
+
+describe('popDroplets', () => {
+  it('sprays more droplets from bigger bubbles, up to a cap', () => {
+    const small = popDroplets(4.5, seeded(1)).length;
+    const big = popDroplets(30, seeded(2)).length;
+    expect(small).toBeGreaterThanOrEqual(6);
+    expect(big).toBeGreaterThan(small);
+    expect(popDroplets(500, seeded(3))).toHaveLength(18);
+  });
+
+  it('throws droplets all round the bubble, not in one direction', () => {
+    const ds = popDroplets(20, seeded(4));
+    for (const [sx, sy] of [
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1],
+    ] as const) {
+      expect(ds.some((d) => Math.sign(d.vx) === sx && Math.sign(d.vy) === sy)).toBe(true);
+    }
+  });
+});
