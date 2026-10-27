@@ -15,7 +15,7 @@ const POP_BOTTOM = 0.45;
 /** Droplets per px² of bubble area: the count follows the size, so a whale bursts in a shower. */
 const DROPLETS_PER_PX2 = 1 / 30;
 /** Fewest droplets (the smallest bubbles) and most (the biggest); a cascade must stay cheap. */
-const MIN_DROPLETS = 2;
+const MIN_DROPLETS = 3;
 const MAX_DROPLETS = 28;
 
 /**
@@ -29,7 +29,7 @@ export function popHeight(h: number, rand: () => number): number {
 
 /**
  * The spray of a bubble of radius `r` popping: droplets spread all round, as many as its area
- * (2 for the smallest bubbles, up to 28) and faster for bigger bubbles.
+ * (3 for the smallest bubbles, up to 28) and faster for bigger bubbles.
  * @package
  */
 export function popDroplets(r: number, rand: () => number): Droplet[] {

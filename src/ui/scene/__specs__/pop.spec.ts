@@ -20,8 +20,8 @@ describe('popHeight', () => {
 });
 
 describe('popDroplets', () => {
-  it('scales droplets with the bubble area: a couple for the smallest, many for the biggest', () => {
-    expect(popDroplets(4.5, seeded(1))).toHaveLength(2);
+  it('scales droplets with the bubble area: three for the smallest, many for the biggest', () => {
+    expect(popDroplets(4.5, seeded(1))).toHaveLength(3);
     const mid = popDroplets(12, seeded(2)).length;
     const twice = popDroplets(24, seeded(3)).length;
     // Twice the radius, about four times the droplets.
