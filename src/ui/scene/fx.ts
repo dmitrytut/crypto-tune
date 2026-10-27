@@ -28,12 +28,10 @@ const DROPLET_GRAVITY = 260;
 const DROPLET_DRAG = 2.4;
 /** Aura flash where a big-trade bubble pops. */
 const BIG_POP_BLOOM = 0.3;
-/** Drop hitting the floor: sparks fall back px/s², slow sideways 1/s, keep this share of their
- * speed on a bounce and of their slide; the impact flash lasts IMPACT_SEC. */
+/** Drop hitting the floor: sparks fall px/s² and slow sideways 1/s, on through the chart to the
+ * screen bottom; the impact flash lasts IMPACT_SEC. */
 const SPARK_GRAVITY = 520;
 const SPARK_DRAG = 1.2;
-const SPARK_BOUNCE = 0.35;
-const SPARK_SLIDE = 0.7;
 const IMPACT_SEC = 0.15;
 /** Drops per frame that throw sparks; past it a cascade lands with the flash only. */
 const MAX_SPLASHES_PER_FRAME = 30;
@@ -247,7 +245,7 @@ export class Fx {
     this.drawBubbles(dt, h);
     this.drawPops(dt);
     this.drawSprays(dt);
-    this.drawSparks(dt);
+    this.drawSparks(dt, h);
     this.drawImpacts(dt);
     this.drawRings(dt);
     this.drawShards(dt);
@@ -391,24 +389,18 @@ export class Fx {
     this.sprays.length = alive;
   }
 
-  private drawSparks(dt: number): void {
+  private drawSparks(dt: number, h: number): void {
     const { ctx } = this;
-    const floor = this.floor ?? this.canvas.clientHeight;
     const drag = Math.exp(-SPARK_DRAG * dt);
     let alive = 0;
     ctx.lineCap = 'round';
     for (const s of this.sparks) {
       s.age += dt;
-      if (s.age >= s.lifeSec) continue;
+      if (s.age >= s.lifeSec || s.y > h) continue;
       s.vx *= drag;
       s.vy += SPARK_GRAVITY * dt;
       s.x += s.vx * dt;
       s.y += s.vy * dt;
-      if (s.y > floor && s.vy > 0) {
-        s.y = floor;
-        s.vy *= -SPARK_BOUNCE;
-        s.vx *= SPARK_SLIDE;
-      }
       const t = s.age / s.lifeSec;
       ctx.globalAlpha = 1 - 0.6 * t;
       ctx.strokeStyle = this.sparkCss[Math.floor(t * SPARK_COLOR_STEPS)] as string;
