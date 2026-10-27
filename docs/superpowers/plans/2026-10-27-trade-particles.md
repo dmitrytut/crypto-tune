@@ -38,21 +38,21 @@
 
 ## Файлы
 
-| Файл | Задачи |
-| --- | --- |
-| `src/ui/scene/sprites.ts` (новый) | 0, 2, 3, 6 |
-| `src/ui/scene/particle.ts` (новый) | 1, 3, 4 |
-| `src/ui/scene/grid.ts` (новый) | 5 |
-| `src/ui/scene/annihilate.ts` (новый) | 6 |
-| `src/ui/scene/merge.ts` (новый) | 7 |
-| `src/ui/scene/layers.ts` (новый) | 8 |
-| `src/ui/scene/fx.ts` | 0–4, 6–8 |
-| `src/ui/scene/spawn.ts` | 1, 4 |
-| `src/ui/scene/stage.ts` | 4 |
-| `src/ui/palette.ts` | 2, 3 |
-| `src/ui/scene/__specs__/{particle,grid,annihilate,merge,layers}.spec.ts` (новые) | 1, 3–8 |
-| `src/ui/__specs__/palette.spec.ts` | 2 |
-| `README.md`, `AGENTS.md`, спек | 9 |
+| Файл                                                                             | Задачи     |
+| -------------------------------------------------------------------------------- | ---------- |
+| `src/ui/scene/sprites.ts` (новый)                                                | 0, 2, 3, 6 |
+| `src/ui/scene/particle.ts` (новый)                                               | 1, 3, 4    |
+| `src/ui/scene/grid.ts` (новый)                                                   | 5          |
+| `src/ui/scene/annihilate.ts` (новый)                                             | 6          |
+| `src/ui/scene/merge.ts` (новый)                                                  | 7          |
+| `src/ui/scene/layers.ts` (новый)                                                 | 8          |
+| `src/ui/scene/fx.ts`                                                             | 0–4, 6–8   |
+| `src/ui/scene/spawn.ts`                                                          | 1, 4       |
+| `src/ui/scene/stage.ts`                                                          | 4          |
+| `src/ui/palette.ts`                                                              | 2, 3       |
+| `src/ui/scene/__specs__/{particle,grid,annihilate,merge,layers}.spec.ts` (новые) | 1, 3–8     |
+| `src/ui/__specs__/palette.spec.ts`                                               | 2          |
+| `README.md`, `AGENTS.md`, спек                                                   | 9          |
 
 ## Проверка на глаз (каждая визуальная задача)
 
@@ -162,7 +162,6 @@ import { bubbleSprite, dropSprite, haloSprite } from './sprites';
 
 Run: `pnpm check && pnpm test && pnpm build`
 Expected: всё зелёное. На глаз (см. «Проверка на глаз») — без изменений.
-
 - [ ] **Step 4: Commit**
 
 ```bash
@@ -247,7 +246,6 @@ describe('stretchAlong', () => {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/particle.spec.ts`
 Expected: FAIL — `Failed to resolve import "../particle"`.
-
 - [ ] **Step 3: `MIN_R_PX` в `spawn.ts`**
 
 После `SIDE_CENTER` добавить:
@@ -262,7 +260,6 @@ export const MIN_R_PX = 4.5;
 
 В `bubbleStart` заменить `const r = 4.5 + 6 * d + (big ? 8 : 0);` на
 `const r = MIN_R_PX + 6 * d + (big ? 8 : 0);`.
-
 - [ ] **Step 4: Создать `src/ui/scene/particle.ts`**
 
 ```ts
@@ -316,7 +313,6 @@ export function stretchAlong(ux: number, uy: number, k: number): Mat2 {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/particle.spec.ts`
 Expected: PASS (5 tests).
-
 - [ ] **Step 6: Подключить в `fx.ts`**
 
 Импорт:
@@ -379,7 +375,6 @@ function setLocal(ctx: CanvasRenderingContext2D, m: Mat2, x: number, y: number, 
 Run: `pnpm check && pnpm test && pnpm build` — зелёное.
 На глаз: новый пузырь коротко вздрагивает; быстрые частицы вытянуты вдоль движения, капли
 сильнее пузырей; блик пузыря всегда сверху слева. Скриншот, fps при шоке.
-
 - [ ] **Step 8: Commit**
 
 ```bash
@@ -446,7 +441,6 @@ describe('shiftHue', () => {
 
 Run: `pnpm vitest run src/ui/__specs__/palette.spec.ts`
 Expected: FAIL — `shiftHue is not a function` (или ошибка импорта).
-
 - [ ] **Step 3: `shiftHue` в `palette.ts`** — после `css()`:
 
 ```ts
@@ -487,7 +481,6 @@ export function shiftHue(c: Rgb, deg: number): Rgb {
 
 Run: `pnpm vitest run src/ui/__specs__/palette.spec.ts`
 Expected: PASS.
-
 - [ ] **Step 5: Спрайты плёнки в `sprites.ts`**
 
 Импорт: `import { css, type Rgb, shiftHue } from '../palette';`. Удалить `bubbleSprite`. После
@@ -600,12 +593,12 @@ const THIN_SHARE = 0.25;
 В `drawBubbles` заменить последние строки отрисовки (от `setLocal(…)` до `ctx.drawImage(b.sprite, …)`):
 
 ```ts
-      setLocal(ctx, stretchAlong(ux, uy, stretchAt(b.side, speed, b.age, b.r)), b.x, b.y, dpr);
-      if (b.side === 'buy') this.drawFilm(b, a);
-      else {
-        ctx.globalAlpha = a;
-        ctx.drawImage(this.drop, -b.r, -b.r, b.r * 2, b.r * 2);
-      }
+setLocal(ctx, stretchAlong(ux, uy, stretchAt(b.side, speed, b.age, b.r)), b.x, b.y, dpr);
+if (b.side === 'buy') this.drawFilm(b, a);
+else {
+  ctx.globalAlpha = a;
+  ctx.drawImage(this.drop, -b.r, -b.r, b.r * 2, b.r * 2);
+}
 ```
 
 Новый метод после `drawBubbles`:
@@ -635,7 +628,6 @@ const THIN_SHARE = 0.25;
 Run: `pnpm check && pnpm test && pnpm build` — зелёное.
 На глаз: ободок пузыря медленно переливается оттенками бирюзового, блик неподвижен; к концу
 жизни ободок тускнеет в золото. Покупки по-прежнему однозначно «зелёные». Скриншот, fps.
-
 - [ ] **Step 8: Commit**
 
 ```bash
@@ -702,7 +694,6 @@ describe('frameAt', () => {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/particle.spec.ts`
 Expected: FAIL — `orientAlong is not a function`.
-
 - [ ] **Step 3: `orientAlong`, `frameAt` в `particle.ts`** — в конец файла:
 
 ```ts
@@ -729,7 +720,6 @@ export function frameAt(age: number, life: number, n: number): number {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/particle.spec.ts`
 Expected: PASS.
-
 - [ ] **Step 5: Экспорт `mix` в `palette.ts`** — заменить объявление `const mix = …` на:
 
 ```ts
@@ -831,17 +821,17 @@ const COOL_FRAMES = 12;
 В `drawBubbles` заменить блок от `setLocal(…)` до конца ветки `else { … }`:
 
 ```ts
-      const k = stretchAt(b.side, speed, b.age, b.r);
-      if (b.side === 'buy') {
-        setLocal(ctx, stretchAlong(ux, uy, k), b.x, b.y, dpr);
-        this.drawFilm(b, a);
-      } else {
-        // Teardrop along its motion: the head at the particle, the tail trailing behind.
-        setLocal(ctx, orientAlong(ux, uy, k), b.x, b.y, dpr);
-        ctx.globalAlpha = a;
-        const frame = this.dropFrames[frameAt(b.age, b.life, COOL_FRAMES)] as HTMLCanvasElement;
-        ctx.drawImage(frame, -3 * b.r, -b.r, 4 * b.r, 2 * b.r);
-      }
+const k = stretchAt(b.side, speed, b.age, b.r);
+if (b.side === 'buy') {
+  setLocal(ctx, stretchAlong(ux, uy, k), b.x, b.y, dpr);
+  this.drawFilm(b, a);
+} else {
+  // Teardrop along its motion: the head at the particle, the tail trailing behind.
+  setLocal(ctx, orientAlong(ux, uy, k), b.x, b.y, dpr);
+  ctx.globalAlpha = a;
+  const frame = this.dropFrames[frameAt(b.age, b.life, COOL_FRAMES)] as HTMLCanvasElement;
+  ctx.drawImage(frame, -3 * b.r, -b.r, 4 * b.r, 2 * b.r);
+}
 ```
 
 - [ ] **Step 8: Проверить**
@@ -849,7 +839,6 @@ const COOL_FRAMES = 12;
 Run: `pnpm check && pnpm test && pnpm build` — зелёное.
 На глаз: капли — слёзы хвостом вверх (против движения), при покачивании хвост следует за
 направлением; свежая капля с белым ядром, к концу жизни тёмно-багровая. Скриншот, fps.
-
 - [ ] **Step 9: Commit**
 
 ```bash
@@ -950,7 +939,6 @@ describe('splashCrown', () => {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/particle.spec.ts`
 Expected: FAIL — нет экспорта `R_PER_DECADE_PX` / `popSpray`.
-
 - [ ] **Step 3: `R_PER_DECADE_PX` в `spawn.ts`** — после `MIN_R_PX`:
 
 ```ts
@@ -962,7 +950,6 @@ export const R_PER_DECADE_PX = 6;
 ```
 
 В `bubbleStart`: `const r = MIN_R_PX + R_PER_DECADE_PX * d + (big ? 8 : 0);`.
-
 - [ ] **Step 4: Брызги в `particle.ts`**
 
 Импорт: `import { MIN_R_PX, R_PER_DECADE_PX } from './spawn';`. В конец файла:
@@ -1026,7 +1013,6 @@ export function splashCrown(r: number, rand: () => number): Spray[] {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/particle.spec.ts src/ui/scene/__specs__/spawn.spec.ts`
 Expected: PASS.
-
 - [ ] **Step 6: Кольца и осколки с позицией и длительностью в `fx.ts`**
 
 Импорт: добавить `popSpray, splashCrown` в импорт из `./particle`.
@@ -1300,20 +1286,20 @@ interface Shard {
 Заменить `const chart = new Chart(el('chart'));` на:
 
 ```ts
-  const chartCanvas = el<HTMLCanvasElement>('chart');
-  const chart = new Chart(chartCanvas);
+const chartCanvas = el<HTMLCanvasElement>('chart');
+const chart = new Chart(chartCanvas);
 ```
 
 После `window.addEventListener('resize', placeOrigin);`:
 
 ```ts
-  const placeFloor = () => {
-    const r = chartCanvas.getBoundingClientRect();
-    // A chart with no box yet has no floor: drops fall off the screen bottom.
-    fx.setFloor(r.height > 0 ? r.top : null);
-  };
-  new ResizeObserver(placeFloor).observe(chartCanvas);
-  window.addEventListener('resize', placeFloor);
+const placeFloor = () => {
+  const r = chartCanvas.getBoundingClientRect();
+  // A chart with no box yet has no floor: drops fall off the screen bottom.
+  fx.setFloor(r.height > 0 ? r.top : null);
+};
+new ResizeObserver(placeFloor).observe(chartCanvas);
+window.addEventListener('resize', placeFloor);
 ```
 
 - [ ] **Step 9: Проверить**
@@ -1323,7 +1309,6 @@ Run: `pnpm check && pnpm test && pnpm build` — зелёное.
 верха графика, разбивается короной брызг вверх и плоским кольцом; недолетевшая остывает и гаснет
 в воздухе. Кольца ликвидаций как прежде. При шоке fps не проседает (лимит 40 лопаний за кадр).
 Скриншот.
-
 - [ ] **Step 10: Commit**
 
 ```bash
@@ -1397,7 +1382,15 @@ describe('nearPairs', () => {
   });
 
   it('sees across cell borders at negative coordinates (above the screen top)', () => {
-    expect(nearPairs([{ x: -1, y: -50, r: 5 }, { x: 4, y: -48, r: 5 }], 0.8)).toEqual([0, 1]);
+    expect(
+      nearPairs(
+        [
+          { x: -1, y: -50, r: 5 },
+          { x: 4, y: -48, r: 5 },
+        ],
+        0.8,
+      ),
+    ).toEqual([0, 1]);
   });
 });
 ```
@@ -1406,7 +1399,6 @@ describe('nearPairs', () => {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/grid.spec.ts`
 Expected: FAIL — `Failed to resolve import "../grid"`.
-
 - [ ] **Step 3: Создать `src/ui/scene/grid.ts`**
 
 ```ts
@@ -1475,7 +1467,6 @@ export function nearPairs(cs: readonly Circle[], reach: number): number[] {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/grid.spec.ts`
 Expected: PASS.
-
 - [ ] **Step 5: Проверить и закоммитить**
 
 Run: `pnpm check && pnpm test && pnpm build` — зелёное.
@@ -1556,7 +1547,6 @@ describe('annihilate', () => {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/annihilate.spec.ts`
 Expected: FAIL — `Failed to resolve import "../annihilate"`.
-
 - [ ] **Step 3: Создать `src/ui/scene/annihilate.ts`**
 
 ```ts
@@ -1623,7 +1613,6 @@ export function annihilate(
 
 Run: `pnpm vitest run src/ui/scene/__specs__/annihilate.spec.ts`
 Expected: PASS.
-
 - [ ] **Step 5: Вспышка в `sprites.ts`** — в конец файла:
 
 ```ts
@@ -1698,7 +1687,6 @@ Run: `pnpm check && pnpm test && pnpm build` — зелёное.
 На глаз: в середине экрана, где встречаются потоки, пузыри и капли гасят друг друга белыми
 вспышками; кит, встретив мелочь, заметно уменьшается, но летит дальше. При одностороннем шоке
 доминирующая сторона прорывается. Экран не выбеливается. Скриншот, fps.
-
 - [ ] **Step 8: Commit**
 
 ```bash
@@ -1788,7 +1776,6 @@ describe('merge', () => {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/merge.spec.ts`
 Expected: FAIL — `Failed to resolve import "../merge"`.
-
 - [ ] **Step 3: Создать `src/ui/scene/merge.ts`**
 
 ```ts
@@ -1855,7 +1842,6 @@ export function merge(ps: readonly Blob[], maxR: number): Set<number> {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/merge.spec.ts`
 Expected: PASS.
-
 - [ ] **Step 5: Слияние в `fx.ts`**
 
 Импорт: `import { merge } from './merge';`. Константа:
@@ -1868,8 +1854,8 @@ const MAX_MERGE_R_PX = 48;
 В `collide()` после фильтра аннигиляции добавить:
 
 ```ts
-    const merged = merge(this.bubbles, MAX_MERGE_R_PX);
-    if (merged.size > 0) this.bubbles = this.bubbles.filter((_, i) => !merged.has(i));
+const merged = merge(this.bubbles, MAX_MERGE_R_PX);
+if (merged.size > 0) this.bubbles = this.bubbles.filter((_, i) => !merged.has(i));
 ```
 
 - [ ] **Step 6: Проверить**
@@ -1877,7 +1863,6 @@ const MAX_MERGE_R_PX = 48;
 Run: `pnpm check && pnpm test && pnpm build` — зелёное.
 На глаз: серия мелких покупок собирается в растущий пузырь, капли сливаются в крупные слёзы;
 пузырей крупнее ~48 px нет. Скриншот, fps.
-
 - [ ] **Step 7: Commit**
 
 ```bash
@@ -1955,7 +1940,6 @@ describe('Layer', () => {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/layers.spec.ts`
 Expected: FAIL — `Failed to resolve import "../layers"`.
-
 - [ ] **Step 3: Создать `src/ui/scene/layers.ts`**
 
 ```ts
@@ -2031,7 +2015,6 @@ export class Layer {
 
 Run: `pnpm vitest run src/ui/scene/__specs__/layers.spec.ts`
 Expected: PASS.
-
 - [ ] **Step 5: Слои в `fx.ts`, окончание С1 удалить**
 
 Импорты: `import { Layer } from './layers';`; добавить `ASH` в импорт из `./sprites`; убрать
@@ -2224,7 +2207,6 @@ Run: `pnpm check && pnpm test && pnpm build` — зелёное.
 капли, долетевшие до графика, — багровым осадком со светящейся кромкой, больше слева. Слои
 неровные, но связные, за пару минут без притока тают. Не толще ~12 % высоты. Пузыри больше не
 лопаются, капли не разбиваются. Скриншот, fps.
-
 - [ ] **Step 7: Commit**
 
 ```bash
@@ -2246,7 +2228,6 @@ git commit -m "feat: foam and sediment layers instead of pops and splashes"
 `git log --oneline -10` → SHA коммитов Task 7 (С1) и Task 8 (С7). Сравнение:
 `git switch --detach <sha-task-7>` → `pnpm dev` → смотреть; `git switch feat/trade-particles` →
 смотреть. Также спросить, какие из идей Task 1–7 откатить. Ждать явного ответа.
-
 - [ ] **Step 2a (если С1): откатить С7**
 
 ```bash
