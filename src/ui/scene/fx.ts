@@ -28,10 +28,14 @@ const DROPLET_GRAVITY = 260;
 const DROPLET_DRAG = 2.4;
 /** Aura flash where a big-trade bubble pops. */
 const BIG_POP_BLOOM = 0.3;
-/** Drop hitting the floor: sparks fall px/s² and slow sideways 1/s, on through the chart to the
- * screen bottom; the impact flash lasts IMPACT_SEC. */
+/** Drop hitting the price line: sparks fall px/s², slow sideways 1/s, keep this share of their
+ * speed on a bounce and of their slide along the line; the impact flash lasts IMPACT_SEC. */
 const SPARK_GRAVITY = 520;
 const SPARK_DRAG = 1.2;
+const SPARK_BOUNCE = 0.35;
+const SPARK_SLIDE = 0.7;
+/** Most a spark is lifted back onto the line in one frame (a rising stretch, a redraw), px. */
+const SPARK_CLIMB_PX = 8;
 const IMPACT_SEC = 0.15;
 /** Drops per frame that throw sparks; past it a cascade lands with the flash only. */
 const MAX_SPLASHES_PER_FRAME = 30;
@@ -153,7 +157,8 @@ export class Fx {
   private readonly sparkCss = Array.from({ length: SPARK_COLOR_STEPS }, (_, i) =>
     css(sparkColor(i / (SPARK_COLOR_STEPS - 1))),
   );
-  private floor: number | null = null;
+  /** Surface height at a screen x, CSS px; null: the screen bottom. */
+  private floorAt: (x: number) => number | null = () => null;
   private labels: Label[] = [];
   private queued: { side: TradeSide; usd: number }[] = [];
   private origin = { x: 0, y: 0 };
@@ -177,9 +182,9 @@ export class Fx {
     this.origin = { x, y };
   }
 
-  /** Top of the chart strip, CSS px: drops break into sparks there. Null: the screen bottom. */
-  setFloor(y: number | null): void {
-    this.floor = y;
+  /** What drops land on and sparks bounce off: the price line, where there is one. */
+  setFloor(floorAt: (x: number) => number | null): void {
+    this.floorAt = floorAt;
   }
 
   trade(side: TradeSide, usd: number): void {
@@ -291,17 +296,21 @@ export class Fx {
 
   private drawBubbles(dt: number, h: number): void {
     const { ctx } = this;
-    const floor = this.floor ?? h;
     let sprays = 0;
     let splashes = 0;
     let alive = 0;
     for (const b of this.bubbles) {
       b.age += dt;
       if (b.y < -b.r * 4 || b.y > h + b.r * 4) continue;
-      // A bubble rises until its pop height; a drop falls until the floor.
-      if (b.popY === null ? b.y >= floor : b.y <= b.popY) {
-        if (b.popY === null) this.splash(b, floor, splashes++ < MAX_SPLASHES_PER_FRAME);
-        else this.pop(b, sprays++ < MAX_SPRAYS_PER_FRAME);
+      // A bubble rises until its pop height; a drop falls until the price line.
+      if (b.popY === null) {
+        const floor = this.floorAt(b.x) ?? h;
+        if (b.y >= floor) {
+          this.splash(b, floor, splashes++ < MAX_SPLASHES_PER_FRAME);
+          continue;
+        }
+      } else if (b.y <= b.popY) {
+        this.pop(b, sprays++ < MAX_SPRAYS_PER_FRAME);
         continue;
       }
       b.vy += b.ay * dt;
@@ -401,6 +410,14 @@ export class Fx {
       s.vy += SPARK_GRAVITY * dt;
       s.x += s.vx * dt;
       s.y += s.vy * dt;
+      // Bounce off the line and roll along it, up rising stretches and as the line redraws.
+      // Past either end of the line the floor drops to the screen bottom and the spark falls.
+      const floor = this.floorAt(s.x) ?? h;
+      if (s.y > floor && s.y - floor <= SPARK_CLIMB_PX + Math.max(0, s.vy * dt)) {
+        s.y = floor;
+        if (s.vy > 0) s.vy *= -SPARK_BOUNCE;
+        s.vx *= SPARK_SLIDE;
+      }
       const t = s.age / s.lifeSec;
       ctx.globalAlpha = 1 - 0.6 * t;
       ctx.strokeStyle = this.sparkCss[Math.floor(t * SPARK_COLOR_STEPS)] as string;

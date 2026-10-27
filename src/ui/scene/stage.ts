@@ -57,13 +57,18 @@ export function mountStage(o: StageOptions): Stage {
   };
   new ResizeObserver(placeOrigin).observe(o.origin);
   window.addEventListener('resize', placeOrigin);
-  const placeFloor = () => {
-    const r = chartCanvas.getBoundingClientRect();
-    // A chart with no box yet has no floor: drops fall to the screen bottom.
-    fx.setFloor(r.height > 0 ? r.top : null);
+  // Drops land on the price line; beside it, or while history is loading, they fall to the
+  // screen bottom.
+  let chartBox = chartCanvas.getBoundingClientRect();
+  const placeChart = () => {
+    chartBox = chartCanvas.getBoundingClientRect();
   };
-  new ResizeObserver(placeFloor).observe(chartCanvas);
-  window.addEventListener('resize', placeFloor);
+  new ResizeObserver(placeChart).observe(chartCanvas);
+  window.addEventListener('resize', placeChart);
+  fx.setFloor((x) => {
+    const y = chartBox.height > 0 ? chart.lineY(x - chartBox.left) : null;
+    return y === null ? null : chartBox.top + y;
+  });
   document.addEventListener('visibilitychange', () => {
     // Events received while hidden were not queued; nothing stale to burst on return.
     if (!document.hidden) fx.clear();

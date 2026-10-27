@@ -1,8 +1,7 @@
 import { DOWN_COLOR, mix, type Rgb } from '../palette';
 
 /**
- * A spark thrown by a drop hitting the floor: launch velocity px/s and cooling time. It falls
- * through the chart and is gone at the screen bottom, usually before it has fully cooled.
+ * A spark thrown by a drop hitting the price line: launch velocity px/s and cooling time.
  * @package
  */
 export interface Spark {
@@ -24,8 +23,8 @@ export const SPARK_ASH: Rgb = [0.47, 0.08, 0.08];
 const HOT_SHARE = 0.3;
 
 /**
- * Sparks of a drop of radius `r` hitting the floor, like hot metal: thrown low and up to both
- * sides, more of them and higher for bigger drops, then falling on through the chart.
+ * Sparks of a drop of radius `r` hitting the price line, like hot metal: thrown low and up to
+ * both sides, more of them and higher for bigger drops; they bounce and roll along the line.
  * @package
  */
 export function floorSparks(r: number, rand: () => number): Spark[] {
@@ -33,7 +32,7 @@ export function floorSparks(r: number, rand: () => number): Spark[] {
   return Array.from({ length: n }, () => ({
     vx: (rand() < 0.5 ? -1 : 1) * (50 + 150 * rand()),
     vy: -(30 + 100 * rand()) * (0.6 + r / 15),
-    lifeSec: 1.8 + 0.6 * rand(),
+    lifeSec: 1.1 + 0.6 * rand(),
   }));
 }
 
