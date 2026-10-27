@@ -11,12 +11,13 @@ const seeded = (seed: number) => {
 };
 
 describe('floorSparks', () => {
-  it('breaks bigger drops into more sparks, up to a cap', () => {
-    const small = floorSparks(4.5, seeded(1)).length;
-    const big = floorSparks(30, seeded(2)).length;
-    expect(small).toBeGreaterThanOrEqual(4);
-    expect(big).toBeGreaterThan(small);
-    expect(floorSparks(500, seeded(3))).toHaveLength(14);
+  it('scales sparks with the drop area: a couple for the smallest, many for the biggest', () => {
+    expect(floorSparks(4.5, seeded(1))).toHaveLength(2);
+    const mid = floorSparks(12, seeded(2)).length;
+    const twice = floorSparks(24, seeded(3)).length;
+    // Twice the radius, about four times the sparks.
+    expect(twice / mid).toBeGreaterThan(3.5);
+    expect(floorSparks(500, seeded(4))).toHaveLength(28);
   });
 
   it('throws every spark up off the floor, to both sides', () => {

@@ -39,6 +39,8 @@ const SPARK_CLIMB_PX = 8;
 const IMPACT_SEC = 0.15;
 /** Drops per frame that throw sparks; past it a cascade lands with the flash only. */
 const MAX_SPLASHES_PER_FRAME = 30;
+/** Live sparks cap: a cascade of whale drops lands with the flash only past it. */
+const MAX_LIVE_SPARKS = 1_200;
 /** Precomputed spark colours along the cooling, so a frame builds no colour strings. */
 const SPARK_COLOR_STEPS = 16;
 
@@ -333,7 +335,7 @@ export class Fx {
   /** A drop hits the floor like hot metal: a flash and, within budget, sparks that skitter. */
   private splash(b: Bubble, floor: number, sparks: boolean): void {
     this.impacts.push({ x: b.x, y: floor, r: b.r, age: 0 });
-    if (!sparks) return;
+    if (!sparks || this.sparks.length >= MAX_LIVE_SPARKS) return;
     for (const s of floorSparks(b.r, Math.random)) {
       this.sparks.push({ x: b.x, y: floor - 1, age: 0, ...s });
     }
