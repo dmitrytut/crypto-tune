@@ -3,7 +3,7 @@ import { usdFmt } from '../format';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
 import { bubbleStart, planSpawns, sizeDecades } from './spawn';
-import { bubbleSprite, dropSprite, haloSprite } from './sprites';
+import { dropSprite, haloSprite } from './sprites';
 
 /** Live bubbles cap; above it the oldest are recycled. */
 const MAX_BUBBLES = 1_500;
@@ -104,7 +104,8 @@ export class Fx {
     if (!ctx) throw new Error('2D canvas unavailable');
     this.ctx = ctx;
     this.fontFamily = getComputedStyle(canvas).fontFamily;
-    this.sprites = { buy: bubbleSprite(UP_COLOR), sell: dropSprite(DOWN_COLOR) };
+    // Both sides are glowing embers; colour alone tells buys from sells.
+    this.sprites = { buy: dropSprite(UP_COLOR), sell: dropSprite(DOWN_COLOR) };
     this.halos = { buy: haloSprite(UP_COLOR), sell: haloSprite(DOWN_COLOR) };
   }
 
