@@ -20,12 +20,13 @@ describe('popHeight', () => {
 });
 
 describe('popDroplets', () => {
-  it('sprays more droplets from bigger bubbles, up to a cap', () => {
-    const small = popDroplets(4.5, seeded(1)).length;
-    const big = popDroplets(30, seeded(2)).length;
-    expect(small).toBeGreaterThanOrEqual(6);
-    expect(big).toBeGreaterThan(small);
-    expect(popDroplets(500, seeded(3))).toHaveLength(18);
+  it('scales droplets with the bubble area: a couple for the smallest, many for the biggest', () => {
+    expect(popDroplets(4.5, seeded(1))).toHaveLength(2);
+    const mid = popDroplets(12, seeded(2)).length;
+    const twice = popDroplets(24, seeded(3)).length;
+    // Twice the radius, about four times the droplets.
+    expect(twice / mid).toBeGreaterThan(3.5);
+    expect(popDroplets(500, seeded(4))).toHaveLength(28);
   });
 
   it('throws droplets all round the bubble, not in one direction', () => {

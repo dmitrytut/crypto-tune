@@ -23,6 +23,8 @@ const FILM_SNAP_SEC = 0.12;
 const POP_SEC = 0.45;
 /** Pops per frame that throw droplets; past it a cascade pops with the ring only. */
 const MAX_SPRAYS_PER_FRAME = 30;
+/** Live droplets cap: a cascade of whale bubbles pops with the ring only past it. */
+const MAX_LIVE_DROPLETS = 1_200;
 /** Droplets fall back, px/s², and slow in the air, 1/s. */
 const DROPLET_GRAVITY = 260;
 const DROPLET_DRAG = 2.4;
@@ -344,7 +346,7 @@ export class Fx {
   /** A bubble bursts: its film snaps away, a ring spreads and, within budget, droplets fly. */
   private pop(b: Bubble, spray: boolean): void {
     this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
-    if (spray) {
+    if (spray && this.sprays.length < MAX_LIVE_DROPLETS) {
       for (const d of popDroplets(b.r, Math.random)) {
         // Droplets fly off the film, so they start on the rim, heading outward.
         const k = b.r / Math.hypot(d.vx, d.vy);
