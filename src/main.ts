@@ -1,5 +1,11 @@
+import { ListenTracker } from './analytics';
 import { AudioEngine, type AudioParams } from './audio/engine';
-import { BinanceFuturesFeed, fetchBinanceSymbols } from './feed/binance';
+import {
+  BINANCE_MARKETS,
+  BinanceFuturesFeed,
+  type BinanceMarket,
+  fetchBinanceSymbols,
+} from './feed/binance';
 import type { MarketFeed, Trade, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
 import { cachedSymbols } from './feed/symbol-cache';
@@ -7,10 +13,23 @@ import { indexedDbTradeStore } from './feed/trade-cache';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
 import { EventBuffer, type EventThresholds } from './metrics/events';
 import { MarketHistory } from './metrics/history';
+import { pagePath, pairPageAt, pairPageOf } from './pair-pages';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { mountApp } from './ui/app';
 
-let settings = loadSettings();
+const stored = loadSettings();
+/** A pair page (/bitcoin/) plays its pair over the stored one. */
+const landing = pairPageAt(location.pathname);
+let settings: Settings = landing
+  ? { ...stored, source: 'live', market: 'usdm', symbol: landing.symbol }
+  : stored;
+/**
+ * The pair to save while the page's pair plays: the user's own, until they pick one. Coming in by
+ * a link and turning the volume down must not replace the pair `/` opens.
+ */
+let savedPair: Pick<Settings, 'source' | 'market' | 'symbol'> | null = landing
+  ? { source: stored.source, market: stored.market, symbol: stored.symbol }
+  : null;
 let feed: MarketFeed | null = null;
 let engine: MetricsEngine | null = null;
 let history: MarketHistory | null = null;
@@ -42,34 +61,52 @@ const metricsEngine = (s: Settings) =>
     tension: tensionParams(s),
   });
 
+/**
+ * Puts the address on the page of the pair being played (`/` for one without a page), so a reload
+ * or a copied link opens it. Replaces the entry: switching pairs must not fill the back button.
+ */
+function syncPath(s: Settings): void {
+  const page = s.source === 'live' && s.market === 'usdm' ? pairPageOf(s.symbol) : undefined;
+  const path = pagePath(page);
+  if (path !== location.pathname) {
+    // `window.`: the module's `history` is the chart's MarketHistory.
+    window.history.replaceState(window.history.state, '', path + location.search + location.hash);
+  }
+}
+
 const audio = new AudioEngine(audioParams(settings));
+const listens = new ListenTracker();
 
 const view = mountApp(settings, {
   onSettings(next) {
     const prev = settings;
     settings = next;
-    if (
-      next.source !== prev.source ||
-      next.symbol !== prev.symbol ||
-      next.windowSec !== prev.windowSec
-    ) {
+    const pairChanged =
+      next.source !== prev.source || next.market !== prev.market || next.symbol !== prev.symbol;
+    if (pairChanged) savedPair = null;
+    if (pairChanged || next.windowSec !== prev.windowSec) {
       startPipeline();
+      syncPath(next);
     } else if (next.sensitivity !== prev.sensitivity) {
       engine?.setTensionParams(tensionParams(next));
     }
     audio.setParams(audioParams(next));
     events?.setThresholds(eventThresholds(next));
-    saveSettings(next);
+    saveSettings(savedPair ? { ...next, ...savedPair } : next);
   },
   onToggleAudio() {
     if (audio.current === 'running') {
       audio.stop();
+      listens.stopped();
       view.setPlayback('stopped');
       return;
     }
     view.setPlayback('starting');
     audio.start().then(
-      () => view.setPlayback('running'),
+      () => {
+        view.setPlayback('running');
+        listens.started(settings.source === 'simulator' ? 'simulator' : settings.symbol);
+      },
       (err: unknown) => {
         console.error('Audio failed to start', err);
         view.setPlayback('stopped');
@@ -89,7 +126,7 @@ function startPipeline(): void {
   const f: MarketFeed =
     settings.source === 'simulator'
       ? new SimulatorFeed({ historyMs: HISTORY_MS })
-      : new BinanceFuturesFeed(settings.symbol, {
+      : new BinanceFuturesFeed(settings.market, settings.symbol, {
           historyMs: HISTORY_MS,
           store: indexedDbTradeStore(`binance:${settings.symbol}`),
         });
@@ -176,14 +213,14 @@ window.setInterval(() => {
   }
 }, TICK_MS);
 
-async function loadSymbols(): Promise<void> {
+async function loadSymbols(market: BinanceMarket): Promise<void> {
   try {
-    view.setSymbols(await cachedSymbols(fetchBinanceSymbols));
+    view.setSymbols(market, await cachedSymbols(market, () => fetchBinanceSymbols(market)));
   } catch (err) {
     // Symbol input still accepts any well-formed ticker without the list.
-    console.warn('Binance symbol list unavailable', err);
+    console.warn(`Binance ${market} symbol list unavailable`, err);
   }
 }
 
 startPipeline();
-void loadSymbols();
+for (const market of BINANCE_MARKETS) void loadSymbols(market);

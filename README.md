@@ -50,8 +50,10 @@ looked at the chart.
   reload), and tension calibrates as soon as they land instead of after a five-minute warm-up.
 - **Glanceable.** The tab title reads `▲ 81,305.2 · BTCUSDT · tension 2.6`. After 10 s without input
   the UI fades out, leaving only the aura, the price and the chart.
-- **Any Binance USDⓈ-M perpetual.** You can also switch to the built-in simulator to hear a sell-off
-  on demand.
+- **Any Binance futures perpetual**, USDⓈ-M (`BTCUSDT`) or COIN-M (`BTCUSD_PERP`). You can also
+  switch to the built-in simulator to hear a sell-off on demand.
+- **Favorite pairs first.** Star pairs directly in the picker: each market keeps its own favorites
+  above the rest, with BTC, ETH and SOL pinned by default. Saved in this browser, no extra tab.
 
 | Live BTCUSDT, buyers in control                    | Simulator, liquidation cascade                                 |
 | -------------------------------------------------- | -------------------------------------------------------------- |
@@ -62,6 +64,9 @@ looked at the chart.
 Open **<https://crypto-tune.com/>** and press **Listen**. Browsers only start audio
 after a click. After that the play/pause media key, a headset button and the system media
 controls (macOS Now Playing, the lock screen on phones) stop and resume it, from any tab or app.
+A popular pair has its own address that opens it directly, e.g. <https://crypto-tune.com/bitcoin/>
+or `/ethereum/`, `/solana/`; the address follows the pair you pick. Chrome and Edge can install
+the site as an app (the install icon in the address bar), so it opens from the dock.
 
 To run it locally:
 
@@ -85,9 +90,14 @@ computation runs in the browser, which talks to Binance directly.
 
 ### Data sources
 
-- **LIVE**: Binance Futures public WebSocket `wss://fstream.binance.com/market/stream` (`aggTrade` +
-  `forceOrder`). The pair can be picked from the list of trading perpetuals. Live trades show at
-  once; meanwhile the last 30 min of trades come from REST (`/fapi/v1/aggTrades`: the newest page,
+- **LIVE**: Binance Futures public WebSocket (`aggTrade` + `forceOrder`): USDⓈ-M at
+  `wss://fstream.binance.com/market/stream`, COIN-M at `wss://dstream.binance.com/stream`. The pair
+  list has a tab per market; a tab only browses, picking a pair switches the stream.
+  COIN-M quantities count USD-face contracts ($100 for BTC, $10 for the rest, read from
+  `/dapi/v1/exchangeInfo` before the stream opens), so the feed converts them to coins and volume,
+  thresholds and events stay in USD. The pair can be picked from the market's list of trading
+  perpetuals. Live trades show at once; meanwhile the last 30 min of trades come from REST
+  (`/fapi/v1/aggTrades` or `/dapi/v1/aggTrades`: the newest page,
   then the older ones in one parallel wave, up to 20 requests) and end right before the first live
   trade by id. The last 30 min per pair live in IndexedDB (written every 30 s, when the tab is
   hidden and when the page is left), read while the newest page loads, so a reload usually fetches
@@ -155,7 +165,7 @@ the line under the meter says what it is waiting for (`Connecting to the market�
 `Waiting for trades…`), and the status in the top right is in words (`Live`, `Connecting…`).
 Sound, sensitivity and source live in settings (⚙); every setting has an ⓘ tip that says in a line
 what it is and what it changes. The pair chip in the top left always shows its border and arrow; a click opens a searchable
-list. Pair and tonic share one dropdown component (`ui/components/picker/`): arrows and Enter pick, Esc or a
+list with a tab per market (USDⓈ-M, COIN-M). Pair and tonic share one dropdown component (`ui/components/picker/`): arrows and Enter pick, Esc, Tab out or a
 click outside closes. There is no visible title; the `h1` is for screen readers only. Style: opaque
 surfaces without blur or glow, the yellow accent only on the sound button, Lucide icons, one white
 focus ring on every control. Plain CSS: design tokens (palette, type scale, spacing, radii,
@@ -208,6 +218,8 @@ ARIA and motion. What that changed:
 - ⓘ tips stay open while the pointer moves from the button onto the tip; Esc closes them and the
   chart marker tip alike.
 - A short window or a zoomed page (up to 400%) scrolls instead of cutting off the controls.
+- On phones the page reloads with the browser's own pull-to-refresh: the document is the scroller,
+  no script involved.
 
 ## Development
 
@@ -226,8 +238,9 @@ conventions are in [`AGENTS.md`](AGENTS.md).
 **Deploy.** Every push to `master` builds the site and publishes it to GitHub Pages
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): check, test, build, upload
 `dist/`) at the custom domain `crypto-tune.com`, set in Settings → Pages (an Actions deploy needs no
-`CNAME` file). `vite.config.ts` uses a relative `base`, so the build does not depend on the host
-path. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow.
+`CNAME` file). `vite.config.ts` uses an absolute `base` (`/`), so the pair pages under `/<slug>/`
+load the same `/assets/`; the old `dmitrytut.github.io/crypto-tune/` address redirects to the
+domain. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow.
 
 **Link previews and search.** Open Graph and Twitter card tags in `index.html` point at
 `public/og.jpg` (1200×630). `index.html` also carries the canonical URL and `WebApplication`
@@ -236,9 +249,41 @@ structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-cod
 three times (meta, Open Graph, JSON-LD): keep them identical. The About dialog (the ? button next to
 the gear) is static HTML on purpose: AI crawlers that skip JavaScript read what the app does from it.
 
-**Analytics.** Cloudflare Web Analytics (cookieless, no consent banner): the beacon at the end of
-`index.html`. Visits, referrers, countries and Core Web Vitals are in the Cloudflare dashboard →
-Web Analytics → `crypto-tune.com`. No custom events: it does not count presses of Listen.
+**Pair pages.** `src/pair-pages.ts` lists twelve popular USDⓈ-M pairs (slug and symbol: all the
+app needs); their words (name, ticker, intro) are in `src/pair-page-texts.ts`, which only the
+build imports, so they stay out of the app bundle. For each pair the build (`pairPages` in
+`vite.config.ts`) writes `/<slug>/index.html` from the home page with its own title, description,
+canonical URL, `h1` and an intro paragraph in About, and it writes `sitemap.xml` (home + pair
+pages) and `robots.txt`. The site URL, title and description come from `index.html`; if the
+template changes so that a replacement no longer matches exactly, the build fails instead of
+shipping a copy of the home page. Every page's About links to all pair pages.
+A pair page plays its pair over the saved one but does not save it: settings changed there keep
+the user's own pair for `/` until they pick a pair. Picking a pair moves the address to its page
+(`/` for COIN-M, the simulator or a pair without a page) with `history.replaceState`.
+After a deploy that changes these pages, check one in Search Console → URL Inspection: if the
+"Google-selected canonical" is `/` instead of the page itself, Google sees the pages as
+duplicates (their own text is a hidden `h1` and the About dialog) and the intro has to move into
+visible content.
+
+**Analytics.** Umami Cloud (EU region, cookieless, no consent banner): the beacon at the end of
+`index.html`, counting only on `crypto-tune.com`. Visits, referrers and countries are in the Umami
+dashboard. `src/analytics.ts` sends two events:
+
+| Event        | When                                                               | Data                                                                                            |
+| ------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `listen`     | audio starts (button, media key)                                   | `pair` (symbol or `simulator`), `days`: distinct days this browser has listened, today included |
+| `listen_10m` | 10 minutes without a stop since the last start, once per page load | `pair` as it was at that start                                                                  |
+
+Daily listeners are the unique visitors of `listen` per day; returning listeners are those with
+`days` ≥ 2. Nothing identifies a visitor: `days` is a counter in localStorage. A stop resets the
+10-minute timer, and a pair switch while playing does not change the `listen_10m` pair.
+
+The Performance tab is a rough guide to the first seconds of a page, not field Core Web Vitals:
+Umami sends one report per page, 10 s after load or when the tab is hidden, whichever comes
+first, so Listen, settings and the pair list after that never reach INP, nor late shifts CLS.
+Umami also wraps `history.replaceState`, so a pair switch counts as a pageview of that pair's page
+and ends the measurement early, opening a new window without LCP or FCP. Field CWV come from
+Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 
 ## Status
 
@@ -255,6 +300,11 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Live-first loading**: the live market at once, history in the background
 - [x] **Responsiveness**: Listen and the pair list stay quick on slow phones, stylesheet inlined
 - [x] **Media keys**: play/pause from the keyboard, headset and system media controls
+- [x] **Pull to refresh**: native browser pull-to-refresh on phones, no library
+- [x] **COIN-M**: USDⓈ-M and COIN-M perpetuals, a tab per market in the pair list
+- [x] **Search and analytics**: pair pages, sitemap and robots, Umami with listening events,
+  installable app (web manifest)
+- [x] **Favorites**: per-market starred pairs, pinned above the list and saved locally
 - [x] **Trade particles**: glass bubbles that pop in the upper screen, drops that break into sparks
   on the price line
 
@@ -272,6 +322,48 @@ sound, and Binance covers the pairs that matter.
    screen, small ones with a few droplets, big ones in a shower; drops break exactly on the white
    price line and their sparks roll along it, also up and down its slopes. Past either end of the
    line, or while history loads, drops fall to the screen bottom.
+
+### Favorites
+
+1. With no saved favorites, open each market: BTC, ETH and SOL lead its list. Reopening starts
+   at the top, even if the selected pair is further down.
+2. Click a star: the pair moves between favorites and the rest without selecting it or closing
+   the menu. Switch markets and reload: favorites are independent; removed defaults stay removed.
+3. Search still covers every pair, with exact and prefix matches ahead of less relevant favorites.
+4. From the search, arrows highlight a row; Tab reaches its star, Space toggles it. Left/right
+   moves between star and pair, up/down between rows; Enter on the pair selects it. Esc closes
+   and returns focus to the picker. After a toggle, focus follows the same pair.
+5. On a first visit with a slow symbol-list request, type a pair and Tab to its star before
+   the list arrives. When it loads, focus returns to the search; Esc still closes the menu.
+6. Settings → Tonic: hovering a different note highlights it, and Enter selects that note.
+
+### Search and analytics
+
+1. `pnpm build`: `dist/` has `sitemap.xml`, `robots.txt` and `<slug>/index.html` per pair page,
+   each with its own `<title>`, description, canonical and an inlined `<style>`.
+2. `pnpm preview`, open `/bitcoin/`: BTCUSDT plays whatever pair was saved. Pick SOLUSDT: the
+   address becomes `/solana/`; pick a pair without a page: `/`. Back does not step through pairs.
+3. Open `/`: the saved pair, address unchanged. About lists the pair pages.
+4. DevTools → Application → Manifest: no errors, the install icon shows in the address bar.
+5. On `crypto-tune.com`, press **Listen**: Umami → Events shows `listen` with `pair` and `days`.
+
+### Pull to refresh
+
+1. `pnpm dev --host`, open the page on a phone (Chrome on Android, Safari on iOS) and pull down from
+   the top: the browser's refresh spinner appears and the page reloads.
+2. A short window or zoom still scrolls vertically, never sideways; the pair list and dialogs scroll
+   on their own without reloading the page.
+### COIN-M
+
+1. `pnpm dev`, open the pair list: tabs `USDⓈ-M | COIN-M` above the search, the current market's
+   tab chosen. Click **COIN-M**: the list shows only `…USD_PERP` pairs, the stream does not change.
+2. Pick `BTCUSD_PERP`: the status goes back to `Live`, and the price matches Binance's COIN-M
+   BTCUSD Perpetual, not the USDⓈ-M one. Reopen the list: the COIN-M tab is chosen.
+3. The 15 min volume is in USD and close to the sum of `q × 100` over the last
+   `/dapi/v1/aggTrades` rows for that span (a few $M for BTC, far below USDⓈ-M).
+4. Type `eth`, switch tabs: the query stays (`ETHUSDT` ⇄ `ETHUSD_PERP`). Shift+Tab from the
+   search reaches the tabs, arrows switch them; Esc closes; Tab reaches the active row's star.
+5. Reload: market and pair are kept.
 
 ### Media keys
 
