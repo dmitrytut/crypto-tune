@@ -317,7 +317,8 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Trade particles**: glass bubbles that pop in the upper screen, drops that break into sparks
   on the price line
 - [x] **Trade legend**: About shows what each bubble and drop size means
-- [x] **Chart refresh**: smooth line and eased range, smaller glowing event dots
+- [x] **Chart refresh**: smooth line and eased range, glowing event dots that pop in with sparks,
+  edge to edge on phones
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
