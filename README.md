@@ -198,7 +198,7 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   sell volume down per 10 s. When price sets a new high or low, the range eases over in about a
   third of a second instead of jumping.
 - **Event dots** on the line: a ring for a big trade, a filled dot for a liquidation, in a soft
-  halo; older ones fade. A new one pops in with a flash of its halo and sends out a ring (wider for
+  halo; older ones fade. A new one pops in with a flash of its halo and throws out sparks (more for
   a liquidation); the line stops a little short of the right edge so it shows whole. On a narrow
   screen dots are a quarter smaller.
   Hovering a dot (or tapping it on a phone) shows what it was and when, in one line:
@@ -327,7 +327,7 @@ sound, and Binance covers the pairs that matter.
 1. `pnpm test`: includes the smooth line (flat runs stay flat, no overshoot).
 2. `pnpm dev` → LIVE, settings → Large trade threshold $20K: the line is smooth where price steps
    in short runs, dots are small rings in a halo that fade to the left, and a new one pops in at
-   the right end and sends out a ring. On a new high or low the line glides to the new range.
+   the right end with a burst of sparks. On a new high or low the line glides to the new range.
 3. Narrow the window under 600 px (or open on a phone): the dots are smaller.
 4. Hover a dot: its tip shows as before. With `prefers-reduced-motion`, dots just appear and the
    range does not glide.
