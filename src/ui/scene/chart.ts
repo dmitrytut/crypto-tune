@@ -3,6 +3,7 @@ import { durationLabel } from '../format';
 import { css, DOWN_COLOR, sideColor, tensionColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
 import { sizeDecades } from './spawn';
+import { lineColumns } from './surface';
 
 /** Share of the height for the price line; the rest is the volume band. */
 const PRICE_SHARE = 0.66;
@@ -48,6 +49,9 @@ export class Chart {
     hi: 1,
     bottom: 0,
   };
+  /** Price line height per pixel column as last drawn, CSS px; null when no line was drawn. */
+  private line: Float32Array | null = null;
+  private lineBuf: Float32Array | undefined;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -72,6 +76,7 @@ export class Chart {
     const span = Math.min(periodMs, Math.max(MIN_SPAN_MS, now - oldest));
     const from = now - span;
     view.history = null;
+    this.line = null;
     view.from = from;
     view.span = span;
     view.w = w;
@@ -103,6 +108,12 @@ export class Chart {
       }
     }
     return best;
+  }
+
+  /** Height of the price line at canvas column `px` (CSS px) as last drawn; null where none. */
+  lineY(px: number): number | null {
+    const y = this.line?.[Math.round(px)];
+    return y === undefined || Number.isNaN(y) ? null : y;
   }
 
   private drawPrice(h: HistorySeries, x: (ts: number) => number, ht: number, from: number): void {
@@ -164,6 +175,14 @@ export class Chart {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
+    // Remember the line so particles land on it (lineY).
+    this.lineBuf = lineColumns(
+      pts.map((p) => x(p.ts)),
+      pts.map((p) => y(p.price)),
+      Math.ceil(this.view.w),
+      this.lineBuf,
+    );
+    this.line = this.lineBuf;
 
     for (const m of h.markers) {
       if (m.ts < from) continue;

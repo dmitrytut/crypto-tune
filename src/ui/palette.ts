@@ -50,7 +50,11 @@ export interface AuraTarget {
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const clampSigned = (x: number) => Math.max(-1, Math.min(1, x));
-const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
+/**
+ * Linear blend: t = 0 → a, t = 1 → b.
+ * @package
+ */
+export const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
   a[0] + (b[0] - a[0]) * t,
   a[1] + (b[1] - a[1]) * t,
   a[2] + (b[2] - a[2]) * t,

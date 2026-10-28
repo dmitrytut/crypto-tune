@@ -48,7 +48,8 @@ export function mountStage(o: StageOptions): Stage {
       );
     },
   });
-  const chart = new Chart(el('chart'));
+  const chartCanvas = el<HTMLCanvasElement>('chart');
+  const chart = new Chart(chartCanvas);
 
   const placeOrigin = () => {
     const r = o.origin.getBoundingClientRect();
@@ -56,6 +57,18 @@ export function mountStage(o: StageOptions): Stage {
   };
   new ResizeObserver(placeOrigin).observe(o.origin);
   window.addEventListener('resize', placeOrigin);
+  // Drops land on the price line; beside it, or while history is loading, they fall to the
+  // screen bottom.
+  let chartBox = chartCanvas.getBoundingClientRect();
+  const placeChart = () => {
+    chartBox = chartCanvas.getBoundingClientRect();
+  };
+  new ResizeObserver(placeChart).observe(chartCanvas);
+  window.addEventListener('resize', placeChart);
+  fx.setFloor((x) => {
+    const y = chartBox.height > 0 ? chart.lineY(x - chartBox.left) : null;
+    return y === null ? null : chartBox.top + y;
+  });
   document.addEventListener('visibilitychange', () => {
     // Events received while hidden were not queued; nothing stale to burst on return.
     if (!document.hidden) fx.clear();

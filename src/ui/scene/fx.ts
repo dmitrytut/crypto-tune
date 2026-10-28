@@ -2,22 +2,46 @@ import type { LiquidationSide, TradeSide } from '../../feed/market-feed';
 import { usdFmt } from '../format';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
+import { popDroplets, popHeight } from './pop';
+import { floorSparks, sparkColor } from './sparks';
 import { bubbleStart, planSpawns, sizeDecades } from './spawn';
+import { bubbleSprite, dropSprite, haloSprite } from './sprites';
 
 /** Live bubbles cap; above it the oldest are recycled. */
 const MAX_BUBBLES = 1_500;
 /** Bubbles created per frame; a burst beyond this merges into larger ones. */
 const SPAWN_BUDGET = 120;
-const SPRITE_PX = 128;
 const FADE_IN_SEC = 0.35;
-/** Last share of a bubble's life spent fading out. */
-const FADE_OUT_SHARE = 0.4;
 const RING_SEC = 1.8;
 const SHARD_SEC = 1.1;
 const TRADE_LABEL_SEC = 2.4;
 /** Liquidation labels stay at full opacity for the hold, then fade out over the rest. */
 const LIQ_LABEL_SEC = 5;
 const LIQ_LABEL_HOLD_SEC = 1.5;
+/** Bubble pop: the torn film snaps outward over FILM_SNAP_SEC, the ring spreads over POP_SEC. */
+const FILM_SNAP_SEC = 0.12;
+const POP_SEC = 0.45;
+/** Live droplets cap: past it a cascade of whale bubbles pops with the ring only. */
+const MAX_LIVE_DROPLETS = 1_200;
+/** Droplets fall back, px/s², and slow in the air, 1/s. */
+const DROPLET_GRAVITY = 260;
+const DROPLET_DRAG = 2.4;
+/** Aura flash where a big-trade bubble pops. */
+const BIG_POP_BLOOM = 0.3;
+/** Drop hitting the price line: sparks fall px/s², slow sideways in the air 1/s and keep this
+ * share of their speed on a bounce; the impact flash lasts IMPACT_SEC. */
+const SPARK_GRAVITY = 520;
+const SPARK_DRAG = 1.2;
+const SPARK_BOUNCE = 0.35;
+/** Rolling friction on the line, 1/s: 0.7 of the speed kept per frame at 60 fps, any frame rate. */
+const SPARK_ROLL_DRAG = 21;
+/** Most a spark is lifted back onto the line in one frame (a rising stretch, a redraw), px. */
+const SPARK_CLIMB_PX = 8;
+const IMPACT_SEC = 0.15;
+/** Live sparks cap: past it a cascade of whale drops lands with the flash only. */
+const MAX_LIVE_SPARKS = 1_200;
+/** Precomputed spark colours along the cooling, so a frame builds no colour strings. */
+const SPARK_COLOR_STEPS = 16;
 
 /**
  * Side effects outside the overlay: the aura reacts where the event happened.
@@ -37,8 +61,9 @@ interface Bubble {
   ay: number;
   r: number;
   age: number;
-  life: number;
   phase: number;
+  /** Height a buy bubble pops at, CSS px from the top; null for drops, which fall to the floor. */
+  popY: number | null;
   sprite: HTMLCanvasElement;
   halo: HTMLCanvasElement | null;
 }
@@ -61,6 +86,40 @@ interface Shard {
   color: Rgb;
 }
 
+interface Pop {
+  x: number;
+  y: number;
+  r: number;
+  age: number;
+  sprite: HTMLCanvasElement;
+}
+
+interface Spray {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  age: number;
+  lifeSec: number;
+  sizePx: number;
+}
+
+interface Spark {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  age: number;
+  lifeSec: number;
+}
+
+interface Impact {
+  x: number;
+  y: number;
+  r: number;
+  age: number;
+}
+
 interface Label {
   x: number;
   y: number;
@@ -74,61 +133,11 @@ interface Label {
   hold: number;
 }
 
-/** A sprite square filled with a radial gradient through `stops` (offset, CSS colour). */
-function radialSprite(stops: readonly (readonly [number, string])[]): HTMLCanvasElement {
-  const s = document.createElement('canvas');
-  s.width = s.height = SPRITE_PX;
-  const g = s.getContext('2d');
-  if (!g) return s;
-  const h = SPRITE_PX / 2;
-  const grad = g.createRadialGradient(h, h, 0, h, h, h);
-  for (const [at, color] of stops) grad.addColorStop(at, color);
-  g.fillStyle = grad;
-  g.fillRect(0, 0, SPRITE_PX, SPRITE_PX);
-  return s;
-}
-
-/** Soap bubble: clear centre, bright rim, specular glint. Reads as "rising, light". */
-function bubbleSprite(c: Rgb): HTMLCanvasElement {
-  const s = radialSprite([
-    [0, css(c, 0.16)],
-    [0.62, css(c, 0.22)],
-    [0.84, css(c, 0.95)],
-    [0.92, css(c, 0.4)],
-    [1, css(c, 0)],
-  ]);
-  const g = s.getContext('2d');
-  if (!g) return s;
-  const h = SPRITE_PX / 2;
-  const glint = g.createRadialGradient(h * 0.68, h * 0.62, 0, h * 0.68, h * 0.62, h * 0.24);
-  glint.addColorStop(0, 'rgba(255,255,255,0.9)');
-  glint.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = glint;
-  g.fillRect(0, 0, SPRITE_PX, SPRITE_PX);
-  return s;
-}
-
-/** Ember drop: hot white core in a coloured glow. Reads as "falling, heavy". */
-const dropSprite = (c: Rgb) =>
-  radialSprite([
-    [0, 'rgba(255,255,255,0.95)'],
-    [0.22, css(c, 0.95)],
-    [0.55, css(c, 0.35)],
-    [1, css(c, 0)],
-  ]);
-
-const haloSprite = (c: Rgb) =>
-  radialSprite([
-    [0, css(c, 0.5)],
-    [0.4, css(c, 0.16)],
-    [1, css(c, 0)],
-  ]);
-
 /**
  * Overlay canvas for market events.
- * - Every buy is a bubble rising from the chart, every sell a glowing drop
- *   sinking from the top; size by log notional. Big trades get a halo, a
- *   floating amount and a light burst in the aura.
+ * - Every buy is a glass bubble rising from the chart that pops at a random height in the upper
+ *   screen; every sell a glowing drop that breaks into sparks on the price line. Size by log
+ *   notional; big trades get a halo, a floating amount and a light burst in the aura.
  * - Every liquidation bursts at the price: double ring, shards, and (above the
  *   threshold) an aura shock wave, a label and, for huge ones, a screen shake.
  * @package
@@ -140,6 +149,17 @@ export class Fx {
   private bubbles: Bubble[] = [];
   private rings: Ring[] = [];
   private shards: Shard[] = [];
+  private pops: Pop[] = [];
+  private sprays: Spray[] = [];
+  /** Droplets glow like tiny teal embers. */
+  private readonly droplet = dropSprite(UP_COLOR);
+  private sparks: Spark[] = [];
+  private impacts: Impact[] = [];
+  private readonly sparkCss = Array.from({ length: SPARK_COLOR_STEPS }, (_, i) =>
+    css(sparkColor(i / (SPARK_COLOR_STEPS - 1))),
+  );
+  /** Surface height at a screen x, CSS px; null: the screen bottom. */
+  private floorAt: (x: number) => number | null = () => null;
   private labels: Label[] = [];
   private queued: { side: TradeSide; usd: number }[] = [];
   private origin = { x: 0, y: 0 };
@@ -161,6 +181,11 @@ export class Fx {
   /** Where liquidations burst, CSS pixels (centre of the price). */
   setOrigin(x: number, y: number): void {
     this.origin = { x, y };
+  }
+
+  /** What drops land on and sparks bounce off: the price line, where there is one. */
+  setFloor(floorAt: (x: number) => number | null): void {
+    this.floorAt = floorAt;
   }
 
   trade(side: TradeSide, usd: number): void {
@@ -206,6 +231,10 @@ export class Fx {
     this.bubbles = [];
     this.rings = [];
     this.shards = [];
+    this.pops = [];
+    this.sprays = [];
+    this.sparks = [];
+    this.impacts = [];
     this.labels = [];
   }
 
@@ -220,6 +249,10 @@ export class Fx {
     ctx.clearRect(0, 0, w, h);
     ctx.globalCompositeOperation = 'lighter';
     this.drawBubbles(dt, h);
+    this.drawPops(dt);
+    this.drawSprays(dt);
+    this.drawSparks(dt, h);
+    this.drawImpacts(dt);
     this.drawRings(dt);
     this.drawShards(dt);
     ctx.globalCompositeOperation = 'source-over';
@@ -237,6 +270,7 @@ export class Fx {
         ...b,
         age: 0,
         phase: Math.random() * Math.PI * 2,
+        popY: s.side === 'buy' ? popHeight(h, Math.random) : null,
         sprite: this.sprites[s.side],
         halo: s.big ? this.halos[s.side] : null,
       });
@@ -266,15 +300,23 @@ export class Fx {
     let alive = 0;
     for (const b of this.bubbles) {
       b.age += dt;
-      if (b.age >= b.life || b.y < -b.r * 4 || b.y > h + b.r * 4) continue;
+      if (b.y < -b.r * 4 || b.y > h + b.r * 4) continue;
+      // A bubble rises until its pop height; a drop falls until the price line.
+      if (b.popY === null) {
+        const floor = this.floorAt(b.x) ?? h;
+        if (b.y >= floor) {
+          this.splash(b, floor);
+          continue;
+        }
+      } else if (b.y <= b.popY) {
+        this.pop(b);
+        continue;
+      }
       b.vy += b.ay * dt;
       // Gentle sideways sway; bigger bubbles sway slower and wider, like real ones.
       b.x += (b.vx + Math.sin(b.age * (2.6 - b.r * 0.05) + b.phase) * (8 + b.r)) * dt;
       b.y += b.vy * dt;
-      const fadeIn = Math.min(1, b.age / FADE_IN_SEC);
-      const outStart = b.life * (1 - FADE_OUT_SHARE);
-      const fadeOut = b.age < outStart ? 1 : 1 - (b.age - outStart) / (b.life - outStart);
-      const a = fadeIn * fadeOut;
+      const a = Math.min(1, b.age / FADE_IN_SEC);
       if (b.halo) {
         ctx.globalAlpha = a * (0.7 + 0.3 * Math.sin(b.age * 5));
         const hr = b.r * 4;
@@ -285,6 +327,124 @@ export class Fx {
       this.bubbles[alive++] = b;
     }
     this.bubbles.length = alive;
+  }
+
+  /** A drop hits the floor like hot metal: a flash and, within the cap, sparks that skitter. */
+  private splash(b: Bubble, floor: number): void {
+    this.impacts.push({ x: b.x, y: floor, r: b.r, age: 0 });
+    if (this.sparks.length >= MAX_LIVE_SPARKS) return;
+    for (const s of floorSparks(b.r, Math.random)) {
+      this.sparks.push({ x: b.x, y: floor - 1, age: 0, ...s });
+    }
+  }
+
+  /** A bubble bursts: its film snaps away, a ring spreads and, within the cap, droplets fly. */
+  private pop(b: Bubble): void {
+    this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
+    if (this.sprays.length < MAX_LIVE_DROPLETS) {
+      for (const d of popDroplets(b.r, Math.random)) {
+        // Droplets fly off the film, so they start on the rim, heading outward.
+        const k = b.r / Math.hypot(d.vx, d.vy);
+        this.sprays.push({ x: b.x + d.vx * k, y: b.y + d.vy * k, age: 0, ...d });
+      }
+    }
+    if (b.halo) this.hooks.bloom(b.x, b.y, UP_COLOR, BIG_POP_BLOOM);
+  }
+
+  private drawPops(dt: number): void {
+    const { ctx } = this;
+    let alive = 0;
+    ctx.strokeStyle = css(UP_COLOR, 1);
+    for (const p of this.pops) {
+      p.age += dt;
+      const t = p.age / POP_SEC;
+      if (t >= 1) continue;
+      // The torn film snaps outward and is gone.
+      const snap = p.age / FILM_SNAP_SEC;
+      if (snap < 1) {
+        const s = p.r * (1 + 0.35 * snap);
+        ctx.globalAlpha = 1 - snap;
+        ctx.drawImage(p.sprite, p.x - s, p.y - s, s * 2, s * 2);
+      }
+      ctx.globalAlpha = 0.75 * (1 - t) ** 1.5;
+      ctx.lineWidth = Math.max(0.5, 1.6 * (1 - t));
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (1 + 1.4 * (1 - (1 - t) ** 3)), 0, Math.PI * 2);
+      ctx.stroke();
+      this.pops[alive++] = p;
+    }
+    this.pops.length = alive;
+  }
+
+  private drawSprays(dt: number): void {
+    const { ctx } = this;
+    const drag = Math.exp(-DROPLET_DRAG * dt);
+    let alive = 0;
+    for (const s of this.sprays) {
+      s.age += dt;
+      if (s.age >= s.lifeSec) continue;
+      s.vx *= drag;
+      s.vy = s.vy * drag + DROPLET_GRAVITY * dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      const k = 1 - s.age / s.lifeSec;
+      // The ember sprite's bright core is about a third of its size.
+      const r = s.sizePx * 3 * (0.5 + 0.5 * k);
+      ctx.globalAlpha = k;
+      ctx.drawImage(this.droplet, s.x - r, s.y - r, r * 2, r * 2);
+      this.sprays[alive++] = s;
+    }
+    this.sprays.length = alive;
+  }
+
+  private drawSparks(dt: number, h: number): void {
+    const { ctx } = this;
+    const drag = Math.exp(-SPARK_DRAG * dt);
+    const roll = Math.exp(-SPARK_ROLL_DRAG * dt);
+    let alive = 0;
+    ctx.lineCap = 'round';
+    for (const s of this.sparks) {
+      s.age += dt;
+      if (s.age >= s.lifeSec || s.y > h) continue;
+      s.vx *= drag;
+      s.vy += SPARK_GRAVITY * dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      // Bounce off the line and roll along it, up rising stretches and as the line redraws.
+      // Past either end of the line the floor drops to the screen bottom and the spark falls.
+      const floor = this.floorAt(s.x) ?? h;
+      if (s.y > floor && s.y - floor <= SPARK_CLIMB_PX + Math.max(0, s.vy * dt)) {
+        s.y = floor;
+        if (s.vy > 0) s.vy *= -SPARK_BOUNCE;
+        s.vx *= roll;
+      }
+      const t = s.age / s.lifeSec;
+      ctx.globalAlpha = 1 - 0.6 * t;
+      ctx.strokeStyle = this.sparkCss[Math.floor(t * SPARK_COLOR_STEPS)] as string;
+      ctx.lineWidth = 1.8 * (1 - t) + 0.6;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      // Streak along the velocity: motion blur for free.
+      ctx.lineTo(s.x - s.vx * 0.035, s.y - s.vy * 0.035);
+      ctx.stroke();
+      this.sparks[alive++] = s;
+    }
+    this.sparks.length = alive;
+  }
+
+  private drawImpacts(dt: number): void {
+    const { ctx } = this;
+    let alive = 0;
+    for (const f of this.impacts) {
+      f.age += dt;
+      const t = f.age / IMPACT_SEC;
+      if (t >= 1) continue;
+      const r = f.r * (1.6 + t);
+      ctx.globalAlpha = 1 - t;
+      ctx.drawImage(this.sprites.sell, f.x - r, f.y - r, r * 2, r * 2);
+      this.impacts[alive++] = f;
+    }
+    this.impacts.length = alive;
   }
 
   private drawRings(dt: number): void {

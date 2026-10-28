@@ -60,12 +60,11 @@ describe('bubbleStart', () => {
     }
   });
 
-  it('makes bigger prints visibly bigger and longer-lived', () => {
+  it('makes bigger prints visibly bigger', () => {
     const small = bubbleStart('buy', 1_000, false, W, H, () => 0.5);
     const large = bubbleStart('buy', 1_000_000, false, W, H, () => 0.5);
     const flagged = bubbleStart('buy', 1_000_000, true, W, H, () => 0.5);
     expect(large.r).toBeGreaterThan(small.r * 4);
-    expect(large.life).toBeGreaterThan(small.life);
     expect(flagged.r).toBeGreaterThan(large.r);
   });
 
