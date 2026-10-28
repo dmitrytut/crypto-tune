@@ -68,10 +68,9 @@ export interface MarkerHit {
 }
 
 /**
- * Bottom strip: the chosen period of price with the area under the line tinted
- * by tension at each moment, buy volume up / sell volume down per
- * VOLUME_BUCKET_MS below it, and event markers on the line. No axes — it is
- * ambience, the exact numbers live in the readout.
+ * Bottom strip: the chosen period of price as a smooth line with the area under it tinted by
+ * tension at each moment, buy volume up / sell volume down per VOLUME_BUCKET_MS below it, and
+ * event markers on the line. No axes — it is ambience, the exact numbers live in the readout.
  * @package
  */
 export class Chart {
@@ -82,6 +81,7 @@ export class Chart {
     history: null as HistorySeries | null,
     from: 0,
     span: 1,
+    /** Plot width: the canvas less PLOT_RIGHT_INSET_PX, CSS px. */
     w: 0,
     lo: 0,
     hi: 1,
@@ -93,12 +93,11 @@ export class Chart {
   private line: Float32Array | null = null;
   private lineBuf: Float32Array | undefined;
   private readonly halos = { up: haloSprite(UP_COLOR), down: haloSprite(DOWN_COLOR) };
-  /** Arrival bookkeeping: the history drawn last, its newest marker, and when new ones came. */
+  /** Wall-clock arrival of each marker that came in while drawn, for its pop and sparks. */
+  private readonly arrivals = new WeakMap<EventMarker, number>();
+  /** The history drawn last and its newest marker: anything newer has just arrived. */
   private arrivalHistory: HistorySeries | null = null;
   private seenMarkerTs = Number.NEGATIVE_INFINITY;
-  /** Markers after this timestamp are the ones that arrived at `arrivedAt` (wall clock). */
-  private arrivedSince = Number.NEGATIVE_INFINITY;
-  private arrivedAt = 0;
   /** Price range on screen, easing toward the data's; `history` null makes the next draw snap. */
   private readonly scale = { lo: 0, hi: 0, at: 0, history: null as HistorySeries | null };
 
@@ -150,22 +149,17 @@ export class Chart {
    * centre and radius as last drawn; null when the pointer is not on one.
    */
   markerAt(px: number, py: number): MarkerHit | null {
-    const { history: h, from, span, w, lo, hi, bottom } = this.view;
+    const h = this.view.history;
     if (!h) return null;
     let best: MarkerHit | null = null;
     let bestD2 = Number.POSITIVE_INFINITY;
     for (const m of h.markers) {
-      if (m.ts < from) continue;
-      const price = h.priceAt(m.ts);
-      if (Number.isNaN(price)) continue;
-      const x = ((m.ts - from) / span) * w;
-      // On the line as drawn (smoothed); at its very ends, at the price.
-      const y = this.lineY(x) ?? bottom - ((price - lo) / (hi - lo)) * bottom;
-      const r = markerRadius(m.usd, this.view.markerScale);
-      const d2 = (px - x) ** 2 + (py - y) ** 2;
-      if (d2 <= (r + HIT_SLOP_PX) ** 2 && d2 < bestD2) {
+      const at = this.place(m);
+      if (!at) continue;
+      const d2 = (px - at.x) ** 2 + (py - at.y) ** 2;
+      if (d2 <= (at.r + HIT_SLOP_PX) ** 2 && d2 < bestD2) {
         bestD2 = d2;
-        best = { marker: m, x, y, r };
+        best = { marker: m, ...at };
       }
     }
     return best;
@@ -273,71 +267,57 @@ export class Chart {
     ctx.arc(x1, y(last.price), 3, 0, Math.PI * 2);
     ctx.fillStyle = css(tensionColor(last.tension));
     ctx.fill();
-    const arriving = this.drawMarkers(h, x, y, from, now);
+    const arriving = this.drawMarkers(h, now);
     return arriving || easing;
   }
 
   /**
    * Event markers on the line: a ring (trades) or a dot (liquidations) in a soft halo, fading
-   * toward the past. Markers new since the last draw pop in with a flash of their halo and send
-   * sparks out; returns whether that is still playing.
+   * toward the past. A marker new since the last draw pops in with a flash of its halo and throws
+   * out sparks; returns whether one still is.
    */
-  private drawMarkers(
-    h: HistorySeries,
-    x: (ts: number) => number,
-    y: (price: number) => number,
-    from: number,
-    now: number,
-  ): boolean {
+  private drawMarkers(h: HistorySeries, now: number): boolean {
     const { ctx, view } = this;
     const wall = performance.now();
     const newest = h.markers.at(-1)?.ts ?? Number.NEGATIVE_INFINITY;
     if (h !== this.arrivalHistory) {
-      // A new pair or freshly loaded history: what is there already is not news.
+      // A new pair or freshly loaded history (its clock may differ): what is there is not news.
       this.arrivalHistory = h;
-      this.arrivedSince = newest;
-      this.seenMarkerTs = newest;
-    } else if (newest > this.seenMarkerTs) {
-      this.arrivedSince = this.seenMarkerTs;
-      this.seenMarkerTs = newest;
-      this.arrivedAt = wall;
+    } else {
+      for (let i = h.markers.length - 1; i >= 0; i--) {
+        const m = h.markers[i] as EventMarker;
+        if (m.ts <= this.seenMarkerTs) break;
+        if (m.ts >= now - ARRIVAL_MAX_AGE_MS) this.arrivals.set(m, wall);
+      }
     }
-    const elapsed = wall - this.arrivedAt;
-    const arriving = !this.reducedMotion.matches && elapsed < ARRIVAL_MS;
-    // Pop: grows from nothing past its size and settles (ease-out-back); the halo flashes.
-    const p = Math.min(1, elapsed / POP_MS);
-    const pop = 1 + (POP_OVERSHOOT + 1) * (p - 1) ** 3 + POP_OVERSHOOT * (p - 1) ** 2;
-    const flash = 1 + HALO_FLASH * (1 - p);
-    // Sparks: fly out (ease-out) and fade.
-    const s = elapsed / SPARK_MS;
-    const fly = 1 - (1 - Math.min(1, s)) ** 3;
+    this.seenMarkerTs = newest;
     let animating = false;
     for (const m of h.markers) {
-      if (m.ts < from) continue;
-      const price = h.priceAt(m.ts);
-      if (Number.isNaN(price)) continue;
+      const at = this.place(m);
+      if (!at) continue;
+      const arrived = this.reducedMotion.matches ? undefined : this.arrivals.get(m);
+      const elapsed = arrived === undefined ? ARRIVAL_MS : wall - arrived;
+      const fresh = elapsed < ARRIVAL_MS;
+      animating ||= fresh;
+      // Pop: grows from nothing past its size and settles (ease-out-back); the halo flashes.
+      const p = Math.min(1, elapsed / POP_MS);
+      const pop = 1 + (POP_OVERSHOOT + 1) * (p - 1) ** 3 + POP_OVERSHOOT * (p - 1) ** 2;
+      const glow = 1 + HALO_FLASH * (1 - p);
       const c = sideColor(m.side);
       const liq = m.kind === 'liquidation';
-      const fresh = arriving && m.ts > this.arrivedSince && m.ts >= now - ARRIVAL_MAX_AGE_MS;
-      animating ||= fresh;
-      const base = markerRadius(m.usd, view.markerScale);
-      const r = fresh ? base * Math.max(0, pop) : base;
-      const mx = x(m.ts);
-      const my = this.lineY(mx) ?? y(price);
-      const alpha = OLDEST_MARKER_ALPHA + (1 - OLDEST_MARKER_ALPHA) * Math.min(1, mx / view.w);
-      const glow = fresh ? flash : 1;
-      const halo = base * HALO_SCALE * glow;
+      const alpha = OLDEST_MARKER_ALPHA + (1 - OLDEST_MARKER_ALPHA) * Math.min(1, at.x / view.w);
+      const halo = at.r * HALO_SCALE * glow;
       ctx.globalAlpha = Math.min(1, alpha * glow);
       ctx.drawImage(
         isDown(m.side) ? this.halos.down : this.halos.up,
-        mx - halo,
-        my - halo,
+        at.x - halo,
+        at.y - halo,
         halo * 2,
         halo * 2,
       );
       ctx.globalAlpha = alpha;
       ctx.beginPath();
-      ctx.arc(mx, my, r, 0, Math.PI * 2);
+      ctx.arc(at.x, at.y, at.r * Math.max(0, pop), 0, Math.PI * 2);
       if (liq) {
         ctx.fillStyle = css(c, 0.95);
         ctx.fill();
@@ -348,9 +328,11 @@ export class Chart {
         ctx.lineWidth = 1;
         ctx.stroke();
       }
-      if (fresh && s < 1) {
+      // Sparks: fly out (ease-out) and fade.
+      const s = elapsed / SPARK_MS;
+      if (s < 1) {
         const n = liq ? SPARKS_LIQ : SPARKS;
-        const far = SPARK_PX * view.markerScale * fly;
+        const far = SPARK_PX * view.markerScale * (1 - (1 - s) ** 3);
         // Fixed per marker (seeded by its time): the same sparks every frame.
         const rand = (i: number) => {
           const v = Math.sin(m.ts * 0.001 + i * 12.9898) * 43758.5453;
@@ -359,13 +341,27 @@ export class Chart {
         ctx.fillStyle = css(c, 1 - s);
         for (let k = 0; k < n; k++) {
           const a = ((k + rand(2 * k)) / n) * Math.PI * 2;
-          const d = base + far * (SPARK_MIN_SPEED + (1 - SPARK_MIN_SPEED) * rand(2 * k + 1));
-          ctx.fillRect(mx + Math.cos(a) * d - 0.8, my + Math.sin(a) * d - 0.8, 1.6, 1.6);
+          const d = at.r + far * (SPARK_MIN_SPEED + (1 - SPARK_MIN_SPEED) * rand(2 * k + 1));
+          ctx.fillRect(at.x + Math.cos(a) * d - 0.8, at.y + Math.sin(a) * d - 0.8, 1.6, 1.6);
         }
       }
     }
     ctx.globalAlpha = 1;
     return animating;
+  }
+
+  /**
+   * Where a marker sits as last drawn: on the smoothed line at its time, at its price past the
+   * line's ends; null when it is out of view or there is no price.
+   */
+  private place(m: EventMarker): { x: number; y: number; r: number } | null {
+    const { history: h, from, span, w, lo, hi, bottom, markerScale } = this.view;
+    if (!h || m.ts < from) return null;
+    const price = h.priceAt(m.ts);
+    if (Number.isNaN(price)) return null;
+    const x = ((m.ts - from) / span) * w;
+    const y = this.lineY(x) ?? bottom - ((price - lo) / (hi - lo)) * bottom;
+    return { x, y, r: markerRadius(m.usd, markerScale) };
   }
 
   private drawVolume(

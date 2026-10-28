@@ -4,6 +4,15 @@ const MAX_BLEND_RUN_PX = 8;
 const SAMPLE_PX = 2;
 
 /**
+ * A line sampled into points, `xs` ascending, CSS px.
+ * @package
+ */
+export interface SampledLine {
+  xs: number[];
+  ys: number[];
+}
+
+/**
  * A smooth line through a stepped one (`xs` ascending, px): every short run of equal heights
  * becomes one knot at its middle, so a staircase turns into a slope, while a run longer than
  * MAX_BLEND_RUN_PX keeps a knot at each end and stays flat. The knots are joined by a monotone
@@ -11,10 +20,7 @@ const SAMPLE_PX = 2;
  * Sampled every SAMPLE_PX and at every knot.
  * @package
  */
-export function smoothLine(
-  xs: readonly number[],
-  ys: readonly number[],
-): { xs: number[]; ys: number[] } {
+export function smoothLine(xs: readonly number[], ys: readonly number[]): SampledLine {
   const kx: number[] = [];
   const ky: number[] = [];
   const n = xs.length;

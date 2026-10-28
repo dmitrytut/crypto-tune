@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lineColumns, smoothLine } from '../surface';
+import { lineColumns, type SampledLine, smoothLine } from '../surface';
 
 describe('lineColumns', () => {
   it('gives the line height at every pixel column between its points', () => {
@@ -28,7 +28,7 @@ describe('lineColumns', () => {
 
 describe('smoothLine', () => {
   /** Height of the sampled line at `x`, linear between samples. */
-  const at = (line: { xs: number[]; ys: number[] }, x: number) =>
+  const at = (line: SampledLine, x: number) =>
     lineColumns(line.xs, line.ys, Math.ceil(x) + 1)[Math.round(x)];
   /** One point per px: `runs` of [length, height]. */
   const steps = (runs: [number, number][]) => {
