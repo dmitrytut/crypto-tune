@@ -64,13 +64,16 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `meter/` tension meter with zones and its hint; `price-readout/` fixed-decimal price with
   per-digit flash; `modal/` the `<dialog>` shell and open/close for every modal; `settings-panel/`
   settings modal, a hint per setting from its `HELP` texts; `about/` About modal, static text in
-  `index.html` so crawlers without JS read it; `chart-tip/` tooltip for chart event markers,
+  `index.html` so crawlers without JS read it, plus the trade legend drawn on open from
+  `scene/legend.ts` (marks, captions, threshold note); `chart-tip/` tooltip for chart event markers,
   hit-tested by `Chart.markerAt`),
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, off on
   software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation
-  bursts, `sprites.ts` their sprites, drawn once, `chart.ts` price/volume strip (`lineY`: the
-  price line drops land on), `canvas.ts` DPR fit).
+  bursts, `sprites.ts` their sprites, drawn once, `legend.ts` the About trade legend (pure
+  `tradeLegend` steps of the `spawn.ts` size scale + threshold; sizes from `bubbleRadius`, never
+  restated), `chart.ts` price/volume strip (`lineY`: the price line drops land on), `canvas.ts`
+  DPR fit).
   `media-session.ts`: media keys and OS media controls. Browsers grant them only to a playing
   `<audio>`/`<video>` (Web Audio does not count; Chrome ignores media under 5 s), so a looped
   10 s silent WAV plays while Listen runs; play/pause follow the Listen button state.
