@@ -200,7 +200,8 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 - **Event dots** on the line: a ring for a big trade, a filled dot for a liquidation, in a soft
   halo; older ones fade. A new one pops in with a flash of its halo and throws out sparks (more for
   a liquidation); the line stops a little short of the right edge so it shows whole. On a narrow
-  screen dots are a quarter smaller.
+  screen dots are a quarter smaller; on a phone (up to 480 px) the chart runs edge to edge and to
+  the bottom of the screen.
   Hovering a dot (or tapping it on a phone) shows what it was and when, in one line:
   `SELL $603K 03:57:03`. While history is shorter, the chart stretches over what there is (at
   least 30 s).
@@ -328,7 +329,8 @@ sound, and Binance covers the pairs that matter.
 2. `pnpm dev` → LIVE, settings → Large trade threshold $20K: the line is smooth where price steps
    in short runs, dots are small rings in a halo that fade to the left, and a new one pops in at
    the right end with a burst of sparks. On a new high or low the line glides to the new range.
-3. Narrow the window under 600 px (or open on a phone): the dots are smaller.
+3. Narrow the window under 600 px (or open on a phone): the dots are smaller; under 480 px the
+   chart touches both sides and the bottom of the window, with no horizontal scroll.
 4. Hover a dot: its tip shows as before. With `prefers-reduced-motion`, dots just appear and the
    range does not glide.
 
