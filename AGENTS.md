@@ -69,9 +69,9 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, off on
   software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation
-  bursts, `sprites.ts` their sprites, drawn once, `chart.ts` price strip with event markers and a
-  trade-size spectrogram band (`lineY`: the price line drops land on; `draw` returns true while it
-  animates, so the view redraws next frame), `canvas.ts` DPR fit).
+  bursts, `sprites.ts` their sprites, drawn once, `chart.ts` price/volume strip (`lineY`: the
+  price line drops land on; `draw` returns true while it animates, so the view redraws next
+  frame), `canvas.ts` DPR fit).
   `media-session.ts`: media keys and OS media controls. Browsers grant them only to a playing
   `<audio>`/`<video>` (Web Audio does not count; Chrome ignores media under 5 s), so a looped
   10 s silent WAV plays while Listen runs; play/pause follow the Listen button state.
@@ -79,8 +79,7 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   flow → aura colours/motion; the one source of side and tension colours, CSS included),
   `scene/spawn.ts` (merging, bubble start state), `scene/pop.ts` (bubble pop height, droplets),
   `scene/sparks.ts` (sparks of a drop on the line, their cooling), `scene/surface.ts` (the smooth
-  price line, a polyline per pixel column), `scene/spectrum.ts` (spectrogram cells: size class ×
-  time, levelled per class). Visuals are wall-clock animation; anything older
+  price line, a polyline per pixel column). Visuals are wall-clock animation; anything older
   than 2 s is not animated (a throttled tab's catch-up, filtered in the view). Every motion effect
   respects `prefers-reduced-motion`.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
