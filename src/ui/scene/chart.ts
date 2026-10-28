@@ -33,6 +33,14 @@ const RIPPLE_PX = 12;
 const RIPPLE_MAX_AGE_MS = 2_000;
 /** Pointer tolerance around a marker, CSS px: small markers stay easy to hit. */
 const HIT_SLOP_PX = 5;
+/** The price range follows a new high or low with this time constant (≈95 % in 3τ), ms. */
+const SCALE_TAU_MS = 120;
+/** Longest step of that easing: the first frame after a quiet tick does not jump, ms. */
+const SCALE_MAX_STEP_MS = 34;
+/** No draw for this long (hidden tab): the range snaps instead of easing from stale, ms. */
+const SCALE_SNAP_AFTER_MS = 2_000;
+/** The easing stops within this share of the range (well under a pixel). */
+const SCALE_SETTLE = 0.002;
 
 const markerRadius = (usd: number, scale: number) =>
   (MARKER_BASE_R + sizeDecades(usd) * MARKER_GROWTH) * scale;
@@ -77,6 +85,8 @@ export class Chart {
   /** Markers after this timestamp are the ones that arrived at `rippleAt` (wall clock). */
   private rippleSince = Number.NEGATIVE_INFINITY;
   private rippleAt = 0;
+  /** Price range on screen, easing toward the data's; `history` null makes the next draw snap. */
+  private readonly scale = { lo: 0, hi: 0, at: 0, history: null as HistorySeries | null };
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -96,6 +106,8 @@ export class Chart {
     if (periodMs !== this.labelledMs) {
       this.labelledMs = periodMs;
       canvas.setAttribute('aria-label', `Price and volume, last ${durationLabel(periodMs)}`);
+      // Another period is another picture, not a move: no easing into it.
+      this.scale.history = null;
     }
     const dpr = fitCanvas(canvas);
     const w = canvas.clientWidth;
@@ -168,6 +180,23 @@ export class Chart {
     const span = hi - lo || hi * 1e-4 || 1;
     lo -= span * PRICE_PAD;
     hi += span * PRICE_PAD;
+    // A new high or low eases the range over instead of jumping the whole line.
+    const s = this.scale;
+    const wall = performance.now();
+    const snap = s.history !== h || this.reducedMotion.matches || wall - s.at > SCALE_SNAP_AFTER_MS;
+    const k = snap ? 1 : 1 - Math.exp(-Math.min(wall - s.at, SCALE_MAX_STEP_MS) / SCALE_TAU_MS);
+    s.lo += (lo - s.lo) * k;
+    s.hi += (hi - s.hi) * k;
+    s.at = wall;
+    s.history = h;
+    const settle = (hi - lo) * SCALE_SETTLE;
+    const easing = Math.abs(s.lo - lo) > settle || Math.abs(s.hi - hi) > settle;
+    if (!easing) {
+      s.lo = lo;
+      s.hi = hi;
+    }
+    lo = s.lo;
+    hi = s.hi;
     const bottom = ht * PRICE_SHARE;
     const y = (price: number) => bottom - ((price - lo) / (hi - lo)) * bottom;
     // Markers are drawn from here on: remember the scale so markerAt finds them.
@@ -229,7 +258,7 @@ export class Chart {
     ctx.arc(x1, y(last.price), 3, 0, Math.PI * 2);
     ctx.fillStyle = css(tensionColor(last.tension));
     ctx.fill();
-    return rippling;
+    return rippling || easing;
   }
 
   /**

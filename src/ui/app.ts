@@ -198,7 +198,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     bigTradeUsd: () => settings.tradeThresholdUsd,
     onFrame() {
       if (chartDirty && history && last) {
-        // Stays dirty while the chart animates (a new marker's ripple).
+        // Stays dirty while the chart animates (a new marker's ripple, the range easing).
         chartDirty = chart.draw(history, last.ts, settings.periodMin * 60_000);
       }
     },
