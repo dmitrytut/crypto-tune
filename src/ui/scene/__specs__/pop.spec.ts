@@ -13,7 +13,7 @@ describe('popHeight', () => {
   it('pops in the upper part of the screen, above where bubbles are born', () => {
     const H = 800;
     expect(popHeight(H, () => 0)).toBeCloseTo(0.08 * H, 9);
-    expect(popHeight(H, () => 0.999_999)).toBeCloseTo(0.35 * H, 3);
+    expect(popHeight(H, () => 0.999_999)).toBeCloseTo(0.3 * H, 3);
     // bubbleStart puts buys at 62 % of the height or lower.
     expect(popHeight(H, () => 0.999_999)).toBeLessThan(0.62 * H);
   });

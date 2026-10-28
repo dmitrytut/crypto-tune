@@ -11,7 +11,7 @@ export interface Droplet {
 
 /** Bubbles pop between these shares of the screen height, from the top. */
 const POP_TOP = 0.08;
-const POP_BOTTOM = 0.35;
+const POP_BOTTOM = 0.3;
 /** Droplets per px² of bubble area: the count follows the size, so a whale bursts in a shower. */
 const DROPLETS_PER_PX2 = 1 / 30;
 /** Fewest droplets (the smallest bubbles) and most (the biggest); a cascade must stay cheap. */
