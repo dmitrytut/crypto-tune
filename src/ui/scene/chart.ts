@@ -26,13 +26,25 @@ const HALO_SCALE = 2.6;
 const RING_FILL_ALPHA = 0.15;
 /** The oldest marker on the chart keeps this much of its opacity; the newest has all of it. */
 const OLDEST_MARKER_ALPHA = 0.35;
-/** A new marker sends a ring out this long (wall clock), this many px past its edge. */
-const RIPPLE_MS = 400;
-const RIPPLE_PX = 12;
-/** Markers older than this on arrival (feed clock) are catch-up: no ripple. */
-const RIPPLE_MAX_AGE_MS = 2_000;
+/** A new marker pops in: grows past its size by the ease-out-back overshoot and settles, ms. */
+const POP_MS = 350;
+const POP_OVERSHOOT = 2.2;
+/** Its halo starts this much bigger and brighter (1 + HALO_FLASH times) and calms with the pop. */
+const HALO_FLASH = 1.6;
+/** Then a ring spreads this far past its edge and fades, px (liquidations further), ms. */
+const RING_DELAY_MS = 60;
+const RING_MS = 700;
+const RING_PX = 18;
+const RING_LIQ_PX = 26;
+const RING_ALPHA = 0.75;
+/** The whole arrival, pop and ring. */
+const ARRIVAL_MS = RING_DELAY_MS + RING_MS;
+/** Markers older than this on arrival (feed clock) are catch-up: they just appear. */
+const ARRIVAL_MAX_AGE_MS = 2_000;
 /** Pointer tolerance around a marker, CSS px: small markers stay easy to hit. */
 const HIT_SLOP_PX = 5;
+/** Room right of the newest point, so a marker arriving there shows whole with its ring, CSS px. */
+const PLOT_RIGHT_INSET_PX = 16;
 /** The price range follows a new high or low with this time constant (≈95 % in 3τ), ms. */
 const SCALE_TAU_MS = 120;
 /** Longest step of that easing: the first frame after a quiet tick does not jump, ms. */
@@ -79,12 +91,12 @@ export class Chart {
   private line: Float32Array | null = null;
   private lineBuf: Float32Array | undefined;
   private readonly halos = { up: haloSprite(UP_COLOR), down: haloSprite(DOWN_COLOR) };
-  /** Ripple bookkeeping: the history drawn last, its newest marker, and when new ones arrived. */
-  private rippleHistory: HistorySeries | null = null;
+  /** Arrival bookkeeping: the history drawn last, its newest marker, and when new ones came. */
+  private arrivalHistory: HistorySeries | null = null;
   private seenMarkerTs = Number.NEGATIVE_INFINITY;
-  /** Markers after this timestamp are the ones that arrived at `rippleAt` (wall clock). */
-  private rippleSince = Number.NEGATIVE_INFINITY;
-  private rippleAt = 0;
+  /** Markers after this timestamp are the ones that arrived at `arrivedAt` (wall clock). */
+  private arrivedSince = Number.NEGATIVE_INFINITY;
+  private arrivedAt = 0;
   /** Price range on screen, easing toward the data's; `history` null makes the next draw snap. */
   private readonly scale = { lo: 0, hi: 0, at: 0, history: null as HistorySeries | null };
 
@@ -122,10 +134,12 @@ export class Chart {
     this.line = null;
     view.from = from;
     view.span = span;
-    view.w = w;
+    // The plot stops short of the right edge: a new marker sits at "now" and pops in there.
+    const plotW = Math.max(1, w - PLOT_RIGHT_INSET_PX);
+    view.w = plotW;
     view.markerScale = w < NARROW_PX ? MARKER_NARROW_SCALE : 1;
-    const x = (ts: number) => ((ts - from) / span) * w;
-    this.drawVolume(h, x, (VOLUME_BUCKET_MS / span) * w, ht, from);
+    const x = (ts: number) => ((ts - from) / span) * plotW;
+    this.drawVolume(h, x, (VOLUME_BUCKET_MS / span) * plotW, ht, from);
     return this.drawPrice(h, x, ht, from, now);
   }
 
@@ -252,19 +266,19 @@ export class Chart {
     this.lineBuf = lineColumns(line.xs, line.ys, Math.ceil(this.view.w), this.lineBuf);
     this.line = this.lineBuf;
 
-    const rippling = this.drawMarkers(h, x, y, from, now);
-    // Head of the line, in the current tension colour.
+    // Head of the line, in the current tension colour; markers over it, the newest sits here.
     ctx.beginPath();
     ctx.arc(x1, y(last.price), 3, 0, Math.PI * 2);
     ctx.fillStyle = css(tensionColor(last.tension));
     ctx.fill();
-    return rippling || easing;
+    const arriving = this.drawMarkers(h, x, y, from, now);
+    return arriving || easing;
   }
 
   /**
    * Event markers on the line: a ring (trades) or a dot (liquidations) in a soft halo, fading
-   * toward the past. Markers new since the last draw send a ring out; returns whether one is
-   * still spreading.
+   * toward the past. Markers new since the last draw pop in with a flash of their halo and send
+   * a ring out; returns whether that is still playing.
    */
   private drawMarkers(
     h: HistorySeries,
@@ -276,28 +290,42 @@ export class Chart {
     const { ctx, view } = this;
     const wall = performance.now();
     const newest = h.markers.at(-1)?.ts ?? Number.NEGATIVE_INFINITY;
-    if (h !== this.rippleHistory) {
+    if (h !== this.arrivalHistory) {
       // A new pair or freshly loaded history: what is there already is not news.
-      this.rippleHistory = h;
-      this.rippleSince = newest;
+      this.arrivalHistory = h;
+      this.arrivedSince = newest;
       this.seenMarkerTs = newest;
     } else if (newest > this.seenMarkerTs) {
-      this.rippleSince = this.seenMarkerTs;
+      this.arrivedSince = this.seenMarkerTs;
       this.seenMarkerTs = newest;
-      this.rippleAt = wall;
+      this.arrivedAt = wall;
     }
-    const progress = this.reducedMotion.matches ? 1 : (wall - this.rippleAt) / RIPPLE_MS;
-    let rippling = false;
+    const elapsed = wall - this.arrivedAt;
+    const arriving = !this.reducedMotion.matches && elapsed < ARRIVAL_MS;
+    // Pop: grows from nothing past its size and settles (ease-out-back); the halo flashes.
+    const p = Math.min(1, elapsed / POP_MS);
+    const pop = 1 + (POP_OVERSHOOT + 1) * (p - 1) ** 3 + POP_OVERSHOOT * (p - 1) ** 2;
+    const flash = 1 + HALO_FLASH * (1 - p);
+    // Ring: starts just after the pop, spreads out (ease-out) and fades.
+    const q = (elapsed - RING_DELAY_MS) / RING_MS;
+    const spread = 1 - (1 - q) ** 3;
+    let animating = false;
     for (const m of h.markers) {
       if (m.ts < from) continue;
       const price = h.priceAt(m.ts);
       if (Number.isNaN(price)) continue;
       const c = sideColor(m.side);
-      const r = markerRadius(m.usd, view.markerScale);
+      const liq = m.kind === 'liquidation';
+      const fresh = arriving && m.ts > this.arrivedSince && m.ts >= now - ARRIVAL_MAX_AGE_MS;
+      animating ||= fresh;
+      const base = markerRadius(m.usd, view.markerScale);
+      const r = fresh ? base * Math.max(0, pop) : base;
       const mx = x(m.ts);
       const my = this.lineY(mx) ?? y(price);
-      ctx.globalAlpha = OLDEST_MARKER_ALPHA + (1 - OLDEST_MARKER_ALPHA) * Math.min(1, mx / view.w);
-      const halo = r * HALO_SCALE;
+      const alpha = OLDEST_MARKER_ALPHA + (1 - OLDEST_MARKER_ALPHA) * Math.min(1, mx / view.w);
+      const glow = fresh ? flash : 1;
+      const halo = base * HALO_SCALE * glow;
+      ctx.globalAlpha = Math.min(1, alpha * glow);
       ctx.drawImage(
         isDown(m.side) ? this.halos.down : this.halos.up,
         mx - halo,
@@ -305,9 +333,10 @@ export class Chart {
         halo * 2,
         halo * 2,
       );
+      ctx.globalAlpha = alpha;
       ctx.beginPath();
       ctx.arc(mx, my, r, 0, Math.PI * 2);
-      if (m.kind === 'liquidation') {
+      if (liq) {
         ctx.fillStyle = css(c, 0.95);
         ctx.fill();
       } else {
@@ -317,16 +346,17 @@ export class Chart {
         ctx.lineWidth = 1;
         ctx.stroke();
       }
-      if (progress < 1 && m.ts > this.rippleSince && m.ts >= now - RIPPLE_MAX_AGE_MS) {
-        rippling = true;
+      if (fresh && q > 0 && q < 1) {
+        const far = (liq ? RING_LIQ_PX : RING_PX) * view.markerScale;
         ctx.beginPath();
-        ctx.arc(mx, my, r + RIPPLE_PX * progress, 0, Math.PI * 2);
-        ctx.strokeStyle = css(c, 0.6 * (1 - progress));
+        ctx.arc(mx, my, base + far * spread, 0, Math.PI * 2);
+        ctx.strokeStyle = css(c, RING_ALPHA * (1 - q));
+        ctx.lineWidth = liq ? 1.6 : 1.1;
         ctx.stroke();
       }
     }
     ctx.globalAlpha = 1;
-    return rippling;
+    return animating;
   }
 
   private drawVolume(
