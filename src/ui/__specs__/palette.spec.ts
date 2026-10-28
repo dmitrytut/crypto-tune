@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { auraTarget } from '../palette';
+import { auraTarget, DOWN_COLOR, slopeColor, UP_COLOR } from '../palette';
 
 const calm = { tension: 0, direction: 0, volZ: 0, emaZ: 0 };
 
@@ -61,5 +61,21 @@ describe('auraTarget', () => {
   it('lets strong opposite flow override a stale direction', () => {
     const a = auraTarget({ ...calm, direction: 0.3 }, { imbalance: -1, activity: 0.5 });
     expect(a.colorB[0]).toBeGreaterThan(a.colorB[2]);
+  });
+});
+
+describe('slopeColor', () => {
+  it('takes the side colour on a hard move and saturates past it', () => {
+    expect(slopeColor(1)).toEqual(UP_COLOR);
+    expect(slopeColor(5)).toEqual(UP_COLOR);
+    expect(slopeColor(-1)).toEqual(DOWN_COLOR);
+  });
+
+  it('is neither side when flat, and part of the way on a gentle move', () => {
+    const flat = slopeColor(0);
+    expect(flat).not.toEqual(UP_COLOR);
+    expect(flat).not.toEqual(DOWN_COLOR);
+    expect(slopeColor(0.5)[1]).toBeGreaterThan(flat[1]);
+    expect(slopeColor(0.5)[1]).toBeLessThan(UP_COLOR[1]);
   });
 });

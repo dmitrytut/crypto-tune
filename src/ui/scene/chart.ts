@@ -1,6 +1,11 @@
-import { type EventMarker, type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
+import {
+  type EventMarker,
+  type HistorySeries,
+  type PricePoint,
+  VOLUME_BUCKET_MS,
+} from '../../metrics/history';
 import { durationLabel } from '../format';
-import { css, DOWN_COLOR, isDown, sideColor, tensionColor, UP_COLOR } from '../palette';
+import { css, DOWN_COLOR, isDown, sideColor, slopeColor, tensionColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
 import { sizeDecades } from './spawn';
 import { haloSprite } from './sprites';
@@ -10,8 +15,20 @@ import { lineColumns, smoothLine } from './surface';
 const PRICE_SHARE = 0.66;
 /** Vertical padding of the price range so the line never touches the edges. */
 const PRICE_PAD = 0.12;
-/** Tension colour stops along the fill: every Nth point is plenty for a gradient. */
+/** Colour stops along the glow: every Nth point is plenty for a gradient. */
 const GRADIENT_EVERY = 6;
+/** Glow edge under the line: the line stroked this wide (CSS px) at this opacity, in layers. */
+const GLOW_LAYERS: readonly (readonly [number, number])[] = [
+  [24, 0.08],
+  [12, 0.14],
+  [5, 0.3],
+];
+/** Opacity of the glow's faint body at its top; it fades out toward the base. */
+const GLOW_BODY_ALPHA = 0.1;
+/** The glow's slope: price change across this share of the points either side of a moment... */
+const SLOPE_WINDOW_SHARE = 0.03;
+/** ...where a change of this share of the price range is a full move (the side colour). */
+const SLOPE_FULL_SHARE = 0.15;
 /** Shortest span drawn: a fresh live session fills the width instead of hugging the right edge. */
 const MIN_SPAN_MS = 30_000;
 /** Marker radius at the smallest size; each decade of `sizeDecades` adds MARKER_GROWTH px. */
@@ -68,9 +85,10 @@ export interface MarkerHit {
 }
 
 /**
- * Bottom strip: the chosen period of price as a smooth line with the area under it tinted by
- * tension at each moment, buy volume up / sell volume down per VOLUME_BUCKET_MS below it, and
- * event markers on the line. No axes — it is ambience, the exact numbers live in the readout.
+ * Bottom strip: the chosen period of price as a smooth line with a glow under it coloured by
+ * where price heads at each moment, buy volume up / sell volume down per VOLUME_BUCKET_MS
+ * below it, and event markers on the line. No axes — it is ambience, the exact numbers live in
+ * the readout.
  * @package
  */
 export class Chart {
@@ -221,26 +239,41 @@ export class Chart {
     const x0 = x(first.ts);
     const x1 = x(last.ts);
 
-    // Area under the line, coloured by tension at each moment.
-    const fill = ctx.createLinearGradient(x0, 0, x1, 0);
-    for (let i = 0; i < pts.length; i += GRADIENT_EVERY) {
-      const p = pts[i];
-      if (!p) continue;
-      fill.addColorStop((x(p.ts) - x0) / (x1 - x0 || 1), css(tensionColor(p.tension), 0.3));
-    }
-    fill.addColorStop(1, css(tensionColor(last.tension), 0.3));
     const line = smoothLine(
       pts.map((p) => x(p.ts)),
       pts.map((p) => y(p.price)),
     );
-    ctx.beginPath();
-    ctx.moveTo(x0, bottom);
-    for (const [i, lx] of line.xs.entries()) ctx.lineTo(lx, line.ys[i] as number);
+    const trace = () => {
+      ctx.beginPath();
+      for (const [i, lx] of line.xs.entries()) {
+        if (i === 0) ctx.moveTo(lx, line.ys[i] as number);
+        else ctx.lineTo(lx, line.ys[i] as number);
+      }
+    };
+    // Glow under the line, coloured like the aura by where price heads at each moment.
+    const glow = ctx.createLinearGradient(x0, 0, x1, 0);
+    const win = Math.max(1, Math.round(pts.length * SLOPE_WINDOW_SHARE));
+    const fullMove = (hi - lo) * SLOPE_FULL_SHARE;
+    const slopeAt = (i: number) =>
+      ((pts[Math.min(pts.length - 1, i + win)] as PricePoint).price -
+        (pts[Math.max(0, i - win)] as PricePoint).price) /
+      fullMove;
+    for (let i = 0; i < pts.length; i += GRADIENT_EVERY) {
+      const p = pts[i] as PricePoint;
+      glow.addColorStop((x(p.ts) - x0) / (x1 - x0 || 1), css(slopeColor(slopeAt(i))));
+    }
+    glow.addColorStop(1, css(slopeColor(slopeAt(pts.length - 1))));
+    ctx.save();
+    trace();
     ctx.lineTo(x1, bottom);
+    ctx.lineTo(x0, bottom);
     ctx.closePath();
-    ctx.fillStyle = fill;
-    ctx.fill();
-    // Fade the area toward its base so it reads as a glow under the line, not a slab.
+    ctx.clip();
+    // A faint body, faded toward the base so it reads as light under the line, not a slab...
+    ctx.globalAlpha = GLOW_BODY_ALPHA;
+    ctx.fillStyle = glow;
+    ctx.fillRect(x0, 0, x1 - x0 + 1, bottom);
+    ctx.globalAlpha = 1;
     const fade = ctx.createLinearGradient(0, y(hi - (hi - lo) * PRICE_PAD), 0, bottom);
     fade.addColorStop(0, 'rgba(0, 0, 0, 0)');
     fade.addColorStop(1, 'rgba(0, 0, 0, 1)');
@@ -248,12 +281,18 @@ export class Chart {
     ctx.fillStyle = fade;
     ctx.fillRect(x0, 0, x1 - x0 + 1, bottom);
     ctx.globalCompositeOperation = 'source-over';
-
-    ctx.beginPath();
-    for (const [i, lx] of line.xs.entries()) {
-      if (i === 0) ctx.moveTo(lx, line.ys[i] as number);
-      else ctx.lineTo(lx, line.ys[i] as number);
+    // ...and a bright edge: the line stroked wide in layers, only its lower half inside the clip.
+    ctx.strokeStyle = glow;
+    ctx.lineJoin = 'round';
+    for (const [width, alpha] of GLOW_LAYERS) {
+      trace();
+      ctx.lineWidth = width;
+      ctx.globalAlpha = alpha;
+      ctx.stroke();
     }
+    ctx.restore();
+
+    trace();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';

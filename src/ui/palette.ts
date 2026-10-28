@@ -137,3 +137,16 @@ export const isDown = (side: TradeSide | LiquidationSide): boolean =>
 /** @package */
 export const sideColor = (side: TradeSide | LiquidationSide): Rgb =>
   isDown(side) ? DOWN_COLOR : UP_COLOR;
+
+/** Chart glow where price goes nowhere: a soft pink between the two side colours. */
+const FLAT_GLOW: Rgb = [0.95, 0.55, 0.85];
+
+/**
+ * Colour of the glow under the chart line for its local slope, −1 (falling hard) … 1 (rising
+ * hard): pink when flat, toward the up colour as price rises and the down colour as it falls.
+ * @package
+ */
+export function slopeColor(slope: number): Rgb {
+  const s = clampSigned(slope);
+  return mix(FLAT_GLOW, s >= 0 ? UP_COLOR : DOWN_COLOR, Math.abs(s));
+}
