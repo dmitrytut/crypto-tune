@@ -170,10 +170,13 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   - at rest: a cool steel blue breathing in time with the drone.
   - without a hardware GPU (software WebGL such as SwiftShader) the aura is off and the background
     stays plain: drawn on the CPU it costs tens of ms per frame.
-- **Every buy is a bubble** rising from the chart, **every sell a drop** falling from the top. Buys sit
-  slightly right and sells left, as in the stereo mix. Size grows with log notional, from 4 px at $1K
-  to 22 px at $1M. Trades above the threshold get a halo, a floating amount (`+$864K`) and a flash in
-  the aura. In a cascade small particles merge, so frames don't drop.
+- **Every buy is a glass bubble** rising from the chart, **every sell a glowing drop** falling from
+  the top. Buys sit slightly right and sells left, as in the stereo mix. Size grows with log notional,
+  from 4 px at $1K to 22 px at $1M. A bubble pops at a random height in the upper third of the
+  screen into a ring and droplets; a drop breaks on the price line into sparks that bounce, roll
+  along the line and cool. Bigger particles throw more (2–3 for the smallest, up to 28). Trades above
+  the threshold get a halo, a floating amount (`+$864K`) and a flash in the aura. In a cascade small
+  particles merge, so frames don't drop.
 - **Every liquidation** is a double ring from the price (LONG magenta, SHORT teal). Above the
   threshold it adds shards, a `LIQUIDATION LONG $1.2M` label and a shockwave that bends the aura; at
   10× the threshold, a light screen shake. Small liquidations leave faint rings, so you can watch a
@@ -252,12 +255,23 @@ Web Analytics → `crypto-tune.com`. No custom events: it does not count presses
 - [x] **Live-first loading**: the live market at once, history in the background
 - [x] **Responsiveness**: Listen and the pair list stay quick on slow phones, stylesheet inlined
 - [x] **Media keys**: play/pause from the keyboard, headset and system media controls
+- [x] **Trade particles**: glass bubbles that pop in the upper screen, drops that break into sparks
+  on the price line
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Trade particles
+
+1. `pnpm test`: includes the pop height band, droplet and spark counts by size, spark cooling, and
+   the price line sampled per pixel column.
+2. `pnpm dev` → ⚙ → SIMULATOR, sensitivity ×2: bubbles pop no lower than about a third of the
+   screen, small ones with a few droplets, big ones in a shower; drops break exactly on the white
+   price line and their sparks roll along it, also up and down its slopes. Past either end of the
+   line, or while history loads, drops fall to the screen bottom.
 
 ### Media keys
 
