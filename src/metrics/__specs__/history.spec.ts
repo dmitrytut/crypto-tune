@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from '../../feed/market-feed';
-import { HISTORY_WINDOW_MS, MarketHistory, SIZE_CLASSES, SPECTRUM_BUCKET_MS } from '../history';
+import {
+  HISTORY_WINDOW_MS,
+  MarketHistory,
+  SIZE_CLASSES,
+  SPECTRUM_BUCKET_MS,
+  VOLUME_BUCKET_MS,
+} from '../history';
 
 const T0 = 1_700_000_000_000;
 const trade = (ts: number, side: Trade['side'], usd: number): Trade => ({
@@ -22,13 +28,22 @@ describe('MarketHistory', () => {
     ]);
   });
 
+  it('splits aggressor volume into buy and sell per 10 s bucket', () => {
+    const h = new MarketHistory();
+    h.addTrade(trade(T0 + 1_000, 'buy', 500));
+    h.addTrade(trade(T0 + 9_000, 'sell', 200));
+    h.addTrade(trade(T0 + VOLUME_BUCKET_MS, 'buy', 50));
+    expect(h.volumes).toEqual([
+      { ts: T0, buyUsd: 500, sellUsd: 200 },
+      { ts: T0 + VOLUME_BUCKET_MS, buyUsd: 50, sellUsd: 0 },
+    ]);
+  });
+
   it('folds a late trade into the newest bucket instead of reordering', () => {
     const h = new MarketHistory();
-    h.addTrade(trade(T0 + SPECTRUM_BUCKET_MS, 'buy', 10));
+    h.addTrade(trade(T0 + VOLUME_BUCKET_MS, 'buy', 10));
     h.addTrade(trade(T0 + 1, 'sell', 5));
-    expect(h.spectrum).toHaveLength(1);
-    expect(h.spectrum[0]).toMatchObject({ ts: T0 + SPECTRUM_BUCKET_MS });
-    expect(h.volumeUsdSince(T0)).toBe(15);
+    expect(h.volumes).toEqual([{ ts: T0 + VOLUME_BUCKET_MS, buyUsd: 10, sellUsd: 5 }]);
   });
 
   it('sorts aggressor volume per 2 s by trade size, a decade per class', () => {
@@ -50,10 +65,11 @@ describe('MarketHistory', () => {
     h.addSnapshot({ ts: T0, price: 1, tension: 0 });
     h.addTrade(trade(T0, 'buy', 1));
     h.addMarker({ ts: T0, kind: 'liquidation', side: 'long', usd: 1 });
-    const later = T0 + HISTORY_WINDOW_MS + SPECTRUM_BUCKET_MS;
+    const later = T0 + HISTORY_WINDOW_MS + VOLUME_BUCKET_MS;
     h.addSnapshot({ ts: later, price: 2, tension: 0 });
     h.addTrade(trade(later, 'sell', 1));
     expect(h.prices.map((p) => p.price)).toEqual([2]);
+    expect(h.volumes).toHaveLength(1);
     expect(h.spectrum).toHaveLength(1);
     expect(h.markers).toHaveLength(0);
   });
@@ -78,12 +94,11 @@ describe('MarketHistory', () => {
     const h = new MarketHistory();
     expect(h.volumeUsdSince(T0)).toBe(0);
     h.addTrade(trade(T0, 'buy', 1));
-    h.addTrade(trade(T0 + SPECTRUM_BUCKET_MS, 'buy', 10));
-    h.addTrade(trade(T0 + SPECTRUM_BUCKET_MS + 1, 'sell', 20));
-    h.addTrade(trade(T0 + 2 * SPECTRUM_BUCKET_MS, 'sell', 100));
-    // The bucket starting exactly at `ts` counts; the one before it does not. Every size
-    // class counts ($100 is a class above the rest).
-    expect(h.volumeUsdSince(T0 + SPECTRUM_BUCKET_MS)).toBeCloseTo(130);
+    h.addTrade(trade(T0 + VOLUME_BUCKET_MS, 'buy', 10));
+    h.addTrade(trade(T0 + VOLUME_BUCKET_MS + 1, 'sell', 20));
+    h.addTrade(trade(T0 + 2 * VOLUME_BUCKET_MS, 'sell', 100));
+    // The bucket starting exactly at `ts` counts; the one before it does not.
+    expect(h.volumeUsdSince(T0 + VOLUME_BUCKET_MS)).toBeCloseTo(130);
     expect(h.volumeUsdSince(T0 + 1)).toBeCloseTo(130);
     expect(h.volumeUsdSince(T0)).toBeCloseTo(131);
   });

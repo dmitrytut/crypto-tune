@@ -1,31 +1,13 @@
-import { type EventMarker, type HistorySeries, SIZE_CLASSES } from '../../metrics/history';
+import { type EventMarker, type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
 import { durationLabel } from '../format';
-import {
-  css,
-  DOWN_COLOR,
-  isDown,
-  sideColor,
-  spectrumColor,
-  tensionColor,
-  UP_COLOR,
-} from '../palette';
+import { css, DOWN_COLOR, isDown, sideColor, tensionColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
 import { sizeDecades } from './spawn';
-import { spectrumCells } from './spectrum';
 import { haloSprite } from './sprites';
 import { lineColumns, smoothLine } from './surface';
 
-/** Spectrogram band along the bottom and its gap to the price area above, CSS px. */
-const BAND_PX = 20;
-const BAND_GAP_PX = 6;
-/** Spectrogram column width to aim for, CSS px: the time a column covers follows the width. */
-const CELL_PX = 5;
-/** Gaps between spectrogram cells, CSS px. */
-const CELL_GAP_PX = 0.7;
-const ROW_GAP_PX = 0.6;
-/** Opacity of a silent spectrogram cell (the grid stays faintly visible) and the busiest one. */
-const EMPTY_CELL_ALPHA = 0.08;
-const FULL_CELL_ALPHA = 0.93;
+/** Share of the height for the price line; the rest is the volume band. */
+const PRICE_SHARE = 0.66;
 /** Vertical padding of the price range so the line never touches the edges. */
 const PRICE_PAD = 0.12;
 /** Tension colour stops along the fill: every Nth point is plenty for a gradient. */
@@ -72,10 +54,10 @@ export interface MarkerHit {
 }
 
 /**
- * Bottom strip: the chosen period of price as a smooth line with the area under it tinted by
- * tension at each moment, event markers on the line, and below it a spectrogram of trade
- * sizes (rows) over time (columns). No axes: it is ambience, the exact numbers live in the
- * readout.
+ * Bottom strip: the chosen period of price with the area under the line tinted
+ * by tension at each moment, buy volume up / sell volume down per
+ * VOLUME_BUCKET_MS below it, and event markers on the line. No axes — it is
+ * ambience, the exact numbers live in the readout.
  * @package
  */
 export class Chart {
@@ -105,12 +87,6 @@ export class Chart {
   private rippleAt = 0;
   /** Price range on screen, easing toward the data's; `history` null makes the next draw snap. */
   private readonly scale = { lo: 0, hi: 0, at: 0, history: null as HistorySeries | null };
-  /** The spectrogram band as last rendered, and the view it was rendered for. */
-  private readonly band = {
-    canvas: document.createElement('canvas'),
-    key: '',
-    history: null as HistorySeries | null,
-  };
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -139,7 +115,7 @@ export class Chart {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, ht);
     // Grow with the history until it covers the full period.
-    const oldest = Math.min(h.prices[0]?.ts ?? now, h.spectrum[0]?.ts ?? now);
+    const oldest = Math.min(h.prices[0]?.ts ?? now, h.volumes[0]?.ts ?? now);
     const span = Math.min(periodMs, Math.max(MIN_SPAN_MS, now - oldest));
     const from = now - span;
     view.history = null;
@@ -149,7 +125,7 @@ export class Chart {
     view.w = w;
     view.markerScale = w < NARROW_PX ? MARKER_NARROW_SCALE : 1;
     const x = (ts: number) => ((ts - from) / span) * w;
-    this.drawSpectrum(h, from, span, w, ht - BAND_PX, dpr);
+    this.drawVolume(h, x, (VOLUME_BUCKET_MS / span) * w, ht, from);
     return this.drawPrice(h, x, ht, from, now);
   }
 
@@ -221,7 +197,7 @@ export class Chart {
     }
     lo = s.lo;
     hi = s.hi;
-    const bottom = ht - BAND_PX - BAND_GAP_PX;
+    const bottom = ht * PRICE_SHARE;
     const y = (price: number) => bottom - ((price - lo) / (hi - lo)) * bottom;
     // Markers are drawn from here on: remember the scale so markerAt finds them.
     this.view.history = h;
@@ -353,46 +329,31 @@ export class Chart {
     return rippling;
   }
 
-  /**
-   * Trade sizes over time in a band along the bottom: a column per CELL_PX, a row per size class
-   * (the biggest on top), brighter where that class trades more, tinted by who is buying.
-   * Rendered once per view and reused while only the line animates.
-   */
-  private drawSpectrum(
+  private drawVolume(
     h: HistorySeries,
+    x: (ts: number) => number,
+    bucketPx: number,
+    ht: number,
     from: number,
-    span: number,
-    w: number,
-    top: number,
-    dpr: number,
   ): void {
-    const b = this.band;
-    const key = `${from}|${span}|${w}|${dpr}`;
-    if (key !== b.key || h !== b.history) {
-      b.key = key;
-      b.history = h;
-      // Resizing also clears the canvas and resets its transform.
-      b.canvas.width = Math.ceil(w * dpr);
-      b.canvas.height = Math.ceil(BAND_PX * dpr);
-      const g = b.canvas.getContext('2d');
-      if (!g) return;
-      g.scale(dpr, dpr);
-      const cols = Math.max(1, Math.floor(w / CELL_PX));
-      const cells = spectrumCells(h.spectrum, from, span, cols);
-      const cw = w / cols;
-      const rh = BAND_PX / SIZE_CLASSES;
-      for (let c = 0; c < cols; c++) {
-        for (let k = 0; k < SIZE_CLASSES; k++) {
-          const i = c * SIZE_CLASSES + k;
-          const level = cells.level[i] as number;
-          g.fillStyle = css(
-            spectrumColor(cells.buyShare[i] as number),
-            EMPTY_CELL_ALPHA + (FULL_CELL_ALPHA - EMPTY_CELL_ALPHA) * level,
-          );
-          g.fillRect(c * cw, (SIZE_CLASSES - 1 - k) * rh, cw - CELL_GAP_PX, rh - ROW_GAP_PX);
-        }
-      }
+    const bars = h.volumes.filter((b) => b.ts + VOLUME_BUCKET_MS > from);
+    if (bars.length === 0) return;
+    const { ctx } = this;
+    let peak = 0;
+    for (const b of bars) peak = Math.max(peak, b.buyUsd, b.sellUsd);
+    if (peak === 0) return;
+    const top = ht * PRICE_SHARE + 4;
+    const mid = top + (ht - top) / 2;
+    const half = (ht - top) / 2 - 1;
+    const barW = Math.max(1, bucketPx - 1.5);
+    for (const b of bars) {
+      const bx = x(b.ts);
+      const up = (b.buyUsd / peak) * half;
+      const down = (b.sellUsd / peak) * half;
+      ctx.fillStyle = css(UP_COLOR, 0.55);
+      ctx.fillRect(bx, mid - up, barW, up);
+      ctx.fillStyle = css(DOWN_COLOR, 0.55);
+      ctx.fillRect(bx, mid, barW, down);
     }
-    this.ctx.drawImage(b.canvas, 0, top, w, BAND_PX);
   }
 }

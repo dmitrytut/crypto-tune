@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { auraTarget, DOWN_COLOR, spectrumColor, UP_COLOR } from '../palette';
+import { auraTarget } from '../palette';
 
 const calm = { tension: 0, direction: 0, volZ: 0, emaZ: 0 };
 
@@ -61,22 +61,5 @@ describe('auraTarget', () => {
   it('lets strong opposite flow override a stale direction', () => {
     const a = auraTarget({ ...calm, direction: 0.3 }, { imbalance: -1, activity: 0.5 });
     expect(a.colorB[0]).toBeGreaterThan(a.colorB[2]);
-  });
-});
-
-describe('spectrumColor', () => {
-  it('takes the side colour once one side clearly dominates', () => {
-    expect(spectrumColor(1)).toEqual(UP_COLOR);
-    expect(spectrumColor(0.8)).toEqual(UP_COLOR);
-    expect(spectrumColor(0)).toEqual(DOWN_COLOR);
-  });
-
-  it('is neither side when buys and sells are even', () => {
-    const even = spectrumColor(0.5);
-    expect(even).not.toEqual(UP_COLOR);
-    expect(even).not.toEqual(DOWN_COLOR);
-    // A slight lean moves it only part of the way.
-    expect(spectrumColor(0.6)[1]).toBeGreaterThan(even[1]);
-    expect(spectrumColor(0.6)[1]).toBeLessThan(UP_COLOR[1]);
   });
 });

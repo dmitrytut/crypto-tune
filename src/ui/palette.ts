@@ -137,19 +137,3 @@ export const isDown = (side: TradeSide | LiquidationSide): boolean =>
 /** @package */
 export const sideColor = (side: TradeSide | LiquidationSide): Rgb =>
   isDown(side) ? DOWN_COLOR : UP_COLOR;
-
-/** Spectrogram cell with no lean: a soft violet between the two side colours. */
-const SPECTRUM_EVEN: Rgb = [0.58, 0.45, 0.9];
-/** Lean (buy share 0.5 → 0, all one side → 1) at which a cell takes its side's full colour. */
-const SPECTRUM_FULL_LEAN = 0.6;
-
-/**
- * Spectrogram cell colour for the share of its volume bought: violet when even, toward the up
- * colour as buys dominate and the down colour as sells do.
- * @package
- */
-export function spectrumColor(buyShare: number): Rgb {
-  const lean = (buyShare - 0.5) * 2;
-  const t = clamp01(Math.abs(lean) / SPECTRUM_FULL_LEAN);
-  return mix(SPECTRUM_EVEN, lean >= 0 ? UP_COLOR : DOWN_COLOR, t);
-}
