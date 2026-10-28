@@ -103,7 +103,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     handlers.onSettings(settings);
   };
   const panel = mountSettingsPanel(initial, update);
-  const about = mountAbout();
+  const about = mountAbout(() => settings.tradeThresholdUsd);
   // CSS reads the side colours from the palette, so text and canvas never drift apart.
   document.documentElement.style.setProperty('--up', css(UP_COLOR));
   document.documentElement.style.setProperty('--down', css(DOWN_COLOR));

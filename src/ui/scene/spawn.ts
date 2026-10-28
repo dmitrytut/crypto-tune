@@ -49,12 +49,28 @@ export function planSpawns(
 }
 
 /**
- * Decades above $1k, 0…3: the size scale for every event visual.
+ * Every event visual grows with log notional from SIZE_MIN_USD over SIZE_DECADES decades;
+ * below and above that the size holds.
+ * @package
+ */
+export const SIZE_MIN_USD = 1_000;
+/** @package */
+export const SIZE_DECADES = 3;
+
+/**
+ * Decades above SIZE_MIN_USD, 0…SIZE_DECADES: the size scale for every event visual.
  * @package
  */
 export function sizeDecades(usd: number): number {
-  return Math.min(3, Math.max(0, Math.log10(usd / 1_000)));
+  return Math.min(SIZE_DECADES, Math.max(0, Math.log10(usd / SIZE_MIN_USD)));
 }
+
+/**
+ * Radius of a trade's bubble or drop, CSS px; a big trade is a step larger.
+ * @package
+ */
+export const bubbleRadius = (usd: number, big: boolean): number =>
+  4.5 + 6 * sizeDecades(usd) + (big ? 8 : 0);
 
 /**
  * Initial state of a trade bubble, CSS px and px/s.
@@ -88,7 +104,7 @@ export function bubbleStart(
   rand: () => number,
 ): BubbleStart {
   const d = sizeDecades(usd);
-  const r = 4.5 + 6 * d + (big ? 8 : 0);
+  const r = bubbleRadius(usd, big);
   const x = Math.min(w - r, Math.max(r, w * (SIDE_CENTER[side] + (rand() - 0.5) * 0.85)));
   const speed = (26 + 14 * d) * (0.8 + 0.4 * rand());
   const buy = side === 'buy';

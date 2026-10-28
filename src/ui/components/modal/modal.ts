@@ -7,12 +7,16 @@ export interface Modal {
 }
 
 /**
- * Opens `<dialog id={id}>` as a modal from the button `#openerId`. It closes on its ✕ (a
- * `method="dialog"` submit), Esc, or a click on the backdrop.
+ * Opens `<dialog id={id}>` as a modal from the button `#openerId`, then calls `onOpen` (the
+ * dialog has its layout by then). It closes on its ✕ (a `method="dialog"` submit), Esc, or a
+ * click on the backdrop.
  */
-export function mountModal(id: string, openerId: string): Modal {
+export function mountModal(id: string, openerId: string, onOpen?: () => void): Modal {
   const dialog = el<HTMLDialogElement>(id);
-  el(openerId).addEventListener('click', () => dialog.showModal());
+  el(openerId).addEventListener('click', () => {
+    dialog.showModal();
+    onOpen?.();
+  });
   dialog.addEventListener('click', (e) => {
     // A click on the dialog element itself (not its content) is a click on the backdrop.
     if (e.target === dialog) dialog.close();
