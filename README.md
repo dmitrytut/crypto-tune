@@ -186,7 +186,8 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   screen into a ring and droplets; a drop breaks on the price line into sparks that bounce, roll
   along the line and cool. Bigger particles throw more (2–3 for the smallest, up to 28). Trades above
   the threshold get a halo, a floating amount (`+$864K`) and a flash in the aura. In a cascade small
-  particles merge, so frames don't drop.
+  particles merge, so frames don't drop. About explains them with a legend: a bubble and a drop
+  per size step and at the large trade threshold, drawn with the same sprites and sizes.
 - **Every liquidation** is a double ring from the price (LONG magenta, SHORT teal). Above the
   threshold it adds shards, a `LIQUIDATION LONG $1.2M` label and a shockwave that bends the aura; at
   10× the threshold, a light screen shake. Small liquidations leave faint rings, so you can watch a
@@ -315,6 +316,7 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Favorites**: per-market starred pairs, pinned above the list and saved locally
 - [x] **Trade particles**: glass bubbles that pop in the upper screen, drops that break into sparks
   on the price line
+- [x] **Trade legend**: About shows what each bubble and drop size means
 - [x] **Chart refresh**: smooth line and eased range, smaller glowing event dots
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
@@ -333,6 +335,15 @@ sound, and Binance covers the pairs that matter.
    chart touches both sides and the bottom of the window, with no horizontal scroll.
 4. Hover a dot: its tip shows as before. With `prefers-reduced-motion`, dots just appear and the
    range does not glide.
+
+### Trade legend
+
+1. `pnpm test`: includes the legend steps (`≤ $1K` … `≥ $1M`), the threshold column and the mark
+   sizes matching the scene.
+2. `pnpm dev` → ?: under the text, a Buy row of bubbles and a Sell row of drops, captioned
+   `≤ $1K, $10K, $100K, $200K, ≥ $1M`; the last two glow. ⚙ → Large trade threshold $5M, reopen
+   About: the columns end in `$1M, ≥ $5M` and only the last glows; the note names $5M.
+3. On a 360 px wide window the marks shrink alike and halos are not cut at the edges.
 
 ### Trade particles
 
