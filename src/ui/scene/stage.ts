@@ -49,7 +49,7 @@ export function mountStage(o: StageOptions): Stage {
     },
   });
   const chartCanvas = el<HTMLCanvasElement>('chart');
-  const chart = new Chart(chartCanvas);
+  const chart = new Chart(chartCanvas, reducedMotion);
 
   const placeOrigin = () => {
     const r = o.origin.getBoundingClientRect();

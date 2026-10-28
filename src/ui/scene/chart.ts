@@ -1,8 +1,9 @@
 import { type EventMarker, type HistorySeries, VOLUME_BUCKET_MS } from '../../metrics/history';
 import { durationLabel } from '../format';
-import { css, DOWN_COLOR, sideColor, tensionColor, UP_COLOR } from '../palette';
+import { css, DOWN_COLOR, isDown, sideColor, tensionColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
 import { sizeDecades } from './spawn';
+import { haloSprite } from './sprites';
 import { lineColumns } from './surface';
 
 /** Share of the height for the price line; the rest is the volume band. */
@@ -14,12 +15,27 @@ const GRADIENT_EVERY = 6;
 /** Shortest span drawn: a fresh live session fills the width instead of hugging the right edge. */
 const MIN_SPAN_MS = 30_000;
 /** Marker radius at the smallest size; each decade of `sizeDecades` adds MARKER_GROWTH px. */
-const MARKER_BASE_R = 2;
-const MARKER_GROWTH = 4 / 3;
+const MARKER_BASE_R = 1.5;
+const MARKER_GROWTH = 0.8;
+/** A chart narrower than this (a phone) draws its markers MARKER_NARROW_SCALE smaller, CSS px. */
+const NARROW_PX = 600;
+const MARKER_NARROW_SCALE = 0.75;
+/** Glow around a marker: its radius over the marker's. */
+const HALO_SCALE = 2.6;
+/** Fill of a trade marker inside its ring. */
+const RING_FILL_ALPHA = 0.15;
+/** The oldest marker on the chart keeps this much of its opacity; the newest has all of it. */
+const OLDEST_MARKER_ALPHA = 0.35;
+/** A new marker sends a ring out this long (wall clock), this many px past its edge. */
+const RIPPLE_MS = 400;
+const RIPPLE_PX = 12;
+/** Markers older than this on arrival (feed clock) are catch-up: no ripple. */
+const RIPPLE_MAX_AGE_MS = 2_000;
 /** Pointer tolerance around a marker, CSS px: small markers stay easy to hit. */
 const HIT_SLOP_PX = 5;
 
-const markerRadius = (usd: number) => MARKER_BASE_R + sizeDecades(usd) * MARKER_GROWTH;
+const markerRadius = (usd: number, scale: number) =>
+  (MARKER_BASE_R + sizeDecades(usd) * MARKER_GROWTH) * scale;
 
 /** A marker found under the pointer: the event and its circle in canvas CSS px. */
 export interface MarkerHit {
@@ -48,19 +64,34 @@ export class Chart {
     lo: 0,
     hi: 1,
     bottom: 0,
+    /** Marker size factor: smaller on a narrow (phone) chart. */
+    markerScale: 1,
   };
   /** Price line height per pixel column as last drawn, CSS px; null when no line was drawn. */
   private line: Float32Array | null = null;
   private lineBuf: Float32Array | undefined;
+  private readonly halos = { up: haloSprite(UP_COLOR), down: haloSprite(DOWN_COLOR) };
+  /** Ripple bookkeeping: the history drawn last, its newest marker, and when new ones arrived. */
+  private rippleHistory: HistorySeries | null = null;
+  private seenMarkerTs = Number.NEGATIVE_INFINITY;
+  /** Markers after this timestamp are the ones that arrived at `rippleAt` (wall clock). */
+  private rippleSince = Number.NEGATIVE_INFINITY;
+  private rippleAt = 0;
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    private readonly reducedMotion: MediaQueryList,
+  ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas unavailable');
     this.ctx = ctx;
   }
 
-  /** Draws up to `periodMs` of history ending at `now`; a shorter history fills the width. */
-  draw(h: HistorySeries, now: number, periodMs: number): void {
+  /**
+   * Draws up to `periodMs` of history ending at `now`; a shorter history fills the width.
+   * Returns true while something is still animating: draw again next frame.
+   */
+  draw(h: HistorySeries, now: number, periodMs: number): boolean {
     const { ctx, canvas, view } = this;
     if (periodMs !== this.labelledMs) {
       this.labelledMs = periodMs;
@@ -80,9 +111,10 @@ export class Chart {
     view.from = from;
     view.span = span;
     view.w = w;
+    view.markerScale = w < NARROW_PX ? MARKER_NARROW_SCALE : 1;
     const x = (ts: number) => ((ts - from) / span) * w;
     this.drawVolume(h, x, (VOLUME_BUCKET_MS / span) * w, ht, from);
-    this.drawPrice(h, x, ht, from);
+    return this.drawPrice(h, x, ht, from, now);
   }
 
   /**
@@ -100,7 +132,7 @@ export class Chart {
       if (Number.isNaN(price)) continue;
       const x = ((m.ts - from) / span) * w;
       const y = bottom - ((price - lo) / (hi - lo)) * bottom;
-      const r = markerRadius(m.usd);
+      const r = markerRadius(m.usd, this.view.markerScale);
       const d2 = (px - x) ** 2 + (py - y) ** 2;
       if (d2 <= (r + HIT_SLOP_PX) ** 2 && d2 < bestD2) {
         bestD2 = d2;
@@ -116,9 +148,15 @@ export class Chart {
     return y === undefined || Number.isNaN(y) ? null : y;
   }
 
-  private drawPrice(h: HistorySeries, x: (ts: number) => number, ht: number, from: number): void {
+  private drawPrice(
+    h: HistorySeries,
+    x: (ts: number) => number,
+    ht: number,
+    from: number,
+    now: number,
+  ): boolean {
     const pts = h.prices.filter((p) => p.ts >= from);
-    if (pts.length < 2) return;
+    if (pts.length < 2) return false;
     const { ctx } = this;
     let lo = Number.POSITIVE_INFINITY;
     let hi = Number.NEGATIVE_INFINITY;
@@ -139,7 +177,7 @@ export class Chart {
 
     const first = pts[0];
     const last = pts.at(-1);
-    if (!first || !last) return;
+    if (!first || !last) return false;
     const x0 = x(first.ts);
     const x1 = x(last.ts);
 
@@ -184,29 +222,81 @@ export class Chart {
     );
     this.line = this.lineBuf;
 
-    for (const m of h.markers) {
-      if (m.ts < from) continue;
-      const price = h.priceAt(m.ts);
-      if (Number.isNaN(price)) continue;
-      const color = css(sideColor(m.side), 0.95);
-      const r = markerRadius(m.usd);
-      ctx.beginPath();
-      ctx.arc(x(m.ts), y(price), r, 0, Math.PI * 2);
-      if (m.kind === 'liquidation') {
-        ctx.fillStyle = color;
-        ctx.fill();
-      } else {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-      }
-    }
-
+    const rippling = this.drawMarkers(h, x, y, from, now);
     // Head of the line, in the current tension colour.
     ctx.beginPath();
     ctx.arc(x1, y(last.price), 3, 0, Math.PI * 2);
     ctx.fillStyle = css(tensionColor(last.tension));
     ctx.fill();
+    return rippling;
+  }
+
+  /**
+   * Event markers on the line: a ring (trades) or a dot (liquidations) in a soft halo, fading
+   * toward the past. Markers new since the last draw send a ring out; returns whether one is
+   * still spreading.
+   */
+  private drawMarkers(
+    h: HistorySeries,
+    x: (ts: number) => number,
+    y: (price: number) => number,
+    from: number,
+    now: number,
+  ): boolean {
+    const { ctx, view } = this;
+    const wall = performance.now();
+    const newest = h.markers.at(-1)?.ts ?? Number.NEGATIVE_INFINITY;
+    if (h !== this.rippleHistory) {
+      // A new pair or freshly loaded history: what is there already is not news.
+      this.rippleHistory = h;
+      this.rippleSince = newest;
+      this.seenMarkerTs = newest;
+    } else if (newest > this.seenMarkerTs) {
+      this.rippleSince = this.seenMarkerTs;
+      this.seenMarkerTs = newest;
+      this.rippleAt = wall;
+    }
+    const progress = this.reducedMotion.matches ? 1 : (wall - this.rippleAt) / RIPPLE_MS;
+    let rippling = false;
+    for (const m of h.markers) {
+      if (m.ts < from) continue;
+      const price = h.priceAt(m.ts);
+      if (Number.isNaN(price)) continue;
+      const c = sideColor(m.side);
+      const r = markerRadius(m.usd, view.markerScale);
+      const mx = x(m.ts);
+      const my = y(price);
+      ctx.globalAlpha = OLDEST_MARKER_ALPHA + (1 - OLDEST_MARKER_ALPHA) * Math.min(1, mx / view.w);
+      const halo = r * HALO_SCALE;
+      ctx.drawImage(
+        isDown(m.side) ? this.halos.down : this.halos.up,
+        mx - halo,
+        my - halo,
+        halo * 2,
+        halo * 2,
+      );
+      ctx.beginPath();
+      ctx.arc(mx, my, r, 0, Math.PI * 2);
+      if (m.kind === 'liquidation') {
+        ctx.fillStyle = css(c, 0.95);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = css(c, RING_FILL_ALPHA);
+        ctx.fill();
+        ctx.strokeStyle = css(c, 0.95);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      if (progress < 1 && m.ts > this.rippleSince && m.ts >= now - RIPPLE_MAX_AGE_MS) {
+        rippling = true;
+        ctx.beginPath();
+        ctx.arc(mx, my, r + RIPPLE_PX * progress, 0, Math.PI * 2);
+        ctx.strokeStyle = css(c, 0.6 * (1 - progress));
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    return rippling;
   }
 
   private drawVolume(
