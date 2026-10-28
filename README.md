@@ -43,8 +43,8 @@ looked at the chart.
 - **Every whale and every wipe-out.** Liquidations sound as FM gongs, big market trades as plucks.
   Each sits where it belongs in the stereo field: buys to the right, sells to the left.
 - **A living picture.** A WebGL aura takes its colour from order flow. Buys float up as bubbles, sells
-  sink as drops, and liquidations send shockwaves out of the price. A price and volume strip runs
-  along the bottom, over the period you pick: 1m, 5m, 15m or 1h.
+  sink as drops, and liquidations send shockwaves out of the price. A price strip with a spectrogram
+  of trade sizes runs along the bottom, over the period you pick: 1m, 5m, 15m or 1h.
 - **Ready in seconds.** The live market shows the moment the socket opens. The last 30 minutes of
   trades load in the background (the pages in parallel, mostly from an IndexedDB cache on a
   reload), and tension calibrates as soon as they land instead of after a five-minute warm-up.
@@ -193,10 +193,19 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   cascade build.
 - **Price** uses thin tabular digits with fixed precision per pair, so the width never jumps. Only the
   digits that changed flash. Film grain sits over everything.
-- **Chart** over the same period: a glow under the line coloured by tension, buy volume up and sell
-  volume down per 10 s, and event dots. Hovering a dot (or tapping it on a phone) shows what it was
-  and when, in one line: `SELL $603K 03:57:03`. While history is shorter, the chart stretches over
-  what there is (at least 30 s).
+- **Chart** over the same period: a smooth price line (flat stretches stay flat, the curve never
+  overshoots a real high or low) with a glow under it coloured by tension. When price sets a new
+  high or low, the range eases over in about a third of a second instead of jumping.
+- **Event dots** on the line: a ring for a big trade, a filled dot for a liquidation, in a soft
+  halo; older ones fade, a new one sends out a ring. On a narrow screen they are a quarter smaller.
+  Hovering a dot (or tapping it on a phone) shows what it was and when, in one line:
+  `SELL $603K 03:57:03`. While history is shorter, the chart stretches over what there is (at
+  least 30 s).
+- **Spectrogram** under the line: a 20 px band of cells, a column per 5 px of width (so a phone's
+  column covers more time) and a row per decade of trade size, from under $100 at the bottom to
+  $1M and up on top. A cell is brighter the more its size class trades there, against that class's
+  own busiest column, and tinted by who is buying: teal for buyers, magenta for sellers, violet when
+  even.
 - **Period** (settings → Period): 1m, 5m, 15m or 1h, one for price change, volume and chart; it is
   remembered. While history is shorter than the period, everything uses what there is and the label
   shows the real span (`in 26m`). History is kept for up to an hour; on LIVE about 30 min are loaded
@@ -307,12 +316,27 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Favorites**: per-market starred pairs, pinned above the list and saved locally
 - [x] **Trade particles**: glass bubbles that pop in the upper screen, drops that break into sparks
   on the price line
+- [x] **Chart refresh**: smooth line and eased range, smaller glowing event dots, a trade-size
+  spectrogram instead of the volume bars
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Chart refresh
+
+1. `pnpm test`: includes the smooth line (flat runs stay flat, no overshoot), spectrogram cells
+   (each size class levelled on its own, buy share) and their colour, and volume by trade size per
+   2 s.
+2. `pnpm dev` → LIVE, settings → Large trade threshold $20K: the line is smooth where price steps
+   in short runs, dots are small rings in a halo that fade to the left, and a new one sends out a
+   ring. On a new high or low the line glides to the new range. The band under the line shows
+   cells, brighter where trades of that size cluster, teal or magenta by side.
+3. Narrow the window under 600 px (or open on a phone): the band keeps ~5 px columns; the dots
+   are smaller.
+4. Hover a dot: its tip shows as before. With `prefers-reduced-motion`, no ring and no glide.
 
 ### Trade particles
 
@@ -425,7 +449,7 @@ sound, and Binance covers the pairs that matter.
 
 ### Stage 5
 
-1. `pnpm test`: includes chart history (price per second, buy/sell volume per 10 s, 1 h trim),
+1. `pnpm test`: includes chart history (price per second, volume by trade size per 2 s, 1 h trim),
    the aura palette (colour by direction, speed by tension, brightness by volume) and particle merging
    under load.
 2. `pnpm dev` → LIVE: the aura changes colour and motion within seconds; buy bubbles rise from the
