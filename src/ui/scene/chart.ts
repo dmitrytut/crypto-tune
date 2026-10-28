@@ -15,8 +15,8 @@ const GRADIENT_EVERY = 6;
 /** Shortest span drawn: a fresh live session fills the width instead of hugging the right edge. */
 const MIN_SPAN_MS = 30_000;
 /** Marker radius at the smallest size; each decade of `sizeDecades` adds MARKER_GROWTH px. */
-const MARKER_BASE_R = 1.5;
-const MARKER_GROWTH = 0.8;
+const MARKER_BASE_R = 2;
+const MARKER_GROWTH = 1.1;
 /** A chart narrower than this (a phone) draws its markers MARKER_NARROW_SCALE smaller, CSS px. */
 const NARROW_PX = 600;
 const MARKER_NARROW_SCALE = 0.75;
