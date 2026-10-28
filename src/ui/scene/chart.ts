@@ -31,19 +31,21 @@ const POP_MS = 350;
 const POP_OVERSHOOT = 2.2;
 /** Its halo starts this much bigger and brighter (1 + HALO_FLASH times) and calms with the pop. */
 const HALO_FLASH = 1.6;
-/** Then a ring spreads this far past its edge and fades, px (liquidations further), ms. */
-const RING_DELAY_MS = 60;
-const RING_MS = 700;
-const RING_PX = 18;
-const RING_LIQ_PX = 26;
-const RING_ALPHA = 0.75;
-/** The whole arrival, pop and ring. */
-const ARRIVAL_MS = RING_DELAY_MS + RING_MS;
+/** With it sparks fly out this far past its edge at the fastest and fade, px, ms. */
+const SPARK_MS = 420;
+const SPARK_PX = 22;
+/** The slowest spark goes this share of the way. */
+const SPARK_MIN_SPEED = 0.5;
+/** Sparks per trade and per liquidation. */
+const SPARKS = 6;
+const SPARKS_LIQ = 10;
+/** The whole arrival, pop and sparks. */
+const ARRIVAL_MS = Math.max(POP_MS, SPARK_MS);
 /** Markers older than this on arrival (feed clock) are catch-up: they just appear. */
 const ARRIVAL_MAX_AGE_MS = 2_000;
 /** Pointer tolerance around a marker, CSS px: small markers stay easy to hit. */
 const HIT_SLOP_PX = 5;
-/** Room right of the newest point, so a marker arriving there shows whole with its ring, CSS px. */
+/** Room right of the newest point, so a marker arriving there shows whole with its sparks, CSS px. */
 const PLOT_RIGHT_INSET_PX = 16;
 /** The price range follows a new high or low with this time constant (≈95 % in 3τ), ms. */
 const SCALE_TAU_MS = 120;
@@ -278,7 +280,7 @@ export class Chart {
   /**
    * Event markers on the line: a ring (trades) or a dot (liquidations) in a soft halo, fading
    * toward the past. Markers new since the last draw pop in with a flash of their halo and send
-   * a ring out; returns whether that is still playing.
+   * sparks out; returns whether that is still playing.
    */
   private drawMarkers(
     h: HistorySeries,
@@ -306,9 +308,9 @@ export class Chart {
     const p = Math.min(1, elapsed / POP_MS);
     const pop = 1 + (POP_OVERSHOOT + 1) * (p - 1) ** 3 + POP_OVERSHOOT * (p - 1) ** 2;
     const flash = 1 + HALO_FLASH * (1 - p);
-    // Ring: starts just after the pop, spreads out (ease-out) and fades.
-    const q = (elapsed - RING_DELAY_MS) / RING_MS;
-    const spread = 1 - (1 - q) ** 3;
+    // Sparks: fly out (ease-out) and fade.
+    const s = elapsed / SPARK_MS;
+    const fly = 1 - (1 - Math.min(1, s)) ** 3;
     let animating = false;
     for (const m of h.markers) {
       if (m.ts < from) continue;
@@ -346,13 +348,20 @@ export class Chart {
         ctx.lineWidth = 1;
         ctx.stroke();
       }
-      if (fresh && q > 0 && q < 1) {
-        const far = (liq ? RING_LIQ_PX : RING_PX) * view.markerScale;
-        ctx.beginPath();
-        ctx.arc(mx, my, base + far * spread, 0, Math.PI * 2);
-        ctx.strokeStyle = css(c, RING_ALPHA * (1 - q));
-        ctx.lineWidth = liq ? 1.6 : 1.1;
-        ctx.stroke();
+      if (fresh && s < 1) {
+        const n = liq ? SPARKS_LIQ : SPARKS;
+        const far = SPARK_PX * view.markerScale * fly;
+        // Fixed per marker (seeded by its time): the same sparks every frame.
+        const rand = (i: number) => {
+          const v = Math.sin(m.ts * 0.001 + i * 12.9898) * 43758.5453;
+          return v - Math.floor(v);
+        };
+        ctx.fillStyle = css(c, 1 - s);
+        for (let k = 0; k < n; k++) {
+          const a = ((k + rand(2 * k)) / n) * Math.PI * 2;
+          const d = base + far * (SPARK_MIN_SPEED + (1 - SPARK_MIN_SPEED) * rand(2 * k + 1));
+          ctx.fillRect(mx + Math.cos(a) * d - 0.8, my + Math.sin(a) * d - 0.8, 1.6, 1.6);
+        }
       }
     }
     ctx.globalAlpha = 1;
