@@ -68,7 +68,6 @@ export interface BubbleStart {
   /** Vertical acceleration: buoyancy for buys (negative), weight for sells. */
   ay: number;
   r: number;
-  life: number;
 }
 
 /** Buys lean right and sells left, matching the stereo pan of their sounds. */
@@ -76,7 +75,7 @@ const SIDE_CENTER: Record<TradeSide, number> = { buy: 0.6, sell: 0.4 };
 
 /**
  * Buys are bubbles rising out of the chart band; sells are drops sinking from
- * the top. Size, speed and lifetime grow with log notional, so a $1M print is
+ * the top. Size and speed grow with log notional, so a $1M print is
  * unmistakable next to $1k noise. `rand` is injected for determinism in specs.
  * @package
  */
@@ -100,6 +99,5 @@ export function bubbleStart(
     vy: buy ? -speed : speed,
     ay: buy ? -10 : 14,
     r,
-    life: 4 + 1.5 * d + (big ? 2 : 0),
   };
 }

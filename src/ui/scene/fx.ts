@@ -21,27 +21,24 @@ const LIQ_LABEL_HOLD_SEC = 1.5;
 /** Bubble pop: the torn film snaps outward over FILM_SNAP_SEC, the ring spreads over POP_SEC. */
 const FILM_SNAP_SEC = 0.12;
 const POP_SEC = 0.45;
-/** Pops per frame that throw droplets; past it a cascade pops with the ring only. */
-const MAX_SPRAYS_PER_FRAME = 30;
-/** Live droplets cap: a cascade of whale bubbles pops with the ring only past it. */
+/** Live droplets cap: past it a cascade of whale bubbles pops with the ring only. */
 const MAX_LIVE_DROPLETS = 1_200;
 /** Droplets fall back, px/s², and slow in the air, 1/s. */
 const DROPLET_GRAVITY = 260;
 const DROPLET_DRAG = 2.4;
 /** Aura flash where a big-trade bubble pops. */
 const BIG_POP_BLOOM = 0.3;
-/** Drop hitting the price line: sparks fall px/s², slow sideways 1/s, keep this share of their
- * speed on a bounce and of their slide along the line; the impact flash lasts IMPACT_SEC. */
+/** Drop hitting the price line: sparks fall px/s², slow sideways in the air 1/s and keep this
+ * share of their speed on a bounce; the impact flash lasts IMPACT_SEC. */
 const SPARK_GRAVITY = 520;
 const SPARK_DRAG = 1.2;
 const SPARK_BOUNCE = 0.35;
-const SPARK_SLIDE = 0.7;
+/** Rolling friction on the line, 1/s: 0.7 of the speed kept per frame at 60 fps, any frame rate. */
+const SPARK_ROLL_DRAG = 21;
 /** Most a spark is lifted back onto the line in one frame (a rising stretch, a redraw), px. */
 const SPARK_CLIMB_PX = 8;
 const IMPACT_SEC = 0.15;
-/** Drops per frame that throw sparks; past it a cascade lands with the flash only. */
-const MAX_SPLASHES_PER_FRAME = 30;
-/** Live sparks cap: a cascade of whale drops lands with the flash only past it. */
+/** Live sparks cap: past it a cascade of whale drops lands with the flash only. */
 const MAX_LIVE_SPARKS = 1_200;
 /** Precomputed spark colours along the cooling, so a frame builds no colour strings. */
 const SPARK_COLOR_STEPS = 16;
@@ -138,9 +135,9 @@ interface Label {
 
 /**
  * Overlay canvas for market events.
- * - Every buy is a bubble rising from the chart, every sell a glowing drop
- *   sinking from the top; size by log notional. Big trades get a halo, a
- *   floating amount and a light burst in the aura.
+ * - Every buy is a glass bubble rising from the chart that pops at a random height in the upper
+ *   screen; every sell a glowing drop that breaks into sparks on the price line. Size by log
+ *   notional; big trades get a halo, a floating amount and a light burst in the aura.
  * - Every liquidation bursts at the price: double ring, shards, and (above the
  *   threshold) an aura shock wave, a label and, for huge ones, a screen shake.
  * @package
@@ -300,8 +297,6 @@ export class Fx {
 
   private drawBubbles(dt: number, h: number): void {
     const { ctx } = this;
-    let sprays = 0;
-    let splashes = 0;
     let alive = 0;
     for (const b of this.bubbles) {
       b.age += dt;
@@ -310,11 +305,11 @@ export class Fx {
       if (b.popY === null) {
         const floor = this.floorAt(b.x) ?? h;
         if (b.y >= floor) {
-          this.splash(b, floor, splashes++ < MAX_SPLASHES_PER_FRAME);
+          this.splash(b, floor);
           continue;
         }
       } else if (b.y <= b.popY) {
-        this.pop(b, sprays++ < MAX_SPRAYS_PER_FRAME);
+        this.pop(b);
         continue;
       }
       b.vy += b.ay * dt;
@@ -334,19 +329,19 @@ export class Fx {
     this.bubbles.length = alive;
   }
 
-  /** A drop hits the floor like hot metal: a flash and, within budget, sparks that skitter. */
-  private splash(b: Bubble, floor: number, sparks: boolean): void {
+  /** A drop hits the floor like hot metal: a flash and, within the cap, sparks that skitter. */
+  private splash(b: Bubble, floor: number): void {
     this.impacts.push({ x: b.x, y: floor, r: b.r, age: 0 });
-    if (!sparks || this.sparks.length >= MAX_LIVE_SPARKS) return;
+    if (this.sparks.length >= MAX_LIVE_SPARKS) return;
     for (const s of floorSparks(b.r, Math.random)) {
       this.sparks.push({ x: b.x, y: floor - 1, age: 0, ...s });
     }
   }
 
-  /** A bubble bursts: its film snaps away, a ring spreads and, within budget, droplets fly. */
-  private pop(b: Bubble, spray: boolean): void {
+  /** A bubble bursts: its film snaps away, a ring spreads and, within the cap, droplets fly. */
+  private pop(b: Bubble): void {
     this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
-    if (spray && this.sprays.length < MAX_LIVE_DROPLETS) {
+    if (this.sprays.length < MAX_LIVE_DROPLETS) {
       for (const d of popDroplets(b.r, Math.random)) {
         // Droplets fly off the film, so they start on the rim, heading outward.
         const k = b.r / Math.hypot(d.vx, d.vy);
@@ -405,6 +400,7 @@ export class Fx {
   private drawSparks(dt: number, h: number): void {
     const { ctx } = this;
     const drag = Math.exp(-SPARK_DRAG * dt);
+    const roll = Math.exp(-SPARK_ROLL_DRAG * dt);
     let alive = 0;
     ctx.lineCap = 'round';
     for (const s of this.sparks) {
@@ -420,7 +416,7 @@ export class Fx {
       if (s.y > floor && s.y - floor <= SPARK_CLIMB_PX + Math.max(0, s.vy * dt)) {
         s.y = floor;
         if (s.vy > 0) s.vy *= -SPARK_BOUNCE;
-        s.vx *= SPARK_SLIDE;
+        s.vx *= roll;
       }
       const t = s.age / s.lifeSec;
       ctx.globalAlpha = 1 - 0.6 * t;
