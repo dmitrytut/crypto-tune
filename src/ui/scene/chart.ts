@@ -4,7 +4,7 @@ import { css, DOWN_COLOR, isDown, sideColor, tensionColor, UP_COLOR } from '../p
 import { fitCanvas } from './canvas';
 import { sizeDecades } from './spawn';
 import { haloSprite } from './sprites';
-import { lineColumns } from './surface';
+import { lineColumns, smoothLine } from './surface';
 
 /** Share of the height for the price line; the rest is the volume band. */
 const PRICE_SHARE = 0.66;
@@ -131,7 +131,8 @@ export class Chart {
       const price = h.priceAt(m.ts);
       if (Number.isNaN(price)) continue;
       const x = ((m.ts - from) / span) * w;
-      const y = bottom - ((price - lo) / (hi - lo)) * bottom;
+      // On the line as drawn (smoothed); at its very ends, at the price.
+      const y = this.lineY(x) ?? bottom - ((price - lo) / (hi - lo)) * bottom;
       const r = markerRadius(m.usd, this.view.markerScale);
       const d2 = (px - x) ** 2 + (py - y) ** 2;
       if (d2 <= (r + HIT_SLOP_PX) ** 2 && d2 < bestD2) {
@@ -189,9 +190,13 @@ export class Chart {
       fill.addColorStop((x(p.ts) - x0) / (x1 - x0 || 1), css(tensionColor(p.tension), 0.3));
     }
     fill.addColorStop(1, css(tensionColor(last.tension), 0.3));
+    const line = smoothLine(
+      pts.map((p) => x(p.ts)),
+      pts.map((p) => y(p.price)),
+    );
     ctx.beginPath();
     ctx.moveTo(x0, bottom);
-    for (const p of pts) ctx.lineTo(x(p.ts), y(p.price));
+    for (const [i, lx] of line.xs.entries()) ctx.lineTo(lx, line.ys[i] as number);
     ctx.lineTo(x1, bottom);
     ctx.closePath();
     ctx.fillStyle = fill;
@@ -206,20 +211,16 @@ export class Chart {
     ctx.globalCompositeOperation = 'source-over';
 
     ctx.beginPath();
-    for (const [i, p] of pts.entries()) {
-      if (i === 0) ctx.moveTo(x(p.ts), y(p.price));
-      else ctx.lineTo(x(p.ts), y(p.price));
+    for (const [i, lx] of line.xs.entries()) {
+      if (i === 0) ctx.moveTo(lx, line.ys[i] as number);
+      else ctx.lineTo(lx, line.ys[i] as number);
     }
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
     ctx.stroke();
-    // Remember the line so particles land on it (lineY).
-    this.lineBuf = lineColumns(
-      pts.map((p) => x(p.ts)),
-      pts.map((p) => y(p.price)),
-      Math.ceil(this.view.w),
-      this.lineBuf,
-    );
+    // Remember the line so particles and markers land on it (lineY).
+    this.lineBuf = lineColumns(line.xs, line.ys, Math.ceil(this.view.w), this.lineBuf);
     this.line = this.lineBuf;
 
     const rippling = this.drawMarkers(h, x, y, from, now);
@@ -265,7 +266,7 @@ export class Chart {
       const c = sideColor(m.side);
       const r = markerRadius(m.usd, view.markerScale);
       const mx = x(m.ts);
-      const my = y(price);
+      const my = this.lineY(mx) ?? y(price);
       ctx.globalAlpha = OLDEST_MARKER_ALPHA + (1 - OLDEST_MARKER_ALPHA) * Math.min(1, mx / view.w);
       const halo = r * HALO_SCALE;
       ctx.drawImage(
