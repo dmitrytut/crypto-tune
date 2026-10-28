@@ -9,10 +9,6 @@ export const HISTORY_WINDOW_MS = Math.max(...HISTORY_PERIODS_MIN) * 60_000;
 const PRICE_STEP_MS = 1_000;
 /** Volume bars of 10 s: 360 bars over an hour. */
 export const VOLUME_BUCKET_MS = 10_000;
-/** Trade-size spectrum columns of 2 s: 1800 over an hour, enough for a 1 min period. */
-export const SPECTRUM_BUCKET_MS = 2_000;
-/** Trade size classes, a decade of notional each: <$100, $100–1K, …, $100K–1M, ≥$1M. */
-export const SIZE_CLASSES = 6;
 
 export interface PricePoint {
   /** Start of the second, source-clock ms. */
@@ -28,14 +24,6 @@ export interface VolumeBucket {
   sellUsd: number;
 }
 
-/** Aggressor volume of one SPECTRUM_BUCKET_MS by trade size class, smallest class first. */
-export interface SpectrumBucket {
-  /** Start of the bucket, source-clock ms. */
-  ts: number;
-  buyUsd: number[];
-  sellUsd: number[];
-}
-
 export type EventMarker =
   | { ts: number; kind: 'liquidation'; side: LiquidationSide; usd: number }
   | { ts: number; kind: 'trade'; side: TradeSide; usd: number };
@@ -44,7 +32,6 @@ export type EventMarker =
 export interface HistorySeries {
   readonly prices: readonly PricePoint[];
   readonly volumes: readonly VolumeBucket[];
-  readonly spectrum: readonly SpectrumBucket[];
   readonly markers: readonly EventMarker[];
   /** Price of the point nearest to `ts`, or NaN with no points. */
   priceAt(ts: number): number;
@@ -57,32 +44,25 @@ export interface HistorySeries {
 
 /**
  * Rolling series behind the chart and readouts, HISTORY_WINDOW_MS long: price and tension per second (last
- * value in the second wins), aggressor volume per 10 s and by trade size per 2 s, and event
- * markers. Everything older than the window behind the newest timestamp is pruned.
+ * value in the second wins), aggressor volume per 10 s, and event markers.
+ * Everything older than the window behind the newest timestamp is pruned.
  */
 export class MarketHistory implements HistorySeries {
   readonly prices: PricePoint[] = [];
   readonly volumes: VolumeBucket[] = [];
-  readonly spectrum: SpectrumBucket[] = [];
   readonly markers: EventMarker[] = [];
 
   addTrade(t: Trade): void {
-    const usd = t.price * t.qty;
-    const v = newestBucket(this.volumes, t.ts, VOLUME_BUCKET_MS, (ts) => ({
-      ts,
-      buyUsd: 0,
-      sellUsd: 0,
-    }));
-    if (t.side === 'buy') v.buyUsd += usd;
-    else v.sellUsd += usd;
-    const s = newestBucket(this.spectrum, t.ts, SPECTRUM_BUCKET_MS, (ts) => ({
-      ts,
-      buyUsd: new Array<number>(SIZE_CLASSES).fill(0),
-      sellUsd: new Array<number>(SIZE_CLASSES).fill(0),
-    }));
-    const side = t.side === 'buy' ? s.buyUsd : s.sellUsd;
-    const c = Math.min(SIZE_CLASSES - 1, Math.max(0, Math.floor(Math.log10(usd)) - 1));
-    side[c] = (side[c] as number) + usd;
+    const ts = Math.floor(t.ts / VOLUME_BUCKET_MS) * VOLUME_BUCKET_MS;
+    let b = this.volumes.at(-1);
+    // A late trade for an older bucket is folded into the newest one; never reorder.
+    if (!b || ts > b.ts) {
+      b = { ts, buyUsd: 0, sellUsd: 0 };
+      this.volumes.push(b);
+    }
+    if (t.side === 'buy') b.buyUsd += t.price * t.qty;
+    else b.sellUsd += t.price * t.qty;
+    prune(this.volumes, ts);
   }
 
   addSnapshot(s: { ts: number; price: number; tension: number }): void {
@@ -136,23 +116,4 @@ function prune(arr: { ts: number }[], newest: number): void {
   let n = 0;
   while (n < arr.length && (arr[n] as { ts: number }).ts < cutoff) n++;
   if (n > 0) arr.splice(0, n);
-}
-
-/**
- * The bucket of `arr` a trade at `ts` goes into, created when it starts a new one. A late trade
- * for an older bucket is folded into the newest one; buckets are never reordered.
- */
-function newestBucket<B extends { ts: number }>(
-  arr: B[],
-  ts: number,
-  widthMs: number,
-  make: (ts: number) => B,
-): B {
-  const start = Math.floor(ts / widthMs) * widthMs;
-  const last = arr.at(-1);
-  if (last && start <= last.ts) return last;
-  const b = make(start);
-  arr.push(b);
-  prune(arr, start);
-  return b;
 }

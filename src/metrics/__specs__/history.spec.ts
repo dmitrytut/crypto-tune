@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Trade } from '../../feed/market-feed';
-import {
-  HISTORY_WINDOW_MS,
-  MarketHistory,
-  SIZE_CLASSES,
-  SPECTRUM_BUCKET_MS,
-  VOLUME_BUCKET_MS,
-} from '../history';
+import { HISTORY_WINDOW_MS, MarketHistory, VOLUME_BUCKET_MS } from '../history';
 
 const T0 = 1_700_000_000_000;
 const trade = (ts: number, side: Trade['side'], usd: number): Trade => ({
@@ -46,20 +40,6 @@ describe('MarketHistory', () => {
     expect(h.volumes).toEqual([{ ts: T0 + VOLUME_BUCKET_MS, buyUsd: 10, sellUsd: 5 }]);
   });
 
-  it('sorts aggressor volume per 2 s by trade size, a decade per class', () => {
-    const h = new MarketHistory();
-    h.addTrade(trade(T0, 'buy', 50)); // < $100
-    h.addTrade(trade(T0 + 100, 'buy', 100)); // $100–1K starts at exactly $100
-    h.addTrade(trade(T0 + 200, 'sell', 250_000)); // $100K–1M
-    h.addTrade(trade(T0 + 300, 'sell', 40_000_000)); // ≥ $1M, however large
-    h.addTrade(trade(T0 + SPECTRUM_BUCKET_MS, 'buy', 5_000)); // next bucket, $1K–10K
-    const zeros = new Array(SIZE_CLASSES).fill(0);
-    expect(h.spectrum).toEqual([
-      { ts: T0, buyUsd: [50, 100, 0, 0, 0, 0], sellUsd: [0, 0, 0, 0, 250_000, 40_000_000] },
-      { ts: T0 + SPECTRUM_BUCKET_MS, buyUsd: [0, 0, 5_000, 0, 0, 0], sellUsd: zeros },
-    ]);
-  });
-
   it('forgets prices, volume and markers older than the window', () => {
     const h = new MarketHistory();
     h.addSnapshot({ ts: T0, price: 1, tension: 0 });
@@ -70,7 +50,6 @@ describe('MarketHistory', () => {
     h.addTrade(trade(later, 'sell', 1));
     expect(h.prices.map((p) => p.price)).toEqual([2]);
     expect(h.volumes).toHaveLength(1);
-    expect(h.spectrum).toHaveLength(1);
     expect(h.markers).toHaveLength(0);
   });
 
