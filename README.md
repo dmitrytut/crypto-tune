@@ -194,10 +194,18 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   cascade build.
 - **Price** uses thin tabular digits with fixed precision per pair, so the width never jumps. Only the
   digits that changed flash. Film grain sits over everything.
-- **Chart** over the same period: a glow under the line coloured by tension, buy volume up and sell
-  volume down per 10 s, and event dots. Hovering a dot (or tapping it on a phone) shows what it was
-  and when, in one line: `SELL $603K 03:57:03`. While history is shorter, the chart stretches over
-  what there is (at least 30 s).
+- **Chart** over the same period: a smooth price line (flat stretches stay flat, the curve never
+  overshoots a real high or low) with a glow under it coloured by tension, and buy volume up and
+  sell volume down per 10 s. When price sets a new high or low, the range eases over in about a
+  third of a second instead of jumping.
+- **Event dots** on the line: a ring for a big trade, a filled dot for a liquidation, in a soft
+  halo; older ones fade. A new one pops in with a flash of its halo and throws out sparks (more for
+  a liquidation); the line stops a little short of the right edge so it shows whole. On a narrow
+  screen dots are a quarter smaller; on a phone (up to 480 px) the chart runs edge to edge and to
+  the bottom of the screen.
+  Hovering a dot (or tapping it on a phone) shows what it was and when, in one line:
+  `SELL $603K 03:57:03`. While history is shorter, the chart stretches over what there is (at
+  least 30 s).
 - **Period** (settings → Period): 1m, 5m, 15m or 1h, one for price change, volume and chart; it is
   remembered. While history is shorter than the period, everything uses what there is and the label
   shows the real span (`in 26m`). History is kept for up to an hour; on LIVE about 30 min are loaded
@@ -309,12 +317,25 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Trade particles**: glass bubbles that pop in the upper screen, drops that break into sparks
   on the price line
 - [x] **Trade legend**: About shows what each bubble and drop size means
+- [x] **Chart refresh**: smooth line and eased range, glowing event dots that pop in with sparks,
+  edge to edge on phones
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Chart refresh
+
+1. `pnpm test`: includes the smooth line (flat runs stay flat, no overshoot).
+2. `pnpm dev` → LIVE, settings → Large trade threshold $20K: the line is smooth where price steps
+   in short runs, dots are small rings in a halo that fade to the left, and a new one pops in at
+   the right end with a burst of sparks. On a new high or low the line glides to the new range.
+3. Narrow the window under 600 px (or open on a phone): the dots are smaller; under 480 px the
+   chart touches both sides and the bottom of the window, with no horizontal scroll.
+4. Hover a dot: its tip shows as before. With `prefers-reduced-motion`, dots just appear and the
+   range does not glide.
 
 ### Trade legend
 

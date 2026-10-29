@@ -72,16 +72,16 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation
   bursts, `sprites.ts` their sprites, drawn once, `legend.ts` the About trade legend (pure
   `tradeLegend` steps of the `spawn.ts` size scale + threshold; sizes from `bubbleRadius`, never
-  restated), `chart.ts` price/volume strip (`lineY`: the price line drops land on), `canvas.ts`
-  DPR fit).
+  restated), `chart.ts` price/volume strip (`lineY`: the price line drops land on; `draw` returns
+  true while it animates, so the view redraws next frame), `canvas.ts` DPR fit).
   `media-session.ts`: media keys and OS media controls. Browsers grant them only to a playing
   `<audio>`/`<video>` (Web Audio does not count; Chrome ignores media under 5 s), so a looped
   10 s silent WAV plays while Listen runs; play/pause follow the Listen button state.
   Pure, spec-covered: `flow.ts` (order-flow imbalance and pace, no warm-up), `palette.ts` (market +
   flow → aura colours/motion; the one source of side and tension colours, CSS included),
   `scene/spawn.ts` (merging, bubble start state), `scene/pop.ts` (bubble pop height, droplets),
-  `scene/sparks.ts` (sparks of a drop on the line, their cooling), `scene/surface.ts` (a polyline
-  per pixel column). Visuals are wall-clock animation; anything older
+  `scene/sparks.ts` (sparks of a drop on the line, their cooling), `scene/surface.ts` (the smooth
+  price line, a polyline per pixel column). Visuals are wall-clock animation; anything older
   than 2 s is not animated (a throttled tab's catch-up, filtered in the view). Every motion effect
   respects `prefers-reduced-motion`.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
