@@ -41,6 +41,8 @@ export interface AppHandlers {
   onSettings(next: Settings): void;
   /** Start/Stop pressed; runs inside the click so the AudioContext may start. */
   onToggleAudio(): void;
+  /** Optional sound for a manually touched particle; no market event is emitted. */
+  onParticleTouch(side: TradeSide, strength: number): void;
 }
 
 /** What the Start/Stop button shows. */
@@ -192,10 +194,16 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let chartDirty = false;
   /** Between reset() and historyReady(): the meter shows the wait, not a warm-up countdown. */
   let loadingHistory = true;
-  const { aura, fx, chart } = mountStage({
+  const {
+    aura,
+    fx,
+    chart,
+    clear: clearStage,
+  } = mountStage({
     origin: priceNode,
     reducedMotion,
     bigTradeUsd: () => settings.tradeThresholdUsd,
+    onParticleTouch: handlers.onParticleTouch,
     onFrame() {
       if (chartDirty && history && last) {
         // Stays dirty while the chart animates (a marker arriving, the range easing).
@@ -274,7 +282,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       meter.reset();
       change.textContent = '\u00a0';
       clearEvent();
-      fx.clear();
+      clearStage();
       chart.draw(h, Date.now(), settings.periodMin * 60_000);
       aura?.setTarget(CALM_AURA);
     },

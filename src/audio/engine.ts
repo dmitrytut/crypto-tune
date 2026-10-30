@@ -1,10 +1,12 @@
 import * as Tone from 'tone';
+import type { TradeSide } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
 import type { EventCues } from '../metrics/events';
 import { AmbienceLayer } from './ambience-layer';
 import { BaseLayer } from './base-layer';
 import { EventsLayer } from './events-layer';
 import { eventVelocity } from './events-map';
+import { InteractionVoice } from './interaction-voice';
 import { Mixer } from './mixer';
 import { TensionLayer } from './tension-layer';
 import { CALM_BPM, INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from './tension-map';
@@ -14,6 +16,7 @@ const FADE_OUT_SEC = 1.5;
 const MASTER_DB = -2;
 /** Headroom before playback so Tone has a moment to prepare the first scheduled event. */
 const LOOKAHEAD_SEC = 0.05;
+const TOUCH_SPACING_SEC = 0.1;
 
 export interface AudioParams {
   /** Tonic pitch class, 0 = C … 11 = B. */
@@ -21,6 +24,7 @@ export interface AudioParams {
   baseVolumeDb: number;
   tensionVolumeDb: number;
   eventsVolumeDb: number;
+  interactionSound: boolean;
 }
 
 /** @package */
@@ -34,6 +38,7 @@ interface Graph {
   tension: TensionLayer;
   tensionChannel: Tone.Volume;
   events: EventsLayer;
+  interaction: InteractionVoice;
   eventsChannel: Tone.Volume;
 }
 
@@ -52,6 +57,7 @@ export class AudioEngine {
   private shock: ShockState = INITIAL_SHOCK;
   /** Context time at which the last stop's scheduled teardown (sources, transport) runs. */
   private stopAt = 0;
+  private lastTouchAt = Number.NEGATIVE_INFINITY;
 
   constructor(private params: AudioParams) {}
 
@@ -83,6 +89,7 @@ export class AudioEngine {
       g.tension.start(t);
       transport.start(t);
       g.mixer.fadeMaster(MASTER_DB, FADE_IN_SEC);
+      this.lastTouchAt = Number.NEGATIVE_INFINITY;
       this.state = 'running';
     } catch (err) {
       // Left "starting", every later press would return at once and report a silent start.
@@ -94,12 +101,14 @@ export class AudioEngine {
   stop(): void {
     const g = this.graph;
     if (this.state !== 'running' || !g) return;
+    g.interaction.silence(Tone.immediate());
     g.mixer.fadeMaster(Number.NEGATIVE_INFINITY, FADE_OUT_SEC);
     const end = Tone.now() + FADE_OUT_SEC + 0.1;
     this.stopAt = end;
     g.base.stop(end);
     g.tension.stop(end);
     Tone.getTransport().stop(end);
+    this.lastTouchAt = Number.NEGATIVE_INFINITY;
     this.state = 'stopped';
   }
 
@@ -135,16 +144,36 @@ export class AudioEngine {
     if (trade) g.events.trade(trade.side, eventVelocity(trade.size), t);
   }
 
+  /** Immediate, opt-in particle accent; never wakes audio or enters the market cue pipeline. */
+  touch(side: TradeSide, strength: number): void {
+    const g = this.graph;
+    if (
+      this.state !== 'running' ||
+      !this.params.interactionSound ||
+      Tone.getContext().state !== 'running' ||
+      !g
+    )
+      return;
+    const now = Tone.now();
+    if (now >= this.lastTouchAt && now - this.lastTouchAt < TOUCH_SPACING_SEC) return;
+    this.lastTouchAt = now;
+    g.interaction.touch(side, Math.min(1, Math.max(0, strength)), now);
+  }
+
   setParams(next: AudioParams): void {
     const prev = this.params;
     this.params = next;
     const g = this.graph;
     if (!g) return;
+    if (prev.interactionSound && !next.interactionSound) {
+      g.interaction.silence(Tone.immediate());
+    }
     if (next.tonicPc !== prev.tonicPc) {
       g.base.setTonic(next.tonicPc);
       g.ambience.setTonic(next.tonicPc);
       g.tension.setTonic(next.tonicPc);
       g.events.setTonic(next.tonicPc);
+      g.interaction.setTonic(next.tonicPc);
     }
     if (next.baseVolumeDb !== prev.baseVolumeDb) {
       g.mixer.setLevel(g.baseChannel, next.baseVolumeDb);
@@ -178,6 +207,7 @@ export class AudioEngine {
     await wait(0);
     const tension = new TensionLayer(tensionChannel, p.tonicPc);
     const events = new EventsLayer(eventsChannel, p.tonicPc);
+    const interaction = new InteractionVoice(eventsChannel, p.tonicPc);
     this.graph = {
       mixer,
       baseChannel,
@@ -187,6 +217,7 @@ export class AudioEngine {
       ambience,
       tension,
       events,
+      interaction,
     };
     // Settings changed while building: setParams diffs against what the layers were built with.
     const latest = this.params;

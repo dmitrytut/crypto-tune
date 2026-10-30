@@ -34,7 +34,11 @@ const HELP: Record<string, { label: string; text: string }> = {
   },
   'events-volume': {
     label: 'Events',
-    text: 'Volume of single big events: gongs for liquidations, plucks for large trades.',
+    text: 'Volume of liquidation gongs, large-trade plucks and any enabled interaction sounds.',
+  },
+  'interaction-sound': {
+    label: 'Interaction sounds',
+    text: 'Optional quiet accents when you tap or drag through particles. They play only while Listen is on.',
   },
   window: {
     label: 'Price-change window',
@@ -170,6 +174,11 @@ export function mountSettingsPanel(
   );
   range('events-volume', LIMITS.layerVolumeDb, initial.eventsVolumeDb, String, (v) =>
     update({ eventsVolumeDb: v }),
+  );
+  const interactionSound = el<HTMLInputElement>('interaction-sound');
+  interactionSound.checked = initial.interactionSound;
+  interactionSound.addEventListener('change', () =>
+    update({ interactionSound: interactionSound.checked }),
   );
   // Window change resets metrics, so commit only on release.
   range(

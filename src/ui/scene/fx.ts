@@ -2,9 +2,17 @@ import type { LiquidationSide, TradeSide } from '../../feed/market-feed';
 import { usdFmt } from '../format';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
+import type { PointerStroke } from './interaction';
 import { popDroplets, popHeight } from './pop';
 import { floorSparks, sparkColor } from './sparks';
-import { bubbleStart, planSpawns, sizeDecades } from './spawn';
+import {
+  bubbleRadius,
+  bubbleStart,
+  planSpawns,
+  SIZE_DECADES,
+  SIZE_MIN_USD,
+  sizeDecades,
+} from './spawn';
 import { bubbleSprite, dropSprite, haloSprite } from './sprites';
 
 /** Live bubbles cap; above it the oldest are recycled. */
@@ -42,6 +50,11 @@ const IMPACT_SEC = 0.15;
 const MAX_LIVE_SPARKS = 1_200;
 /** Precomputed spark colours along the cooling, so a frame builds no colour strings. */
 const SPARK_COLOR_STEPS = 16;
+/** Detailed sprays per user frame; overload degrades to rings/flashes, then removal alone. */
+const TOUCH_FX_BUDGET = 24;
+const MAX_LIVE_POPS = 128;
+const MAX_LIVE_IMPACTS = 128;
+const MAX_PARTICLE_RADIUS = bubbleRadius(SIZE_MIN_USD * 10 ** SIZE_DECADES, true);
 
 /**
  * Side effects outside the overlay: the aura reacts where the event happened.
@@ -51,6 +64,7 @@ export interface FxHooks {
   bloom(x: number, y: number, color: Rgb, strength: number): void;
   shock(x: number, y: number, strength: number): void;
   shake(strength: number): void;
+  touch(side: TradeSide, strength: number): void;
 }
 
 interface Bubble {
@@ -237,6 +251,47 @@ export class Fx {
     this.impacts = [];
     this.labels = [];
   }
+  /** Remove each touched primary once; manual play never emits a market signal. */
+  interact(stroke: PointerStroke): void {
+    if (stroke.length === 0) return;
+    let hits = 0;
+    let strongest: Bubble | null = null;
+    for (let segment = 0; segment < stroke.length; segment++) {
+      const tap = stroke.isTap(segment);
+      let nearest: Bubble | null = null;
+      if (tap) {
+        let distance = Number.POSITIVE_INFINITY;
+        for (const b of this.bubbles) {
+          if (!stroke.hits(b.x, b.y, b.r, segment)) continue;
+          const d = stroke.distanceSq(b.x, b.y, segment);
+          if (d < distance) {
+            nearest = b;
+            distance = d;
+          }
+        }
+      }
+      let alive = 0;
+      for (const b of this.bubbles) {
+        const hit = tap ? b === nearest : stroke.hits(b.x, b.y, b.r, segment);
+        if (!hit) {
+          this.bubbles[alive++] = b;
+          continue;
+        }
+        const detailed = hits++ < TOUCH_FX_BUDGET;
+        if (b.popY === null) this.splash(b, b.y, detailed);
+        else this.pop(b, detailed, false);
+        if (!strongest || b.r > strongest.r) strongest = b;
+      }
+      this.bubbles.length = alive;
+    }
+    stroke.drain();
+    if (strongest) {
+      this.hooks.touch(
+        strongest.popY === null ? 'sell' : 'buy',
+        Math.min(1, strongest.r / MAX_PARTICLE_RADIUS),
+      );
+    }
+  }
 
   frame(dtSec: number, bigTradeUsd: number): void {
     const dt = Math.min(dtSec, 0.1);
@@ -330,25 +385,31 @@ export class Fx {
   }
 
   /** A drop hits the floor like hot metal: a flash and, within the cap, sparks that skitter. */
-  private splash(b: Bubble, floor: number): void {
-    this.impacts.push({ x: b.x, y: floor, r: b.r, age: 0 });
-    if (this.sparks.length >= MAX_LIVE_SPARKS) return;
+  private splash(b: Bubble, floor: number, detailed = true): void {
+    if (this.impacts.length < MAX_LIVE_IMPACTS) {
+      this.impacts.push({ x: b.x, y: floor, r: b.r, age: 0 });
+    }
+    if (!detailed || this.sparks.length >= MAX_LIVE_SPARKS) return;
     for (const s of floorSparks(b.r, Math.random)) {
+      if (this.sparks.length === MAX_LIVE_SPARKS) break;
       this.sparks.push({ x: b.x, y: floor - 1, age: 0, ...s });
     }
   }
 
   /** A bubble bursts: its film snaps away, a ring spreads and, within the cap, droplets fly. */
-  private pop(b: Bubble): void {
-    this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
-    if (this.sprays.length < MAX_LIVE_DROPLETS) {
+  private pop(b: Bubble, detailed = true, market = true): void {
+    if (this.pops.length < MAX_LIVE_POPS) {
+      this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
+    }
+    if (detailed && this.sprays.length < MAX_LIVE_DROPLETS) {
       for (const d of popDroplets(b.r, Math.random)) {
+        if (this.sprays.length === MAX_LIVE_DROPLETS) break;
         // Droplets fly off the film, so they start on the rim, heading outward.
         const k = b.r / Math.hypot(d.vx, d.vy);
         this.sprays.push({ x: b.x + d.vx * k, y: b.y + d.vy * k, age: 0, ...d });
       }
     }
-    if (b.halo) this.hooks.bloom(b.x, b.y, UP_COLOR, BIG_POP_BLOOM);
+    if (market && b.halo) this.hooks.bloom(b.x, b.y, UP_COLOR, BIG_POP_BLOOM);
   }
 
   private drawPops(dt: number): void {

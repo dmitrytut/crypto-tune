@@ -1,8 +1,11 @@
+import type { TradeSide } from '../../feed/market-feed';
 import { el } from '../dom';
 import { CALM_AURA } from '../palette';
 import { Aura } from './aura';
 import { Chart } from './chart';
 import { Fx } from './fx';
+import { PointerStroke } from './interaction';
+import { mountParticleInput } from './particle-input';
 
 const SHAKE_MS = 420;
 
@@ -14,6 +17,8 @@ export interface StageOptions {
   bigTradeUsd(): number;
   /** Runs at the end of every animation frame, e.g. to redraw the chart. */
   onFrame(): void;
+  /** A manual particle hit, independent of market cues. */
+  onParticleTouch(side: TradeSide, strength: number): void;
 }
 
 /** The visual layers: WebGL aura (null without hardware WebGL), event overlay and history chart. */
@@ -21,6 +26,8 @@ export interface Stage {
   aura: Aura | null;
   fx: Fx;
   chart: Chart;
+  /** Erases both queued input and the old scene before a new pipeline begins. */
+  clear(): void;
 }
 
 /**
@@ -31,9 +38,13 @@ export function mountStage(o: StageOptions): Stage {
   const { reducedMotion } = o;
   const aura = Aura.create(el('aura'), CALM_AURA);
   const stage = el('stage');
-  const fx = new Fx(el('fx'), {
+  const canvas = el<HTMLCanvasElement>('fx');
+  const stroke = new PointerStroke();
+  const cancelInput = mountParticleInput(canvas, stroke, reducedMotion);
+  const fx = new Fx(canvas, {
     bloom: (x, y, color, strength) => aura?.bloom(x, y, color, strength),
     shock: (x, y, strength) => aura?.shock(x, y, strength),
+    touch: o.onParticleTouch,
     shake: (strength) => {
       const a = 3 + 5 * strength;
       stage.animate(
@@ -48,6 +59,10 @@ export function mountStage(o: StageOptions): Stage {
       );
     },
   });
+  const clear = () => {
+    cancelInput();
+    fx.clear();
+  };
   const chartCanvas = el<HTMLCanvasElement>('chart');
   const chart = new Chart(chartCanvas, reducedMotion);
 
@@ -70,8 +85,8 @@ export function mountStage(o: StageOptions): Stage {
     return y === null ? null : chartBox.top + y;
   });
   document.addEventListener('visibilitychange', () => {
-    // Events received while hidden were not queued; nothing stale to burst on return.
-    if (!document.hidden) fx.clear();
+    // No old-pair gestures or particles should burst when a hidden scene returns.
+    if (!document.hidden) clear();
   });
 
   let prevFrame = performance.now();
@@ -82,12 +97,13 @@ export function mountStage(o: StageOptions): Stage {
     aura?.frame(reducedMotion.matches ? dt * 0.1 : dt);
     // Reduced motion: no new events are queued; clearing also wipes anything already
     // flying when the preference flips mid-session, so nothing freezes on screen.
-    if (reducedMotion.matches) fx.clear();
+    if (reducedMotion.matches) clear();
+    else fx.interact(stroke);
     fx.frame(dt, o.bigTradeUsd());
     o.onFrame();
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 
-  return { aura, fx, chart };
+  return { aura, fx, chart, clear };
 }

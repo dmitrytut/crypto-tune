@@ -46,6 +46,7 @@ const audioParams = (s: Settings): AudioParams => ({
   baseVolumeDb: s.baseVolumeDb,
   tensionVolumeDb: s.tensionVolumeDb,
   eventsVolumeDb: s.eventsVolumeDb,
+  interactionSound: s.interactionSound,
 });
 
 const eventThresholds = (s: Settings): EventThresholds => ({
@@ -93,6 +94,9 @@ const view = mountApp(settings, {
     audio.setParams(audioParams(next));
     events?.setThresholds(eventThresholds(next));
     saveSettings(savedPair ? { ...next, ...savedPair } : next);
+  },
+  onParticleTouch(side, strength) {
+    audio.touch(side, strength);
   },
   onToggleAudio() {
     if (audio.current === 'running') {
