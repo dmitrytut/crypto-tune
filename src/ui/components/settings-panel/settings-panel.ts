@@ -1,6 +1,13 @@
 import './settings-panel.css';
 import { HISTORY_PERIODS_MIN } from '../../../metrics/history';
-import { LIMITS, type Settings, type SourceKind, TONICS } from '../../../settings';
+import {
+  GRAPHICS_MODES,
+  type GraphicsMode,
+  LIMITS,
+  type Settings,
+  type SourceKind,
+  TONICS,
+} from '../../../settings';
 import { el } from '../../dom';
 import { durationLabel, usdFmt } from '../../format';
 import { createHint } from '../hint/hint';
@@ -10,6 +17,7 @@ import { mountPicker } from '../picker/picker';
 /** Threshold slider resolution in decades; values snap to two significant digits. */
 const LOG_STEP = 0.05;
 const snapUsd = (log10: number) => Number((10 ** log10).toPrecision(2));
+const GRAPHICS_LABELS: Record<GraphicsMode, string> = { auto: 'Auto', full: 'Full', lite: 'Lite' };
 
 /**
  * The ⓘ tip of every setting: what it is and what it changes, for a listener rather than a
@@ -39,6 +47,10 @@ const HELP: Record<string, { label: string; text: string }> = {
   'interaction-sound': {
     label: 'Interaction sounds',
     text: 'Optional quiet accents when you tap or drag through particles. They play only while Listen is on.',
+  },
+  graphics: {
+    label: 'Graphics',
+    text: 'Auto simplifies the scene under sustained load. Full keeps all effects; Lite uses fewer particles, no collisions and a simpler background. Data and music stay unchanged.',
   },
   window: {
     label: 'Price-change window',
@@ -71,6 +83,31 @@ const HELP: Record<string, { label: string; text: string }> = {
       'regular sell-offs and rallies, to hear every sound quickly.',
   },
 };
+
+function segmented<T extends string | number>(
+  id: string,
+  options: readonly T[],
+  initial: T,
+  text: (value: T) => string,
+  update: (value: T) => void,
+): void {
+  el(id).replaceChildren(
+    ...options.map((value) => {
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = id;
+      radio.className = 'visually-hidden';
+      radio.value = String(value);
+      radio.checked = value === initial;
+      radio.addEventListener('change', () => {
+        if (radio.checked) update(value);
+      });
+      const label = document.createElement('label');
+      label.append(radio, text(value));
+      return label;
+    }),
+  );
+}
 
 /**
  * Binds every control in the settings dialog to `update`. The dialog opens
@@ -106,22 +143,19 @@ export function mountSettingsPanel(
     });
   }
 
-  // Period of the change, volume and chart: one radio per HISTORY_PERIODS_MIN, labelled 1m … 1h.
-  el('period').replaceChildren(
-    ...HISTORY_PERIODS_MIN.map((periodMin) => {
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = 'period';
-      radio.className = 'visually-hidden';
-      radio.value = String(periodMin);
-      radio.checked = periodMin === initial.periodMin;
-      radio.addEventListener('change', () => {
-        if (radio.checked) update({ periodMin });
-      });
-      const label = document.createElement('label');
-      label.append(radio, durationLabel(periodMin * 60_000));
-      return label;
-    }),
+  segmented(
+    'period',
+    HISTORY_PERIODS_MIN,
+    initial.periodMin,
+    (periodMin) => durationLabel(periodMin * 60_000),
+    (periodMin) => update({ periodMin }),
+  );
+  segmented(
+    'graphics',
+    GRAPHICS_MODES,
+    initial.graphics,
+    (mode) => GRAPHICS_LABELS[mode],
+    (graphics) => update({ graphics }),
   );
 
   const range = (
