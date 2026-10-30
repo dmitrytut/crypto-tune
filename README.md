@@ -188,6 +188,14 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   the threshold get a halo, a floating amount (`+$864K`) and a flash in the aura. In a cascade small
   particles merge, so frames don't drop. About explains them with a legend: a bubble and a drop
   per size step and at the large trade threshold, drawn with the same sprites and sizes.
+  Falling sell drops bounce off other drops; rising buy bubbles bounce off other bubbles, with
+  bigger particles displacing smaller ones more. Impacts retain most of their normal speed, and
+  slow contacts get a small separation kick so particles do not stick rim-to-rim. Bubble sway is
+  part of the collision velocity; residual horizontal drift fades in the air. Both groups use
+  movement steps of at most 1/120 s and a horizontal neighbour sweep within the existing
+  1,500-particle cap. Sweep bounds are frozen before contacts move particles, so a rebound cannot
+  hide another pair. Bubbles and drops pass through each other; spray and sparks
+  do not participate in these contacts. Particles do not merge or deform.
 - **Every liquidation** is a double ring from the price (LONG magenta, SHORT teal). Above the
   threshold it adds shards, a `LIQUIDATION LONG $1.2M` label and a shockwave that bends the aura; at
   10× the threshold, a light screen shake. Small liquidations leave faint rings, so you can watch a
@@ -319,6 +327,8 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Trade legend**: About shows what each bubble and drop size means
 - [x] **Chart refresh**: smooth line and eased range, glowing event dots that pop in with sparks,
   edge to edge on phones
+- [x] **Particle collisions**: damped, area-weighted contacts within sell drops and within buy bubbles,
+  without a physics dependency
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
@@ -354,6 +364,14 @@ sound, and Binance covers the pairs that matter.
    screen, small ones with a few droplets, big ones in a shower; drops break exactly on the white
    price line and their sparks roll along it, also up and down its slopes. Past either end of the
    line, or while history loads, drops fall to the screen bottom.
+3. `pnpm test src/ui/scene/__specs__/collisions.spec.ts`: circle separation, energetic rebounds,
+   visible gaps after slow contacts, momentum, unequal sizes, glancing contacts, separating overlaps,
+   coincident centres, contacts after sweep reordering and no repeated kick for particles travelling
+   together at exact contact.
+4. In SIMULATOR, overlapping falling sell drops push apart and deflect; rising buy bubbles do the
+   same with other buy bubbles, but not with drops. Bubbles still pop in the upper screen and drops
+   still break on the price line. Enable `prefers-reduced-motion` while particles are visible:
+   the scene clears them; disable it and new particles appear normally.
 
 ### Favorites
 
