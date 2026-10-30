@@ -152,3 +152,49 @@
 - Minor, intentional policy: any competing pointer device cancels the active stroke, not only
   a second finger. One pointer owns the gesture across devices; cost is no simultaneous
   mouse/pen/touch play. This is documented in the input controller.
+
+### Master integration: 5ab9ea9
+
+- Fetched `origin/master` and checkpointed the completed interaction feature as `848c3d1`
+  before merging. Upstream adds PR #38: `CollisionSolver`, collision specs and substepped
+  particle movement in `Fx`. No upstream feed, audio, settings or input changes.
+- Resolved both merge conflicts: retain collision and interaction imports in `fx.ts`, and
+  retain both feature descriptions in README. No runtime compatibility fix was needed.
+- Independent standards review found no dependency/ownership violations. Independent spec
+  review found no confirmed incompatibility. The identified performance concern was measured
+  rather than dismissed: collision sorting/sweeping runs on every movement substep.
+- Trusted desktop input against colliding particles popped only the nearest target. The
+  removed object was absent from eight subsequent solver groups. A corner-shaped drag popped
+  all three on-path targets and left the off-path target alive. Hit-testing still precedes
+  movement, so it uses the last rendered positions rather than future collision positions.
+- Automatic buy pop and sell floor splash still removed their primaries, created their local
+  effects and emitted no interaction cue. Collision scratch lists emptied after the frame
+  and after clear. No manual hit produced market bloom, shock or shake.
+- Mobile 390×844 trusted touch sweep popped the three on-path targets, not the off-path target.
+  Reduced motion cleared primaries, stroke and collision groups. At 390×400, a held touch did
+  not pop; vertical pan scrolled 89 px and left the target alive under `pan-y pinch-zoom`.
+- Actual Listen + enabled interaction sound: ten frames of collision movement produced zero
+  interaction notes; a real particle tap produced one. Stop left gain at zero and rejected
+  twenty subsequent touch calls. Tapping a particle over hidden Listen kept audio stopped.
+  No browser errors; desktop canvas surface visually inspected.
+- CPU probe: owned Chromium, 390×844, CPU ×4, deterministic mixed-side fixtures with 10% larger
+  trades. Compared the merged frame with its solver temporarily disabled in that page only;
+  kinematics/rendering otherwise retained, fixtures reset between alternating variants.
+  This is not a comparison against the old production bundle and not a full GPU frame.
+
+  | Primaries | Simulation step | Approx. p95 without solver | Approx. p95 with solver |
+  | --------- | --------------- | -------------------------- | ----------------------- |
+  | 300       | 16.7 ms         | 2.5 ms                     | 1.7 ms                  |
+  | 300       | 100 ms          | 2.0 ms                     | 3.9 ms                  |
+  | 1500      | 16.7 ms         | 13.5 ms                    | 17.0 ms                 |
+  | 1500      | 100 ms          | 8.7 ms                     | 42.8 ms                 |
+
+  Normal-step variants had 50 samples each, slow-step variants 10. Warm-up was not isolated;
+  do not read the small-scene inversion as a collision speedup. Maximum observed merged slow
+  stress frame: 83.9 ms. Dense scenes after a long frame remain a mobile performance risk;
+  this integration does not silently change master physics or promise field CWV results.
+- Combined verification: `pnpm check` clean (115 files), `pnpm test` **193/193** (29 files),
+  `pnpm build` passed. Module 350.99 kB / 97.63 kB gzip, about +0.62 kB gzip over the feature
+  checkpoint. No new dependencies or permanent diagnostic hooks. Owned proof tab closed.
+- LAN reverse proxy remains at `http://192.168.1.12:5173/`, forwarding to the worktree's Vite
+  on `127.0.0.1:5174`. Physical-device thermals, GPU frame times and field CWV remain unmeasured.
