@@ -5,12 +5,17 @@ import { DEFAULT_TENSION_PARAMS } from './metrics/tension';
 
 export type SourceKind = 'live' | 'simulator';
 
+/** Graphics choices persist; Auto adapts the scene without changing data or sound. */
+export const GRAPHICS_MODES = ['auto', 'full', 'lite'] as const;
+export type GraphicsMode = (typeof GRAPHICS_MODES)[number];
+
 /** Tonic choices, index = pitch class (0 = C). */
 export const TONICS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 export type Tonic = (typeof TONICS)[number];
 
 export interface Settings {
   source: SourceKind;
+  graphics: GraphicsMode;
   /** Binance futures market the live pair trades on. */
   market: BinanceMarket;
   /** Exchange symbol of `market`, upper case, e.g. BTCUSDT or BTCUSD_PERP. */
@@ -46,6 +51,7 @@ const DEFAULT_SYMBOLS: Record<BinanceMarket, string> = {
 
 export const DEFAULT_SETTINGS: Settings = {
   source: 'live',
+  graphics: 'auto',
   market: 'usdm',
   symbol: DEFAULT_SYMBOLS.usdm,
   favorites: {
@@ -103,6 +109,7 @@ export function parseSettings(raw: unknown): Settings {
   };
   return {
     source: o.source === 'live' || o.source === 'simulator' ? o.source : DEFAULT_SETTINGS.source,
+    graphics: GRAPHICS_MODES.find((mode) => mode === o.graphics) ?? DEFAULT_SETTINGS.graphics,
     market,
     favorites: { usdm: favorites('usdm'), coinm: favorites('coinm') },
     symbol:
