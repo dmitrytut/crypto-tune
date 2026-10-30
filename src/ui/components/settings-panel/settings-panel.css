@@ -33,6 +33,22 @@
     }
   }
 
+  .field--checkbox {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+
+    & input[type="checkbox"] {
+      width: 24px;
+      height: 24px;
+      margin: 0;
+      accent-color: var(--text);
+      cursor: pointer;
+    }
+    & label {
+      cursor: pointer;
+    }
+  }
+
   /* Radio group drawn as buttons; the radios are visually hidden, so the label shows focus. */
   .segmented {
     border: 0;

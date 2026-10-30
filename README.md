@@ -45,6 +45,8 @@ looked at the chart.
 - **A living picture.** A WebGL aura takes its colour from order flow. Buys float up as bubbles, sells
   sink as drops, and liquidations send shockwaves out of the price. A price and volume strip runs
   along the bottom, over the period you pick: 1m, 5m, 15m or 1h.
+- **A scene you can touch.** Tap a bubble or drop, or drag through several, for local pops and sparks.
+  Optional quiet interaction sounds play only while Listen is on; no points or fake market events.
 - **Ready in seconds.** The live market shows the moment the socket opens. The last 30 minutes of
   trades load in the background (the pages in parallel, mostly from an IndexedDB cache on a
   reload), and tension calibrates as soon as they land instead of after a five-minute warm-up.
@@ -67,6 +69,14 @@ controls (macOS Now Playing, the lock screen on phones) stop and resume it, from
 A popular pair has its own address that opens it directly, e.g. <https://crypto-tune.com/bitcoin/>
 or `/ethereum/`, `/solana/`; the address follows the pair you pick. Chrome and Edge can install
 the site as an app (the install icon in the address bar), so it opens from the dock.
+
+Tap/click the particles, or hold and sweep through them. Controls and chart markers keep their own
+input. On a fitting phone screen the background accepts swipes in every direction and keeps
+pinch-zoom; on a short or zoomed page vertical swipes scroll instead (taps resolve on release).
+Native pull-to-refresh can start over controls or the chart, not over a background swipe surface.
+Effects follow the order in which the gesture crosses the particles, not their creation order.
+Enable **Settings → Sound → Interaction sounds** for quiet accents, off by default. They follow
+the Events volume and current tonic, never start Listen, and stop when you switch them off or Stop.
 
 To run it locally:
 
@@ -149,6 +159,9 @@ Recomputed every 250 ms on the feed clock, never wall time:
     The latest event is shown under the meter with its age (`LIQ LONG $766K (12s ago)`), even with
     sound off, and fades out after a minute;
   - thresholds are shared by all pairs, so lower them for small pairs.
+- **Interaction accents** (opt-in): one dedicated quiet voice for touching particles, on the Events
+  channel, at most 10 strikes per second. They are independent of market-event cues, chart dots and
+  thresholds; Stop or disabling them cancels even an accent already scheduled in audio lookahead.
 - Every change is smooth: levels and filters ramp over 0.5 s, tempo moves in 1 BPM steps, double time
   lands on the beat and chord changes on bar lines. Tonic, the three layer volumes and both
   thresholds are configurable; a tonic change glides the drone and sub over 3 s.
@@ -235,8 +248,9 @@ ARIA and motion. What that changed:
 - ⓘ tips stay open while the pointer moves from the button onto the tip; Esc closes them and the
   chart marker tip alike.
 - A short window or a zoomed page (up to 400%) scrolls instead of cutting off the controls.
-- On phones the page reloads with the browser's own pull-to-refresh: the document is the scroller,
-  no script involved.
+- On phones the document is the native scroller, including pull-to-refresh started over controls or
+  the chart. On short/zoomed pages the background also leaves vertical gestures to the browser;
+  on a fitting scene it reserves single-finger background swipes for particles and keeps pinch-zoom.
 
 ## Development
 
@@ -317,7 +331,7 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Live-first loading**: the live market at once, history in the background
 - [x] **Responsiveness**: Listen and the pair list stay quick on slow phones, stylesheet inlined
 - [x] **Media keys**: play/pause from the keyboard, headset and system media controls
-- [x] **Pull to refresh**: native browser pull-to-refresh on phones, no library
+- [x] **Pull to refresh**: native browser gesture over controls/chart or scrolling layouts, no library
 - [x] **COIN-M**: USDⓈ-M and COIN-M perpetuals, a tab per market in the pair list
 - [x] **Search and analytics**: pair pages, sitemap and robots, Umami with listening events,
   installable app (web manifest)
@@ -327,6 +341,8 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Trade legend**: About shows what each bubble and drop size means
 - [x] **Chart refresh**: smooth line and eased range, glowing event dots that pop in with sparks,
   edge to edge on phones
+- [x] **Particle interaction**: tap/drag/swipe, bounded local pops and mid-air sparks, opt-in quiet
+  accents, scroll/pinch ownership, and no invisible immersive controls intercepting a gesture
 - [x] **Particle collisions**: damped, area-weighted contacts within sell drops and within buy bubbles,
   without a physics dependency
 
@@ -335,6 +351,30 @@ sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Particle interaction
+
+1. `pnpm check && pnpm test && pnpm build`: includes stroke geometry (fast crossings, tangent hits,
+   corners without shortcuts, quick released taps, multiple taps before a frame, jitter, cancellation
+   and bounded event floods) and strict boolean sound opt-in when loading saved settings.
+2. `pnpm dev` → Simulator: tap one of two overlapping bubbles (only the nearest pops), drag a
+   corner-shaped path through bubbles/drops (only crossed ones pop), hover or right-click (no pop).
+   A drop breaks at its current height, not at the chart; hand gestures never make market labels,
+   dots, liquidation waves or screen shake.
+3. Wait for immersive mode, tap where the hidden Listen was: the scene owns the whole press and
+   Listen stays stopped. Chart taps, dialog backdrops, hints and visible controls do not pop particles.
+4. On a fitting phone screen, swipe vertically through several particles. Pinch cancels the game
+   gesture and zooms; on a short/zoomed page a vertical swipe scrolls without popping the particle
+   under the first touch. A tap there pops on release; a horizontal swipe still works.
+5. Interaction sounds start off; enable them in Settings, then Listen. Dense hits make bounded quiet
+   accents; switching the option off or Stop suppresses new and scheduled accents. No sound before
+   Listen. Reduced motion clears the game effects and pending gesture.
+6. Implementation proof: Chromium trusted mouse/touch input at 1440×900 and 390×844, a 390×400
+   scrolling layout, native pinch and reduced-motion emulation; offline audio verified a cancelled
+   scheduled strike is silent and the next permitted strike sounds. A synthetic dense 1500-particle
+   scene hit-test took about 0.4 ms in the desktop-hosted mobile viewport, capped at 128 rings and
+   408 detailed droplets for that sweep. These are local smoke results, not mobile field CWV.
+   Physical iOS/Android latency, Bluetooth, battery and thermal behavior remain device checks.
 
 ### Chart refresh
 
@@ -399,8 +439,8 @@ sound, and Binance covers the pairs that matter.
 
 ### Pull to refresh
 
-1. `pnpm dev --host`, open the page on a phone (Chrome on Android, Safari on iOS) and pull down from
-   the top: the browser's refresh spinner appears and the page reloads.
+1. `pnpm dev --host`, open the page on a phone (Chrome on Android, Safari on iOS), reveal the controls
+   and pull down over the header or chart: the native refresh spinner appears and the page reloads.
 2. A short window or zoom still scrolls vertically, never sideways; the pair list and dialogs scroll
    on their own without reloading the page.
 ### COIN-M
@@ -507,7 +547,7 @@ sound, and Binance covers the pairs that matter.
    event line shows `LIQ LONG …` and `SELL …` in red; on an up impulse the opposite.
 3. LIVE BTCUSDT: trades above $200K happen several times a minute. Threshold sliders move on a log
    scale ($1K–$1M and $10K–$10M).
-4. The Events slider changes only gongs and plucks.
+4. The Events slider changes gongs, plucks and any enabled interaction accents.
 
 ### Stage 3
 

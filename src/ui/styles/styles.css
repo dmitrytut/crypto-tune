@@ -77,6 +77,12 @@
     height: 100%;
     pointer-events: none;
   }
+  /* The existing FX layer is the only game surface; the stage's blank grid space
+   * passes through to it. Overlays below explicitly reclaim their own input. */
+  #fx {
+    pointer-events: auto;
+    touch-action: pinch-zoom;
+  }
 
   .stage {
     position: relative;
@@ -85,11 +91,19 @@
     display: grid;
     grid-template-rows: auto 1fr auto;
     padding: 20px var(--gutter) 16px;
+    pointer-events: none;
 
     /* Phones: the chart runs to the screen's bottom and side edges (see .chart). */
     @media (max-width: 480px) {
       padding-bottom: 0;
     }
+  }
+  /* Preserve text selection, chart markers, controls, and floating UI without
+   * turning empty header/hero rectangles into invisible game blockers. */
+  .top :is(.picker, .status, .icon-btn),
+  .hero :is(.price, .change, .meter, .info, .play),
+  .chart {
+    pointer-events: auto;
   }
 
   /* ── immersive mode: chrome fades, price and chart stay ── */
@@ -108,6 +122,12 @@
     /* Chrome holding keyboard focus stays: the focus ring must not fade out (WCAG 2.4.7). */
     & .fades:not(:focus-visible, :has(:focus-visible)) {
       opacity: 0;
+    }
+    /* Opacity alone leaves an invisible Listen/picker under the finger. A
+     * keyboard-focused control stays visible and retains its pointer input. */
+    & .fades:not(:focus-visible, :has(:focus-visible)),
+    & .fades:not(:focus-visible, :has(:focus-visible)) * {
+      pointer-events: none;
     }
   }
 
@@ -307,6 +327,11 @@
 }
 
 @layer utilities {
+  /* Component tooltip normally passes through; a visible tip owns its box. */
+  .chart-tip:not([hidden]) {
+    pointer-events: auto;
+  }
+
   /* Side colours: text that names a buy/up or sell/down move. */
   .up {
     color: var(--up);

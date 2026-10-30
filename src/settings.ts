@@ -26,8 +26,10 @@ export interface Settings {
   baseVolumeDb: number;
   /** Tension layer (sub, percussion, riser) level, dB. */
   tensionVolumeDb: number;
-  /** Event voices (liquidation gongs, trade accents) level, dB. */
+  /** Market-event voices and opt-in interaction accents, dB. */
   eventsVolumeDb: number;
+  /** Optional accents when touching scene particles while listening. */
+  interactionSound: boolean;
   /** Liquidations at or above this quote notional sound, USD. */
   liqThresholdUsd: number;
   /** Aggressive trades at or above this quote notional sound, USD. */
@@ -57,6 +59,7 @@ export const DEFAULT_SETTINGS: Settings = {
   baseVolumeDb: -6,
   tensionVolumeDb: -6,
   eventsVolumeDb: -6,
+  interactionSound: false,
   liqThresholdUsd: 20_000,
   tradeThresholdUsd: 200_000,
   periodMin: 15,
@@ -118,6 +121,10 @@ export function parseSettings(raw: unknown): Settings {
       num(o.eventsVolumeDb, DEFAULT_SETTINGS.eventsVolumeDb),
       LIMITS.layerVolumeDb,
     ),
+    interactionSound:
+      typeof o.interactionSound === 'boolean'
+        ? o.interactionSound
+        : DEFAULT_SETTINGS.interactionSound,
     liqThresholdUsd: clamp(
       num(o.liqThresholdUsd, DEFAULT_SETTINGS.liqThresholdUsd),
       LIMITS.liqThresholdUsd,

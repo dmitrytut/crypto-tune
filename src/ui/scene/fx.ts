@@ -3,9 +3,18 @@ import { usdFmt } from '../format';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
 import { type CollisionBody, CollisionSolver } from './collisions';
+import type { PointerStroke } from './interaction';
 import { popDroplets, popHeight } from './pop';
 import { floorSparks, sparkColor } from './sparks';
-import { type BubbleStart, bubbleStart, planSpawns, sizeDecades } from './spawn';
+import {
+  type BubbleStart,
+  bubbleRadius,
+  bubbleStart,
+  planSpawns,
+  SIZE_DECADES,
+  SIZE_MIN_USD,
+  sizeDecades,
+} from './spawn';
 import { bubbleSprite, dropSprite, haloSprite } from './sprites';
 
 /** Live bubbles cap; above it the oldest are recycled. */
@@ -49,6 +58,11 @@ const IMPACT_SEC = 0.15;
 const MAX_LIVE_SPARKS = 1_200;
 /** Precomputed spark colours along the cooling, so a frame builds no colour strings. */
 const SPARK_COLOR_STEPS = 16;
+/** Detailed sprays per user frame; overload degrades to rings/flashes, then removal alone. */
+const TOUCH_FX_BUDGET = 24;
+const MAX_LIVE_POPS = 128;
+const MAX_LIVE_IMPACTS = 128;
+const MAX_PARTICLE_RADIUS = bubbleRadius(SIZE_MIN_USD * 10 ** SIZE_DECADES, true);
 
 /**
  * Side effects outside the overlay: the aura reacts where the event happened.
@@ -58,6 +72,7 @@ export interface FxHooks {
   bloom(x: number, y: number, color: Rgb, strength: number): void;
   shock(x: number, y: number, strength: number): void;
   shake(strength: number): void;
+  touch(side: TradeSide, strength: number): void;
 }
 
 interface Bubble extends BubbleStart {
@@ -67,6 +82,12 @@ interface Bubble extends BubbleStart {
   popY: number | null;
   sprite: HTMLCanvasElement;
   halo: HTMLCanvasElement | null;
+  /** First crossing along the current input segment; only touched bodies are sorted. */
+  touchOrder: number;
+}
+
+function compareTouches(a: Bubble, b: Bubble): number {
+  return a.touchOrder - b.touchOrder;
 }
 
 interface Ring {
@@ -148,6 +169,7 @@ export class Fx {
   private readonly sprites: Record<TradeSide, HTMLCanvasElement>;
   private readonly halos: Record<TradeSide, HTMLCanvasElement>;
   private bubbles: Bubble[] = [];
+  private readonly touched: Bubble[] = [];
   private readonly drops: CollisionBody[] = [];
   private readonly rising: CollisionBody[] = [];
   private readonly collisions = new CollisionSolver();
@@ -165,7 +187,7 @@ export class Fx {
   /** Surface height at a screen x, CSS px; null: the screen bottom. */
   private floorAt: (x: number) => number | null = () => null;
   private labels: Label[] = [];
-  private queued: { side: TradeSide; usd: number }[] = [];
+  private readonly queued: { side: TradeSide; usd: number }[] = [];
   private origin = { x: 0, y: 0 };
   /** The page font stack (--font-sans), inherited by the canvas: one source for CSS and labels. */
   private readonly fontFamily: string;
@@ -231,17 +253,69 @@ export class Fx {
 
   /** Drop anything queued, e.g. while the tab was hidden. */
   clear(): void {
-    this.queued = [];
-    this.bubbles = [];
+    this.queued.length = 0;
+    this.bubbles.length = 0;
+    this.touched.length = 0;
     this.drops.length = 0;
     this.rising.length = 0;
-    this.rings = [];
-    this.shards = [];
-    this.pops = [];
-    this.sprays = [];
-    this.sparks = [];
-    this.impacts = [];
-    this.labels = [];
+    this.rings.length = 0;
+    this.shards.length = 0;
+    this.pops.length = 0;
+    this.sprays.length = 0;
+    this.sparks.length = 0;
+    this.impacts.length = 0;
+    this.labels.length = 0;
+  }
+  /** Remove each touched primary once; manual play never emits a market signal. */
+  interact(stroke: PointerStroke): void {
+    if (stroke.length === 0) return;
+    let hits = 0;
+    let strongest: Bubble | null = null;
+    for (let segment = 0; segment < stroke.length; segment++) {
+      const tap = stroke.isTap(segment);
+      let nearest: Bubble | null = null;
+      if (tap) {
+        let distance = Number.POSITIVE_INFINITY;
+        for (const b of this.bubbles) {
+          if (!stroke.hits(b.x, b.y, b.r, segment)) continue;
+          const d = stroke.distanceSq(b.x, b.y, segment);
+          if (d < distance) {
+            nearest = b;
+            distance = d;
+          }
+        }
+      }
+      let alive = 0;
+      for (const b of this.bubbles) {
+        const order = tap
+          ? b === nearest
+            ? 0
+            : Infinity
+          : stroke.entryFraction(b.x, b.y, b.r, segment);
+        if (order === Infinity) {
+          this.bubbles[alive++] = b;
+          continue;
+        }
+        b.touchOrder = order;
+        this.touched.push(b);
+      }
+      this.bubbles.length = alive;
+      if (!tap) this.touched.sort(compareTouches);
+      for (const b of this.touched) {
+        const detailed = hits++ < TOUCH_FX_BUDGET;
+        if (b.popY === null) this.splash(b, b.y, detailed);
+        else this.pop(b, detailed, false);
+        if (!strongest || b.r > strongest.r) strongest = b;
+      }
+      this.touched.length = 0;
+    }
+    stroke.drain();
+    if (strongest) {
+      this.hooks.touch(
+        strongest.popY === null ? 'sell' : 'buy',
+        Math.min(1, strongest.r / MAX_PARTICLE_RADIUS),
+      );
+    }
   }
 
   frame(dtSec: number, bigTradeUsd: number): void {
@@ -280,6 +354,7 @@ export class Fx {
         vx: b.vx + (s.side === 'buy' ? Math.sin(phase) * (BUBBLE_SWAY_SPEED + b.r) : 0),
         age: 0,
         phase,
+        touchOrder: 0,
         popY: s.side === 'buy' ? popHeight(h, Math.random) : null,
         sprite: this.sprites[s.side],
         halo: s.big ? this.halos[s.side] : null,
@@ -300,7 +375,7 @@ export class Fx {
         this.hooks.bloom(b.x, b.y, color, 0.45 + 0.25 * Math.log10(s.usd / bigTradeUsd + 1));
       }
     }
-    this.queued = [];
+    this.queued.length = 0;
     if (this.bubbles.length > MAX_BUBBLES)
       this.bubbles.splice(0, this.bubbles.length - MAX_BUBBLES);
   }
@@ -374,25 +449,31 @@ export class Fx {
   }
 
   /** A drop hits the floor like hot metal: a flash and, within the cap, sparks that skitter. */
-  private splash(b: Bubble, floor: number): void {
-    this.impacts.push({ x: b.x, y: floor, r: b.r, age: 0 });
-    if (this.sparks.length >= MAX_LIVE_SPARKS) return;
+  private splash(b: Bubble, floor: number, detailed = true): void {
+    if (this.impacts.length < MAX_LIVE_IMPACTS) {
+      this.impacts.push({ x: b.x, y: floor, r: b.r, age: 0 });
+    }
+    if (!detailed || this.sparks.length >= MAX_LIVE_SPARKS) return;
     for (const s of floorSparks(b.r, Math.random)) {
+      if (this.sparks.length === MAX_LIVE_SPARKS) break;
       this.sparks.push({ x: b.x, y: floor - 1, age: 0, ...s });
     }
   }
 
   /** A bubble bursts: its film snaps away, a ring spreads and, within the cap, droplets fly. */
-  private pop(b: Bubble): void {
-    this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
-    if (this.sprays.length < MAX_LIVE_DROPLETS) {
+  private pop(b: Bubble, detailed = true, market = true): void {
+    if (this.pops.length < MAX_LIVE_POPS) {
+      this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
+    }
+    if (detailed && this.sprays.length < MAX_LIVE_DROPLETS) {
       for (const d of popDroplets(b.r, Math.random)) {
+        if (this.sprays.length === MAX_LIVE_DROPLETS) break;
         // Droplets fly off the film, so they start on the rim, heading outward.
         const k = b.r / Math.hypot(d.vx, d.vy);
         this.sprays.push({ x: b.x + d.vx * k, y: b.y + d.vy * k, age: 0, ...d });
       }
     }
-    if (b.halo) this.hooks.bloom(b.x, b.y, UP_COLOR, BIG_POP_BLOOM);
+    if (market && b.halo) this.hooks.bloom(b.x, b.y, UP_COLOR, BIG_POP_BLOOM);
   }
 
   private drawPops(dt: number): void {
