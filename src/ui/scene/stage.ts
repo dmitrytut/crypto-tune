@@ -4,6 +4,7 @@ import { CALM_AURA } from '../palette';
 import { Aura } from './aura';
 import { Chart } from './chart';
 import { Fx } from './fx';
+import { GestureFeedback } from './gesture-feedback';
 import { PointerStroke } from './interaction';
 import { mountParticleInput } from './particle-input';
 
@@ -40,7 +41,8 @@ export function mountStage(o: StageOptions): Stage {
   const stage = el('stage');
   const canvas = el<HTMLCanvasElement>('fx');
   const stroke = new PointerStroke();
-  const cancelInput = mountParticleInput(canvas, stroke, reducedMotion);
+  const feedback = new GestureFeedback(canvas, reducedMotion);
+  const cancelInput = mountParticleInput(canvas, stroke, reducedMotion, feedback);
   const fx = new Fx(canvas, {
     bloom: (x, y, color, strength) => aura?.bloom(x, y, color, strength),
     shock: (x, y, strength) => aura?.shock(x, y, strength),
@@ -95,11 +97,13 @@ export function mountStage(o: StageOptions): Stage {
     prevFrame = t;
     // Reduced motion: the aura barely drifts and no particles fly.
     aura?.frame(reducedMotion.matches ? dt * 0.1 : dt);
-    // Reduced motion: no new events are queued; clearing also wipes anything already
-    // flying when the preference flips mid-session, so nothing freezes on screen.
-    if (reducedMotion.matches) clear();
-    else fx.interact(stroke);
+    // Keep the non-moving press acknowledgment in reduced motion, but no market particles.
+    if (reducedMotion.matches) {
+      stroke.cancel();
+      fx.clear();
+    } else fx.interact(stroke);
     fx.frame(dt, o.bigTradeUsd());
+    feedback.draw(t);
     o.onFrame();
     requestAnimationFrame(frame);
   };

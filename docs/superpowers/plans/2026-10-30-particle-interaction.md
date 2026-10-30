@@ -239,3 +239,24 @@
   Short-screen pan scrolled 91 px without a pop, pinch reached scale 1.3254 and cancelled the
   pending stroke, and keyboard Enter still opened Settings after a cancelled touch gesture.
   No browser errors; owned pages closed. Physical Safari/iOS remains unverified.
+
+### PR #40 sync with master 9c748a9
+
+- Master adds PR #41 gesture feedback: press rings, short trails and a stationary reduced-motion
+  acknowledgment. The only merge conflict was the input guard in `particle-input.ts`.
+- Retained compatibility-click ownership and mouse-focus suppression before the gesture guard,
+  but removed its reduced-motion rejection: the frame loop suppresses market particles while
+  retaining the new acknowledgment. Active/blocked-pointer and hidden-page checks remain.
+- Browser seam RED→GREEN: accepting the old guard produced zero feedback marks under reduced
+  motion; the combined guard produced one stationary ring with radius 8, no trail and no market
+  particles. Hidden stopped Listen stayed stopped in both motion modes; hidden running Listen
+  stayed running, and a deliberate visible touch still started audio.
+- Native mouse corner trail contained the vertical and horizontal legs, never a diagonal; its
+  three marks expired. A second finger cleared feedback. Mobile swipe removed three on-path
+  particles and spared the off-path one. Short-screen pan scrolled 91 px with no pop or feedback;
+  pinch reached 1.3254 and left no pending input/feedback. Keyboard Enter still opened Settings.
+- Desktop surface visually inspected; temporary instrumentation removed by closing owned tabs.
+  One external Umami script request was aborted during device emulation/reload; no application
+  exception was reported. Analytics behavior was not changed.
+- `pnpm check`, 195 tests / 29 files and production build passed. Physical Safari/iOS remains
+  unverified. No adaptive-quality changes are included.
