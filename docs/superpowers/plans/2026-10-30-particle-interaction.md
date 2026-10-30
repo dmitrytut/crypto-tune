@@ -221,3 +221,21 @@
 - Specialist reviewer provider was unavailable (429 before code access); two fresh general
   reviewers independently checked Standards and Spec. No unrelated restructuring or adaptive
   quality changes are included in this PR.
+
+### Mobile compatibility-click regression
+
+- A coherent iPhone 13 device profile exposed a missed case: pointerdown/up target the canvas,
+  but Chrome generates later mouse events and a click targeting the now-revealed `audio-label`.
+  Before the fix, a stopped Listen became running. Viewport-only touch smoke did not catch it.
+- Cancelling pointerdown suppresses compatibility mouse focus, but a separate browser probe
+  proved it does not suppress that click. The input controller now owns the resulting physical
+  click until consumed or another pointerdown begins, and blocks only retargeting away from
+  the canvas. Keyboard/assistive clicks (detail 0) and subsequent deliberate control presses
+  remain native. No timeout, delayed UI wake or touchstart cancellation.
+- Ownership is established even under reduced motion, before the game-only guard; otherwise
+  reduced-motion users would still accidentally start Listen when waking the chrome.
+- Native browser RED→GREEN: hidden stopped Listen stays stopped with and without reduced
+  motion; hidden running Listen stays running. A deliberate visible touch still starts music.
+  Short-screen pan scrolled 91 px without a pop, pinch reached scale 1.3254 and cancelled the
+  pending stroke, and keyboard Enter still opened Settings after a cancelled touch gesture.
+  No browser errors; owned pages closed. Physical Safari/iOS remains unverified.

@@ -363,6 +363,8 @@ sound, and Binance covers the pairs that matter.
    dots, liquidation waves or screen shake.
 3. Wait for immersive mode, tap where the hidden Listen was: the scene owns the whole press and
    Listen stays stopped. Chart taps, dialog backdrops, hints and visible controls do not pop particles.
+   Repeat with a mobile device profile and reduced motion: a compatibility click generated after
+   the chrome wakes must not start/stop Listen. A subsequent deliberate control tap still works.
 4. On a fitting phone screen, swipe vertically through several particles. Pinch cancels the game
    gesture and zooms; on a short/zoomed page a vertical swipe scrolls without popping the particle
    under the first touch. A tap there pops on release; a horizontal swipe still works.
