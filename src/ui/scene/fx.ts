@@ -2,15 +2,22 @@ import type { LiquidationSide, TradeSide } from '../../feed/market-feed';
 import { usdFmt } from '../format';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
 import { fitCanvas } from './canvas';
+import { type CollisionBody, CollisionSolver } from './collisions';
 import { popDroplets, popHeight } from './pop';
 import { floorSparks, sparkColor } from './sparks';
-import { bubbleStart, planSpawns, sizeDecades } from './spawn';
+import { type BubbleStart, bubbleStart, planSpawns, sizeDecades } from './spawn';
 import { bubbleSprite, dropSprite, haloSprite } from './sprites';
 
 /** Live bubbles cap; above it the oldest are recycled. */
 const MAX_BUBBLES = 1_500;
 /** Bubbles created per frame; a burst beyond this merges into larger ones. */
 const SPAWN_BUDGET = 120;
+/** Short movement steps keep ordinary fast particles from skipping contacts on a slow frame. */
+const CONTACT_STEP_SEC = 1 / 120;
+/** Horizontal motion decays in the air, 1/s, rather than drifting forever after impact. */
+const PARTICLE_DRAG = 0.8;
+/** Base buoyant sway speed, px/s; larger bubbles add their radius to the amplitude. */
+const BUBBLE_SWAY_SPEED = 8;
 const FADE_IN_SEC = 0.35;
 const RING_SEC = 1.8;
 const SHARD_SEC = 1.1;
@@ -53,13 +60,7 @@ export interface FxHooks {
   shake(strength: number): void;
 }
 
-interface Bubble {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  ay: number;
-  r: number;
+interface Bubble extends BubbleStart {
   age: number;
   phase: number;
   /** Height a buy bubble pops at, CSS px from the top; null for drops, which fall to the floor. */
@@ -147,6 +148,9 @@ export class Fx {
   private readonly sprites: Record<TradeSide, HTMLCanvasElement>;
   private readonly halos: Record<TradeSide, HTMLCanvasElement>;
   private bubbles: Bubble[] = [];
+  private readonly drops: CollisionBody[] = [];
+  private readonly rising: CollisionBody[] = [];
+  private readonly collisions = new CollisionSolver();
   private rings: Ring[] = [];
   private shards: Shard[] = [];
   private pops: Pop[] = [];
@@ -229,6 +233,8 @@ export class Fx {
   clear(): void {
     this.queued = [];
     this.bubbles = [];
+    this.drops.length = 0;
+    this.rising.length = 0;
     this.rings = [];
     this.shards = [];
     this.pops = [];
@@ -245,6 +251,7 @@ export class Fx {
     const { ctx } = this;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
+    this.moveParticles(dt, h);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     ctx.globalCompositeOperation = 'lighter';
@@ -266,10 +273,13 @@ export class Fx {
     const h = this.canvas.clientHeight;
     for (const s of planSpawns(this.queued, SPAWN_BUDGET, bigTradeUsd)) {
       const b = bubbleStart(s.side, s.usd, s.big, w, h, Math.random);
+      const phase = Math.random() * Math.PI * 2;
       this.bubbles.push({
         ...b,
+        // Store the full velocity, sway included, so contacts see the motion being drawn.
+        vx: b.vx + (s.side === 'buy' ? Math.sin(phase) * (BUBBLE_SWAY_SPEED + b.r) : 0),
         age: 0,
-        phase: Math.random() * Math.PI * 2,
+        phase,
         popY: s.side === 'buy' ? popHeight(h, Math.random) : null,
         sprite: this.sprites[s.side],
         halo: s.big ? this.halos[s.side] : null,
@@ -295,6 +305,44 @@ export class Fx {
       this.bubbles.splice(0, this.bubbles.length - MAX_BUBBLES);
   }
 
+  private moveParticles(dt: number, h: number): void {
+    const steps = Math.ceil(dt / CONTACT_STEP_SEC);
+    const step = steps > 0 ? dt / steps : 0;
+    const drag = Math.exp(-PARTICLE_DRAG * step);
+    for (let i = 0; i < steps; i++) {
+      this.drops.length = 0;
+      this.rising.length = 0;
+      for (const b of this.bubbles) {
+        if (b.y < -b.r * 4 || b.y > h + b.r * 4) continue;
+        // Spent particles wait for drawBubbles to emit their splash or pop, not another contact.
+        if (b.popY === null ? b.y >= (this.floorAt(b.x) ?? h) : b.y <= b.popY) continue;
+        if (b.popY === null) {
+          b.vx *= drag;
+        } else {
+          const frequency = 2.6 - b.r * 0.05;
+          const amplitude = BUBBLE_SWAY_SPEED + b.r;
+          const phase = (b.age + i * step) * frequency + b.phase;
+          // Advance the sway component; only residual drift decays. Collision kicks persist.
+          b.vx =
+            (b.vx - Math.sin(phase) * amplitude) * drag +
+            Math.sin(phase + frequency * step) * amplitude;
+        }
+        b.vy += b.ay * step;
+        b.x += b.vx * step;
+        b.y += b.vy * step;
+        if (b.popY === null) {
+          if (b.y < (this.floorAt(b.x) ?? h)) this.drops.push(b);
+        } else {
+          if (b.y > b.popY) this.rising.push(b);
+        }
+      }
+      this.collisions.resolve(this.drops);
+      this.collisions.resolve(this.rising);
+    }
+    this.drops.length = 0;
+    this.rising.length = 0;
+  }
+
   private drawBubbles(dt: number, h: number): void {
     const { ctx } = this;
     let alive = 0;
@@ -312,10 +360,6 @@ export class Fx {
         this.pop(b);
         continue;
       }
-      b.vy += b.ay * dt;
-      // Gentle sideways sway; bigger bubbles sway slower and wider, like real ones.
-      b.x += (b.vx + Math.sin(b.age * (2.6 - b.r * 0.05) + b.phase) * (8 + b.r)) * dt;
-      b.y += b.vy * dt;
       const a = Math.min(1, b.age / FADE_IN_SEC);
       if (b.halo) {
         ctx.globalAlpha = a * (0.7 + 0.3 * Math.sin(b.age * 5));
