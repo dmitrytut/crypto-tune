@@ -18,6 +18,7 @@ export function mountParticleInput(
   let blocked = -1;
   let pendingTap = false;
   let panAllowed = false;
+  let ownsClick = false;
   let startX = 0;
   let startY = 0;
   const root = document.documentElement;
@@ -59,6 +60,7 @@ export function mountParticleInput(
   window.addEventListener(
     'pointerdown',
     (event) => {
+      ownsClick = false;
       if (active !== -1 && event.pointerId !== active) {
         const first = active;
         cancel();
@@ -67,12 +69,22 @@ export function mountParticleInput(
     },
     true,
   );
+  window.addEventListener(
+    'click',
+    (event) => {
+      if (event.detail === 0) return; // Keyboard and assistive activation are not scene gestures.
+      const owned = ownsClick;
+      ownsClick = false;
+      // Mobile compatibility clicks can hit chrome revealed after the original canvas press.
+      if (!owned || event.target === canvas) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    true,
+  );
 
   canvas.addEventListener('pointerdown', (event) => {
     if (
-      active !== -1 ||
-      blocked !== -1 ||
-      document.hidden ||
       !event.isPrimary ||
       (event.pointerType !== 'touch' && event.button !== 0) ||
       (event.pointerType !== 'touch' &&
@@ -82,6 +94,11 @@ export function mountParticleInput(
       return;
     // Capture before window's bubbling wake handler reveals the hidden Listen button.
     canvas.setPointerCapture(event.pointerId);
+    ownsClick = true;
+    // Prevent compatibility mouse focus without cancelling native touch-action pan or pinch.
+    event.preventDefault();
+    // Reduced motion keeps press feedback; the frame loop suppresses particle hits instead.
+    if (active !== -1 || blocked !== -1 || document.hidden) return;
     active = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;

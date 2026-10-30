@@ -221,3 +221,42 @@
 - Specialist reviewer provider was unavailable (429 before code access); two fresh general
   reviewers independently checked Standards and Spec. No unrelated restructuring or adaptive
   quality changes are included in this PR.
+
+### Mobile compatibility-click regression
+
+- A coherent iPhone 13 device profile exposed a missed case: pointerdown/up target the canvas,
+  but Chrome generates later mouse events and a click targeting the now-revealed `audio-label`.
+  Before the fix, a stopped Listen became running. Viewport-only touch smoke did not catch it.
+- Cancelling pointerdown suppresses compatibility mouse focus, but a separate browser probe
+  proved it does not suppress that click. The input controller now owns the resulting physical
+  click until consumed or another pointerdown begins, and blocks only retargeting away from
+  the canvas. Keyboard/assistive clicks (detail 0) and subsequent deliberate control presses
+  remain native. No timeout, delayed UI wake or touchstart cancellation.
+- Ownership is established even under reduced motion, before the game-only guard; otherwise
+  reduced-motion users would still accidentally start Listen when waking the chrome.
+- Native browser RED→GREEN: hidden stopped Listen stays stopped with and without reduced
+  motion; hidden running Listen stays running. A deliberate visible touch still starts music.
+  Short-screen pan scrolled 91 px without a pop, pinch reached scale 1.3254 and cancelled the
+  pending stroke, and keyboard Enter still opened Settings after a cancelled touch gesture.
+  No browser errors; owned pages closed. Physical Safari/iOS remains unverified.
+
+### PR #40 sync with master 9c748a9
+
+- Master adds PR #41 gesture feedback: press rings, short trails and a stationary reduced-motion
+  acknowledgment. The only merge conflict was the input guard in `particle-input.ts`.
+- Retained compatibility-click ownership and mouse-focus suppression before the gesture guard,
+  but removed its reduced-motion rejection: the frame loop suppresses market particles while
+  retaining the new acknowledgment. Active/blocked-pointer and hidden-page checks remain.
+- Browser seam RED→GREEN: accepting the old guard produced zero feedback marks under reduced
+  motion; the combined guard produced one stationary ring with radius 8, no trail and no market
+  particles. Hidden stopped Listen stayed stopped in both motion modes; hidden running Listen
+  stayed running, and a deliberate visible touch still started audio.
+- Native mouse corner trail contained the vertical and horizontal legs, never a diagonal; its
+  three marks expired. A second finger cleared feedback. Mobile swipe removed three on-path
+  particles and spared the off-path one. Short-screen pan scrolled 91 px with no pop or feedback;
+  pinch reached 1.3254 and left no pending input/feedback. Keyboard Enter still opened Settings.
+- Desktop surface visually inspected; temporary instrumentation removed by closing owned tabs.
+  One external Umami script request was aborted during device emulation/reload; no application
+  exception was reported. Analytics behavior was not changed.
+- `pnpm check`, 195 tests / 29 files and production build passed. Physical Safari/iOS remains
+  unverified. No adaptive-quality changes are included.
