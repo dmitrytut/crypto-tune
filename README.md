@@ -74,6 +74,7 @@ Tap/click the particles, or hold and sweep through them. Controls and chart mark
 input. On a fitting phone screen the background accepts swipes in every direction and keeps
 pinch-zoom; on a short or zoomed page vertical swipes scroll instead (taps resolve on release).
 Native pull-to-refresh can start over controls or the chart, not over a background swipe surface.
+Effects follow the order in which the gesture crosses the particles, not their creation order.
 Enable **Settings → Sound → Interaction sounds** for quiet accents, off by default. They follow
 the Events volume and current tonic, never start Listen, and stop when you switch them off or Stop.
 

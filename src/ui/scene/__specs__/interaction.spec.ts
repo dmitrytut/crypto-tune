@@ -114,4 +114,23 @@ describe('PointerStroke', () => {
     expect(stroke.length).toBe(1);
     expect(stroke.isTap(0)).toBe(true);
   });
+
+  it('orders crossings by entry into the padded circle, not by its centre', () => {
+    const stroke = new PointerStroke();
+    stroke.begin(0, 0, 2);
+    stroke.move(100, 0);
+    expect(stroke.entryFraction(90, 0, 3, 1)).toBeCloseTo(0.85);
+    expect(stroke.entryFraction(10, 0, 3, 1)).toBeCloseTo(0.05);
+    expect(stroke.entryFraction(50, 0, 28, 1)).toBeLessThan(stroke.entryFraction(40, 0, 3, 1));
+  });
+
+  it('distinguishes entry at the start, tangent end and a missed segment', () => {
+    const stroke = new PointerStroke();
+    stroke.begin(0, 0, 0);
+    stroke.move(100, 0);
+    expect(stroke.entryFraction(0, 0, 5, 1)).toBe(0);
+    expect(stroke.entryFraction(100, 3, 3, 1)).toBeCloseTo(1);
+    expect(stroke.entryFraction(110, 0, 3, 1)).toBe(Infinity);
+    expect(stroke.entryFraction(50, 4, 3, 1)).toBe(Infinity);
+  });
 });

@@ -71,18 +71,27 @@ export class PointerStroke {
   hits(x: number, y: number, radius: number, index = -1): boolean {
     const from = Math.max(0, index);
     const until = index < 0 ? this.count : index + 1;
-    for (let i = from * STRIDE; i < until * STRIDE; i += STRIDE) {
-      // count is bounded by the fixed buffer; every component in this range was written.
-      const ax = this.segments[i] as number;
-      const ay = this.segments[i + 1] as number;
-      const dx = this.segments[i + 2] as number;
-      const dy = this.segments[i + 3] as number;
-      const inv = this.segments[i + 4] as number;
-      const r2 = (radius + (this.segments[i + 6] as number)) ** 2;
-      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) * inv));
-      if ((x - ax - t * dx) ** 2 + (y - ay - t * dy) ** 2 <= r2) return true;
+    for (let i = from; i < until; i++) {
+      if (this.entryFraction(x, y, radius, i) < Infinity) return true;
     }
     return false;
+  }
+
+  /** First crossing of a padded circle, 0…1 along this segment; Infinity for a miss. */
+  entryFraction(x: number, y: number, radius: number, index: number): number {
+    if (index >= this.count) return Infinity;
+    const i = index * STRIDE;
+    const ax = this.segments[i] as number;
+    const ay = this.segments[i + 1] as number;
+    const dx = this.segments[i + 2] as number;
+    const dy = this.segments[i + 3] as number;
+    const inv = this.segments[i + 4] as number;
+    const r2 = (radius + (this.segments[i + 6] as number)) ** 2;
+    const projection = ((x - ax) * dx + (y - ay) * dy) * inv;
+    const t = Math.min(1, Math.max(0, projection));
+    if ((x - ax - t * dx) ** 2 + (y - ay - t * dy) ** 2 > r2) return Infinity;
+    const normalSq = (x - ax - projection * dx) ** 2 + (y - ay - projection * dy) ** 2;
+    return Math.max(0, projection - Math.sqrt(Math.max(0, (r2 - normalSq) * inv)));
   }
 
   private append(x: number, y: number, dx: number, dy: number, tap: boolean): void {

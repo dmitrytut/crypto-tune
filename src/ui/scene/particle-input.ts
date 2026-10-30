@@ -1,7 +1,12 @@
 import { el } from '../dom';
 import { DRAG_SLOP_PX, type PointerStroke } from './interaction';
 
-/** A single canvas owns game gestures; overlays and controls keep their native pointer behavior. */
+const TOUCH_PADDING_PX = 12;
+
+/**
+ * A single canvas owns game gestures; overlays and controls keep their native pointer behavior.
+ * @package
+ */
 export function mountParticleInput(
   canvas: HTMLCanvasElement,
   stroke: PointerStroke,
@@ -58,8 +63,7 @@ export function mountParticleInput(
       reducedMotion.matches ||
       document.hidden ||
       !event.isPrimary ||
-      (event.pointerType === 'mouse' && event.button !== 0) ||
-      (event.pointerType === 'pen' && event.button !== 0) ||
+      (event.pointerType !== 'touch' && event.button !== 0) ||
       (event.pointerType !== 'touch' &&
         event.pointerType !== 'mouse' &&
         event.pointerType !== 'pen')
@@ -73,7 +77,7 @@ export function mountParticleInput(
     // Let a scroll-eligible touch prove it is a tap or horizontal stroke before any pop.
     pendingTap = event.pointerType === 'touch' && panAllowed;
     if (!pendingTap) {
-      stroke.begin(startX, startY, event.pointerType === 'touch' ? 12 : 3);
+      stroke.begin(startX, startY, event.pointerType === 'touch' ? TOUCH_PADDING_PX : 3);
     }
   });
 
@@ -84,7 +88,7 @@ export function mountParticleInput(
       const dy = Math.abs(event.clientY - startY);
       if (dx <= DRAG_SLOP_PX || dx <= dy) return;
       pendingTap = false;
-      stroke.begin(startX, startY, 12);
+      stroke.begin(startX, startY, TOUCH_PADDING_PX);
     }
     stroke.move(event.clientX, event.clientY);
   });
@@ -93,7 +97,8 @@ export function mountParticleInput(
     if (event.pointerId !== active) return;
     if (pendingTap) {
       const distanceSq = (event.clientX - startX) ** 2 + (event.clientY - startY) ** 2;
-      if (distanceSq <= DRAG_SLOP_PX ** 2) stroke.begin(event.clientX, event.clientY, 12);
+      if (distanceSq <= DRAG_SLOP_PX ** 2)
+        stroke.begin(event.clientX, event.clientY, TOUCH_PADDING_PX);
       pendingTap = false;
     } else {
       stroke.move(event.clientX, event.clientY);

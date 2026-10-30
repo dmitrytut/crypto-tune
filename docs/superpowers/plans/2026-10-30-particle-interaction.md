@@ -198,3 +198,26 @@
   checkpoint. No new dependencies or permanent diagnostic hooks. Owned proof tab closed.
 - LAN reverse proxy remains at `http://192.168.1.12:5173/`, forwarding to the worktree's Vite
   on `127.0.0.1:5174`. Physical-device thermals, GPU frame times and field CWV remain unmeasured.
+
+### Pre-PR review and cleanup
+
+- Standards axis: fixed the missing `@package` boundary on `mountParticleInput`; LSP confirmed
+  its only consumer is `scene/stage.ts`. Named the repeated touch padding and combined the
+  identical mouse/pen button guard without changing touch ownership.
+- Spec axis: reproduced reversed cascade order in the browser: particles created at x=350
+  then x=150 popped in that order during a left-to-right stroke. Crossings now use the first
+  segment/circle intersection, including padding, not array order or centre projection.
+  Only touched bodies are sorted in reused scratch storage; primary age order stays intact.
+- Regression geometry specs went RED before `entryFraction` existed, then GREEN (12 stroke
+  specs). Browser rerun proved both gesture directions; with 30 reverse-created targets,
+  the first 24 crossings received detailed effects and later crossings used the fallback.
+- Removed repeated empty-array allocation from FX clear and consumed trade queues. Browser
+  proof confirmed reused queues/primary storage, empty reset state and no replayed queued trade.
+- Retained the simple nearest-tap scan/compaction: bounded linear work and preserved primary
+  age ordering are preferable to a separate deletion path without a demonstrated bottleneck.
+- Trusted desktop input removed only on-path targets. Mobile fitting-screen sweep popped
+  three targets and spared the off-path one; short-screen native pan scrolled 91 px without
+  popping its target. No browser errors; owned proof pages closed.
+- Specialist reviewer provider was unavailable (429 before code access); two fresh general
+  reviewers independently checked Standards and Spec. No unrelated restructuring or adaptive
+  quality changes are included in this PR.

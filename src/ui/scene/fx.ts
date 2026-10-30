@@ -82,6 +82,12 @@ interface Bubble extends BubbleStart {
   popY: number | null;
   sprite: HTMLCanvasElement;
   halo: HTMLCanvasElement | null;
+  /** First crossing along the current input segment; only touched bodies are sorted. */
+  touchOrder: number;
+}
+
+function compareTouches(a: Bubble, b: Bubble): number {
+  return a.touchOrder - b.touchOrder;
 }
 
 interface Ring {
@@ -163,6 +169,7 @@ export class Fx {
   private readonly sprites: Record<TradeSide, HTMLCanvasElement>;
   private readonly halos: Record<TradeSide, HTMLCanvasElement>;
   private bubbles: Bubble[] = [];
+  private readonly touched: Bubble[] = [];
   private readonly drops: CollisionBody[] = [];
   private readonly rising: CollisionBody[] = [];
   private readonly collisions = new CollisionSolver();
@@ -180,7 +187,7 @@ export class Fx {
   /** Surface height at a screen x, CSS px; null: the screen bottom. */
   private floorAt: (x: number) => number | null = () => null;
   private labels: Label[] = [];
-  private queued: { side: TradeSide; usd: number }[] = [];
+  private readonly queued: { side: TradeSide; usd: number }[] = [];
   private origin = { x: 0, y: 0 };
   /** The page font stack (--font-sans), inherited by the canvas: one source for CSS and labels. */
   private readonly fontFamily: string;
@@ -246,17 +253,18 @@ export class Fx {
 
   /** Drop anything queued, e.g. while the tab was hidden. */
   clear(): void {
-    this.queued = [];
-    this.bubbles = [];
+    this.queued.length = 0;
+    this.bubbles.length = 0;
+    this.touched.length = 0;
     this.drops.length = 0;
     this.rising.length = 0;
-    this.rings = [];
-    this.shards = [];
-    this.pops = [];
-    this.sprays = [];
-    this.sparks = [];
-    this.impacts = [];
-    this.labels = [];
+    this.rings.length = 0;
+    this.shards.length = 0;
+    this.pops.length = 0;
+    this.sprays.length = 0;
+    this.sparks.length = 0;
+    this.impacts.length = 0;
+    this.labels.length = 0;
   }
   /** Remove each touched primary once; manual play never emits a market signal. */
   interact(stroke: PointerStroke): void {
@@ -279,17 +287,27 @@ export class Fx {
       }
       let alive = 0;
       for (const b of this.bubbles) {
-        const hit = tap ? b === nearest : stroke.hits(b.x, b.y, b.r, segment);
-        if (!hit) {
+        const order = tap
+          ? b === nearest
+            ? 0
+            : Infinity
+          : stroke.entryFraction(b.x, b.y, b.r, segment);
+        if (order === Infinity) {
           this.bubbles[alive++] = b;
           continue;
         }
+        b.touchOrder = order;
+        this.touched.push(b);
+      }
+      this.bubbles.length = alive;
+      if (!tap) this.touched.sort(compareTouches);
+      for (const b of this.touched) {
         const detailed = hits++ < TOUCH_FX_BUDGET;
         if (b.popY === null) this.splash(b, b.y, detailed);
         else this.pop(b, detailed, false);
         if (!strongest || b.r > strongest.r) strongest = b;
       }
-      this.bubbles.length = alive;
+      this.touched.length = 0;
     }
     stroke.drain();
     if (strongest) {
@@ -336,6 +354,7 @@ export class Fx {
         vx: b.vx + (s.side === 'buy' ? Math.sin(phase) * (BUBBLE_SWAY_SPEED + b.r) : 0),
         age: 0,
         phase,
+        touchOrder: 0,
         popY: s.side === 'buy' ? popHeight(h, Math.random) : null,
         sprite: this.sprites[s.side],
         halo: s.big ? this.halos[s.side] : null,
@@ -356,7 +375,7 @@ export class Fx {
         this.hooks.bloom(b.x, b.y, color, 0.45 + 0.25 * Math.log10(s.usd / bigTradeUsd + 1));
       }
     }
-    this.queued = [];
+    this.queued.length = 0;
     if (this.bubbles.length > MAX_BUBBLES)
       this.bubbles.splice(0, this.bubbles.length - MAX_BUBBLES);
   }
