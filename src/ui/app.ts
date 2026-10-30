@@ -203,6 +203,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     origin: priceNode,
     reducedMotion,
     bigTradeUsd: () => settings.tradeThresholdUsd,
+    graphics: () => settings.graphics,
     onParticleTouch: handlers.onParticleTouch,
     onFrame() {
       if (chartDirty && history && last) {

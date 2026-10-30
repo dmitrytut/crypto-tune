@@ -1,4 +1,5 @@
 import type { TradeSide } from '../../feed/market-feed';
+import type { GraphicsMode } from '../../settings';
 import { el } from '../dom';
 import { CALM_AURA } from '../palette';
 import { Aura } from './aura';
@@ -6,13 +7,16 @@ import { Chart } from './chart';
 import { Fx } from './fx';
 import { PointerStroke } from './interaction';
 import { mountParticleInput } from './particle-input';
+import { QualityController } from './quality';
 
 const SHAKE_MS = 420;
+const LITE_AURA_INTERVAL_SEC = 1 / 15;
 
 export interface StageOptions {
   /** Element liquidations burst from (its centre), tracked through resizes. */
   origin: HTMLElement;
   reducedMotion: MediaQueryList;
+  graphics(): GraphicsMode;
   /** Trades at or above this notional get the big-trade treatment; read every frame. */
   bigTradeUsd(): number;
   /** Runs at the end of every animation frame, e.g. to redraw the chart. */
@@ -36,6 +40,14 @@ export interface Stage {
  */
 export function mountStage(o: StageOptions): Stage {
   const { reducedMotion } = o;
+  const quality = new QualityController(o.graphics());
+  let prevFrame: number | null = null;
+  let auraElapsed = 0;
+  const resetTiming = () => {
+    quality.reset();
+    prevFrame = null;
+    auraElapsed = 0;
+  };
   const aura = Aura.create(el('aura'), CALM_AURA);
   const stage = el('stage');
   const canvas = el<HTMLCanvasElement>('fx');
@@ -85,25 +97,49 @@ export function mountStage(o: StageOptions): Stage {
     return y === null ? null : chartBox.top + y;
   });
   document.addEventListener('visibilitychange', () => {
-    // No old-pair gestures or particles should burst when a hidden scene returns.
-    if (!document.hidden) clear();
+    // Never sample hidden throttling or replay old particles after returning.
+    clear();
+    resetTiming();
   });
 
-  let prevFrame = performance.now();
+  window.addEventListener('resize', resetTiming);
+  window.visualViewport?.addEventListener('resize', resetTiming);
+  reducedMotion.addEventListener('change', resetTiming);
   const frame = (t: number) => {
-    const dt = (t - prevFrame) / 1000;
+    if (document.hidden) {
+      requestAnimationFrame(frame);
+      return;
+    }
+    const start = performance.now();
+    const frameMs = prevFrame === null ? 0 : t - prevFrame;
+    const dt = frameMs / 1000;
     prevFrame = t;
-    // Reduced motion: the aura barely drifts and no particles fly.
-    aura?.frame(reducedMotion.matches ? dt * 0.1 : dt);
+    quality.setMode(o.graphics());
+    fx.setQuality(quality.level);
+    auraElapsed += dt;
+    if (quality.level === 'full' || auraElapsed >= LITE_AURA_INTERVAL_SEC) {
+      // Reduced motion retains the barely drifting background, regardless of graphics mode.
+      aura?.frame(reducedMotion.matches ? auraElapsed * 0.1 : auraElapsed, quality.level);
+      auraElapsed = 0;
+    }
     // Reduced motion: no new events are queued; clearing also wipes anything already
     // flying when the preference flips mid-session, so nothing freezes on screen.
     if (reducedMotion.matches) clear();
     else fx.interact(stroke);
     fx.frame(dt, o.bigTradeUsd());
     o.onFrame();
+    quality.sample(frameMs, performance.now() - start);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 
-  return { aura, fx, chart, clear };
+  return {
+    aura,
+    fx,
+    chart,
+    clear() {
+      clear();
+      resetTiming();
+    },
+  };
 }
