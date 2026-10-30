@@ -68,7 +68,7 @@
 
 ## Execution ledger
 
-- Baseline: worktree created at `4074322`; isolated `pnpm test` passed 195 tests / 29 files. PR #39 is open, so adaptation is stacked until that PR merges.
+- Baseline: worktree created at `4074322`; isolated `pnpm test` passed 195 tests / 29 files. PR #39 was open when adaptation began; final ancestry is recorded below.
 - Ruling: Lite uses a lower-resolution aura at <=15 Hz rather than a frozen image or new CSS renderer, preserving current market colours and avoiding a second rendering implementation. Cost: some background GPU work remains.
 - Ruling: count consecutive completed windows rather than accumulating one giant frame's duration as several seconds of overload; this prevents a single stall from deciding quality.
 - Ruling: keep existing substepped kinematics in Lite and skip only contacts; this avoids duplicated physics while the 400-primary cap limits the remaining work.
@@ -104,8 +104,8 @@
 - Final Standards review: no findings. Spec review: no concrete behavior bug; missing README
   guidance was fixed with profile limits, verification and evidence limitations.
 - Final native mobile testing also exposed a pre-existing interaction bug: a compatibility
-  click could target newly revealed Listen after the original canvas touch. Fixed and pushed
-  to PR #39 as `4394eb6`, then cherry-picked here as `b112281`. RED→GREEN included reduced
+  click could target newly revealed Listen after the original canvas touch. Published on the
+  original feature branch as `4394eb6`, then cherry-picked here as `b112281`. RED→GREEN included reduced
   motion, stopped/running Listen, deliberate control presses, pan/pinch and keyboard activation.
   See the interaction plan's compatibility-click regression for the exact trace.
 - Production preview: default Auto/stopped; native click on an actual rendered buy bubble
@@ -118,5 +118,9 @@
 - Ruling: Lite also bounds existing liquidation decorations and labels at 64 each, while Full
   retains legacy behavior — otherwise non-trade decoration could evade the low-load profile.
   Cost: old decoration may disappear sooner during a large cascade.
-- No physical Safari/iOS/Android, battery/thermal or field CWV proof. Keep adaptation local
-  and separate from PR #39; the branch remains stacked until that PR is integrated.
+- PR #39 merged as `51dc6ab` through `4074322`, without the later mobile fix. Published that fix
+  separately in PR #40; its branch includes current master as `b2ae440`. Merged that ancestry
+  into adaptation without rewriting commits; no source-content changes were reported.
+  Adaptation remains local, with the mobile fix also present independently in PR #40.
+- No physical Safari/iOS/Android, battery/thermal or field CWV proof. Native hidden-tab lifecycle
+  remains unverified; only its real handlers were exercised with simulated visibility.
