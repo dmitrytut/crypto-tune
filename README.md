@@ -75,6 +75,8 @@ input. On a fitting phone screen the background accepts swipes in every directio
 pinch-zoom; on a short or zoomed page vertical swipes scroll instead (taps resolve on release).
 Native pull-to-refresh can start over controls or the chart, not over a background swipe surface.
 Effects follow the order in which the gesture crosses the particles, not their creation order.
+A thin neutral ring acknowledges each scene press, even a miss (280 ms); a held swipe leaves a
+short fading trail (180 ms). Both use the existing overlay, with fixed storage for 128 marks.
 Enable **Settings → Sound → Interaction sounds** for quiet accents, off by default. They follow
 the Events volume and current tonic, never start Listen, and stop when you switch them off or Stop.
 
@@ -234,8 +236,8 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 - **Tab title**: `▲ 81,305.2 · BTCUSDT · tension 2.6`, so the state is visible without switching tabs.
 - **Immersive mode**: after 10 s without mouse or keyboard the UI fades out, leaving the aura, the
   price and the chart. A control that holds keyboard focus stays visible.
-- `prefers-reduced-motion`: the aura is nearly still, and there are no bubbles, rings, waves, shake
-  or flashes.
+- `prefers-reduced-motion`: the aura is nearly still, and there are no market particles, waves,
+  shake or flashes. Scene presses retain a stationary fading ring, without expansion or swipe trails.
 
 ### Accessibility
 
@@ -343,6 +345,8 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
   edge to edge on phones
 - [x] **Particle interaction**: tap/drag/swipe, bounded local pops and mid-air sparks, opt-in quiet
   accents, scroll/pinch ownership, and no invisible immersive controls intercepting a gesture
+- [x] **Gesture feedback**: quiet press rings and short swipe trails, including misses; stationary
+  acknowledgment in reduced motion, cleared with cancelled gestures and scene changes
 - [x] **Particle collisions**: damped, area-weighted contacts within sell drops and within buy bubbles,
   without a physics dependency
 
@@ -351,6 +355,21 @@ sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Gesture feedback
+
+1. `pnpm dev`: click empty background — a faint neutral ring appears immediately and fades in
+   280 ms. Hold and sweep around a corner — the thin trail follows the actual path, fades in
+   180 ms, and never joins separate gestures. Hover and right-click do not draw it.
+2. Repeat on a phone-sized viewport. Controls and chart markers retain native input; vertical
+   scrolling on short/zoomed pages does not leave a trail. A second finger or pointer cancellation
+   clears the feedback; switching pairs or leaving the tab clears it too.
+3. Emulate `prefers-reduced-motion: reduce`: a press still has a stationary fading ring, but no
+   expansion, swipe trail or market particles.
+4. Implementation smoke: Chromium mouse input at 1728×913 and touch at 390×844; real-canvas pixel
+   checks cover first-frame feedback when input follows the rAF timestamp, corners without
+   shortcuts, expiry, separate taps, cancellation, bounded input floods and the reduced-motion
+   stationary ring. Physical phone feel remains a device check.
 
 ### Particle interaction
 
