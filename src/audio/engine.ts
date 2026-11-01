@@ -144,7 +144,7 @@ export class AudioEngine {
     if (trade) g.events.trade(trade.side, eventVelocity(trade.size), t);
   }
 
-  /** Immediate, opt-in particle accent; never wakes audio or enters the market cue pipeline. */
+  /** Immediate particle accent if enabled; never wakes audio or enters the market cue pipeline. */
   touch(side: TradeSide, strength: number): void {
     const g = this.graph;
     if (
