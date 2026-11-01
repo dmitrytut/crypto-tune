@@ -56,6 +56,9 @@ looked at the chart.
   switch to the built-in simulator to hear a sell-off on demand.
 - **Favorite pairs first.** Star pairs directly in the picker: each market keeps its own favorites
   above the rest, with BTC, ETH and SOL pinned by default. Saved in this browser, no extra tab.
+- **Share a clip.** The share icon makes a vertical video (1080×1920, H.264 + AAC) of the last 15
+  or 30 seconds with its sound, the pair, the price and a `crypto-tune.com/bitcoin` watermark, ready
+  for Shorts, TikTok or Reels: shared from a phone, downloaded elsewhere.
 
 | Live BTCUSDT, buyers in control                    | Simulator, liquidation cascade                                 |
 | -------------------------------------------------- | -------------------------------------------------------------- |
@@ -239,6 +242,22 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 - `prefers-reduced-motion`: the aura is nearly still, and there are no market particles, waves,
   shake or flashes. Scene presses retain a stationary fading ring, without expansion or swipe trails.
 
+### Clips
+
+The share icon (top right, next to About) opens **Share a clip**: pick 15 or 30 s, **Make clip**,
+preview, then **Download** or, where the browser shares files (phones), **Share** with the pair's
+page link (`?utm_source=clip`). Nothing is recorded while you listen: the last 36 s of the live
+market (trades, liquidations, every tick's metrics and cues) stay in memory, and a clip replays
+them faster than real time. The music comes from the same layers built in an offline audio context,
+the picture from the same aura, particles and chart on a hidden phone-sized stage (432×768 at 2.5×),
+with the price, its change, the last event and the watermark drawn over it; mediabunny muxes the
+WebCodecs output into an mp4. A clip works before **Listen** and leaves live audio alone (its
+scheduling headroom grows while one renders). The first 5 s of every render are a pre-roll and are
+cut off. Until enough has arrived the dialog counts down (`Preparing clip… 12 s`); a pair change or
+a feed gap starts it over. The simulator's clips say **Simulated market**. Browsers that cannot
+encode H.264 + AAC (Firefox, desktop Linux, Safari before 26) do not show the icon; Umami counts
+them (`clip_support`), and clips made, shared and failed.
+
 ### Accessibility
 
 Audited for WCAG 2.2 AA: Lighthouse and axe-core, keyboard, zoom, hover and contrast checks over the
@@ -356,12 +375,30 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
   acknowledgment in reduced motion, cleared with cancelled gestures and scene changes
 - [x] **Particle collisions**: damped, area-weighted contacts within sell drops and within buy bubbles,
   without a physics dependency
+- [x] **Clips**: the last 15 or 30 s as a vertical mp4 with sound and a watermark, rendered offline
+  from the live data; share or download
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Clips
+
+1. `pnpm test`: includes the clip buffer (readiness per length, trimming with drifting ticks, reset,
+   the window), the history replay (nothing after the frame), the clip layout and share wording.
+2. `pnpm dev`, BTCUSDT: the share icon appears; open it — `Preparing clip… 34 s` counts down.
+   Make a 15 s and a 30 s clip, with and without **Listen**: a few seconds each, preview plays with
+   sound, **Download** saves `crypto-tune-bitcoin-<date>-<time>.mp4`.
+3. `ffprobe` on the file: H.264 Main 1080×1920 30 fps, AAC 48 kHz stereo, 15.0 or 30.0 s, `moov`
+   before `mdat`. The frames show the pair, price, change, last event, chart and the watermark.
+4. With **Listen** on, DevTools 4× CPU slowdown: the music keeps time while a clip renders.
+5. Closing the dialog mid-render stops it (no hidden stage left in the page). Settings → Simulator:
+   the clip says `Simulated market`, watermark `crypto-tune.com`.
+6. DevTools device toolbar at 320, 360 and 375 px: three icons fit, the status keeps at least its
+   dot. With `delete window.AudioEncoder` before load the icon is invisible and About does not move.
+7. On a phone (HTTPS preview): **Share** opens the system sheet with the video.
 
 ### Gesture feedback
 

@@ -12,14 +12,14 @@ const snap = (ts: number, price: number) =>
     Parameters<ClipBuffer['addTick']>[0]['snap']
   >;
 
-/** Live ticks every 250 ms from T0 for `sec` seconds, with one trade per tick. */
-function fill(b: ClipBuffer, sec: number, from = T0): number {
+/** Live ticks every `stepMs` from `from` for `sec` seconds, with one trade per tick. */
+function fill(b: ClipBuffer, sec: number, from = T0, stepMs = 250): number {
   let ts = from;
-  for (; ts < from + sec * 1000; ts += 250) {
+  for (; ts < from + sec * 1000; ts += stepMs) {
     b.addTrade(trade(ts - 100));
     b.addTick({ ts, snap: snap(ts, 100), cues: NO_CUES });
   }
-  return ts - 250;
+  return ts - stepMs;
 }
 
 describe('ClipBuffer', () => {
@@ -41,6 +41,14 @@ describe('ClipBuffer', () => {
     expect(w?.ticks[0]?.ts).toBeGreaterThan(end - 35_000);
     // A 30 s clip stays ready right after old data is trimmed.
     expect(b.readiness(30).ready).toBe(true);
+  });
+
+  it('stays ready for the longest clip when ticks drift off the 250 ms grid', () => {
+    // A timer is never exact: no tick lands right on the trim cutoff.
+    const b = new ClipBuffer();
+    fill(b, 120, T0, 251);
+    expect(b.readiness(30).ready).toBe(true);
+    expect(b.window(30)).not.toBeNull();
   });
 
   it('cuts the window to the clip and its pre-roll, in feed-clock order', () => {

@@ -1,4 +1,4 @@
-/* Modal dialog shell (modal.ts): Settings and About. */
+/* Modal dialog shell (modal.ts): Settings, About and Share a clip. */
 @layer components {
   /* A drag inside an open dialog never reaches the page's native pull-to-refresh. */
   html:has(.modal:modal) {

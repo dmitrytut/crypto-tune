@@ -11,7 +11,11 @@ export type ClipSeconds = (typeof CLIP_LENGTHS_SEC)[number];
  * needs a tail, the aura and particles need a moment to fill the screen.
  */
 export const CLIP_PREROLL_SEC = 5;
-const KEEP_MS = (Math.max(...CLIP_LENGTHS_SEC) + CLIP_PREROLL_SEC) * 1000;
+/**
+ * Kept: the longest clip, its pre-roll and a second of slack. Ticks do not land on the trim
+ * cutoff (timers drift), so without the slack the longest clip would stay just short of ready.
+ */
+const KEEP_MS = (Math.max(...CLIP_LENGTHS_SEC) + CLIP_PREROLL_SEC + 1) * 1000;
 
 /** One metrics tick as the live view and audio got it. */
 export interface ClipTick {
