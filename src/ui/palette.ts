@@ -97,6 +97,12 @@ export function auraTarget(
 export const CALM_AURA: AuraTarget = auraTarget({ tension: 0, direction: 0, volZ: 0, emaZ: 0 });
 
 /**
+ * Aura brightening by a liquidation at or above its threshold (`Aura.pulseBy`, 0…1).
+ * @package
+ */
+export const LIQUIDATION_PULSE = 0.35;
+
+/**
  * Meter/chart colour for a tension value: blue calm → amber mid → red high.
  * @package
  */

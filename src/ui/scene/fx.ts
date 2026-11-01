@@ -195,6 +195,8 @@ export class Fx {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly hooks: FxHooks,
+    /** Fixed backing-store ratio (a clip); by default the device's. */
+    private readonly pixelRatio?: number,
   ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas unavailable');
@@ -320,7 +322,7 @@ export class Fx {
 
   frame(dtSec: number, bigTradeUsd: number): void {
     const dt = Math.min(dtSec, 0.1);
-    const dpr = fitCanvas(this.canvas);
+    const dpr = fitCanvas(this.canvas, this.pixelRatio);
     this.spawn(bigTradeUsd);
     const { ctx } = this;
     const w = this.canvas.clientWidth;

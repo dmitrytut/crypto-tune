@@ -55,6 +55,11 @@
         <div class="picker picker-chip" id="pair"></div>
         <div class="top-right">
           <span id="status" class="status" role="status" data-state="idle">idle</span>
+          <button id="share-open" class="icon-btn" type="button" aria-label="Share">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2v13" /><path d="m16 6-4-4-4 4" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            </svg>
+          </button>
           <button id="about-open" class="icon-btn" type="button" aria-label="About">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" />
@@ -231,6 +236,37 @@
           browser, no sign-up.
         </p>
         <!-- pair-pages:links -->
+      </form>
+    </dialog>
+
+    <!-- Link and clip actions are wired by ui/components/share-dialog. -->
+    <dialog id="share" class="modal share" aria-labelledby="share-title">
+      <form method="dialog" class="modal-body">
+        <header class="modal-head">
+          <h2 id="share-title">Share</h2>
+          <button class="icon-btn" type="submit" value="close" aria-label="Close">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
+        </header>
+        <button id="share-link" class="share-btn" type="button">Share link</button>
+        <!-- Shown once clip-format.ts finds the browser can encode a clip. -->
+        <section id="clip-section" class="clip-section" aria-labelledby="clip-title" hidden>
+          <h3 id="clip-title">Clip</h3>
+          <p class="clip-note">The last seconds of the market, with sound.</p>
+          <fieldset class="segmented" id="clip-length" aria-label="Clip length"></fieldset>
+          <!-- biome-ignore lint/a11y/useMediaCaption: generative music without words; nothing to caption. -->
+          <video id="clip-preview" class="clip-preview" aria-label="Clip preview" controls playsinline preload="metadata" hidden></video>
+          <!-- Only state changes are announced; the countdown and percentage are not. -->
+          <p class="clip-status"><span id="clip-status" role="status"></span> <span id="clip-detail"></span></p>
+          <progress id="clip-progress" class="clip-progress" max="1" value="0" aria-label="Rendering" hidden></progress>
+          <div class="share-actions">
+            <button id="clip-make" class="share-btn" type="button">Make clip</button>
+          </div>
+          <div id="clip-done" class="share-actions" hidden>
+            <button id="clip-download" class="share-btn" type="button">Download</button>
+            <button id="clip-share" class="share-btn share-btn--primary" type="button" hidden>Share video</button>
+          </div>
+        </section>
       </form>
     </dialog>
 

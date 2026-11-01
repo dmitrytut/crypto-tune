@@ -1,5 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { clock, durationLabel, priceDecimals, splitPrice } from '../format';
+import { MarketHistory } from '../../metrics/history';
+import {
+  changeLabel,
+  clock,
+  durationLabel,
+  priceChange,
+  priceDecimals,
+  splitPrice,
+} from '../format';
+
+describe('priceChange', () => {
+  const T0 = 1_700_000_000_000;
+  const history = () => {
+    const h = new MarketHistory();
+    for (let i = 0; i <= 120; i++) h.addSnapshot({ ts: T0 + i * 1000, price: 100 + i, tension: 0 });
+    return h;
+  };
+
+  it('measures over the period, or all the history while it is shorter', () => {
+    const h = history();
+    expect(priceChange(h, T0 + 120_000, 220, 60_000)).toEqual({
+      pct: (220 / 160 - 1) * 100,
+      spanMs: 60_000,
+    });
+    expect(priceChange(h, T0 + 120_000, 220, 900_000)?.spanMs).toBe(120_000);
+    expect(changeLabel({ pct: -0.4251, spanMs: 900_000 })).toBe('▼ 0.43% in 15m');
+  });
+
+  it('reads a tiny move as flat and has nothing without history or a price', () => {
+    const h = history();
+    expect(priceChange(h, T0 + 120_000, 160.000_001, 60_000)?.pct).toBe(0);
+    expect(changeLabel({ pct: 0, spanMs: 60_000 })).toBe('0.00% in 1m');
+    expect(priceChange(new MarketHistory(), T0, 100, 60_000)).toBeNull();
+    expect(priceChange(h, T0, Number.NaN, 60_000)).toBeNull();
+  });
+});
 
 describe('priceDecimals', () => {
   it('keeps about six significant digits across price scales', () => {

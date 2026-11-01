@@ -147,6 +147,15 @@
     @media (max-width: 480px) {
       gap: var(--space-sm);
     }
+    /* Three icons beside the pair: on a 320 px screen the status would lose even its dot. */
+    @media (max-width: 340px) {
+      gap: 4px;
+
+      & .icon-btn {
+        width: 36px;
+        height: 36px;
+      }
+    }
   }
   /* Takes the room the pair leaves. Dot and words are two flex items on one visible line: when
    * the words do not fit, they wrap to a clipped second line and only the dot stays. Width 0
@@ -196,6 +205,39 @@
     }
     &:hover {
       background: var(--surface-strong);
+    }
+  }
+
+  /* Radio group drawn as buttons (Settings, clip length); the radios are visually hidden, so
+   * the label shows focus. */
+  .segmented {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: var(--space-xs);
+
+    & label {
+      flex: 1;
+      text-align: center;
+      font-size: var(--font-size-md);
+      padding: var(--space-sm);
+      border: var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+
+      &:has(input:focus-visible) {
+        outline: var(--focus-ring);
+        outline-offset: var(--focus-offset);
+      }
+      &:has(input:checked) {
+        border-color: rgb(255 255 255 / 0.5);
+        background: var(--surface-strong);
+      }
+      &:has(input:disabled) {
+        opacity: 0.5;
+        cursor: default;
+      }
     }
   }
 

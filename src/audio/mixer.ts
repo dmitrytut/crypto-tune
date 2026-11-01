@@ -29,6 +29,11 @@ export class Mixer {
     return this.reverb.ready;
   }
 
+  /** The context the bus was built in: live, or offline for a clip. */
+  get context(): Tone.BaseContext {
+    return this.master.context;
+  }
+
   /** New layer input at `volumeDb`, routed into the bus. */
   createChannel(volumeDb: number): Tone.Volume {
     const ch = new Tone.Volume(volumeDb);

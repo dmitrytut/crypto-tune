@@ -18,11 +18,20 @@ import { TensionMeter } from './components/meter/meter';
 import { mountPicker } from './components/picker/picker';
 import { PriceReadout } from './components/price-readout/price-readout';
 import { mountSettingsPanel } from './components/settings-panel/settings-panel';
+import { mountShareDialog, type ShareHandlers } from './components/share-dialog/share-dialog';
 import { el } from './dom';
 import { FlowMeter } from './flow';
-import { durationLabel, eventLabel, usdFmt } from './format';
+import { changeLabel, cueLabel, durationLabel, priceChange, usdFmt } from './format';
 import { mountMediaKeys } from './media-session';
-import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, UP_COLOR } from './palette';
+import {
+  auraTarget,
+  CALM_AURA,
+  css,
+  DOWN_COLOR,
+  isDown,
+  LIQUIDATION_PULSE,
+  UP_COLOR,
+} from './palette';
 import { mountStage } from './scene/stage';
 
 /** Smoothed direction beyond ±this gets an arrow in the tab title; inside it reads as flat. */
@@ -43,6 +52,8 @@ export interface AppHandlers {
   onToggleAudio(): void;
   /** Optional sound for a manually touched particle; no market event is emitted. */
   onParticleTouch(side: TradeSide, strength: number): void;
+  /** The link, clip data and rendering behind the Share dialog. */
+  share: ShareHandlers;
 }
 
 /** What the Start/Stop button shows. */
@@ -68,6 +79,8 @@ export interface AppView {
   trade(t: Trade): void;
   /** Every liquidation, for the shock waves; a stale catch-up is ignored. */
   liquidation(l: Liquidation): void;
+  /** The browser can make clips: the Share dialog shows its clip part. */
+  enableClips(): void;
 }
 
 function statusText(s: FeedStatus, source: Settings['source']): string {
@@ -106,6 +119,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   };
   const panel = mountSettingsPanel(initial, update);
   const about = mountAbout(() => settings.tradeThresholdUsd);
+  const share = mountShareDialog(handlers.share);
   // CSS reads the side colours from the palette, so text and canvas never drift apart.
   document.documentElement.style.setProperty('--up', css(UP_COLOR));
   document.documentElement.style.setProperty('--down', css(DOWN_COLOR));
@@ -220,7 +234,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => {
       // Never fade the chrome out from under an open dialog or a tip someone is reading.
-      if (!panel.isOpen() && !about.isOpen() && !isHintOpen()) document.body.classList.add('idle');
+      const dialogOpen = panel.isOpen() || about.isOpen() || share.isOpen();
+      if (!dialogOpen && !isHintOpen()) document.body.classList.add('idle');
     }, IDLE_MS);
   };
   for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const) {
@@ -248,20 +263,19 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       // Change, volume and chart cover the same period: the chosen one, or all the history
       // there is while it is shorter. While history loads, a second of live data would read as
       // "0.00% in 1s, vol $0/1s": the readouts stay blank for those few seconds instead.
-      const first = history?.prices[0];
-      if (!history || !first || Number.isNaN(s.price) || loadingHistory) {
+      const moved =
+        history && !loadingHistory
+          ? priceChange(history, s.ts, s.price, settings.periodMin * 60_000)
+          : null;
+      if (!history || !moved) {
         change.textContent = '\u00a0';
         change.className = 'change';
         vol.textContent = '—';
       } else {
-        const spanMs = Math.min(settings.periodMin * 60_000, s.ts - first.ts);
-        const span = durationLabel(spanMs);
-        const pct = (s.price / history.priceAt(s.ts - spanMs) - 1) * 100;
-        const shown = Math.abs(pct) < 0.005 ? 0 : pct;
-        const arrow = shown > 0 ? '▲ ' : shown < 0 ? '▼ ' : '';
-        change.textContent = `${arrow}${Math.abs(shown).toFixed(2)}% in ${span}`;
-        change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
-        vol.textContent = `vol ${usdFmt.format(history.volumeUsdSince(s.ts - spanMs))}/${span}`;
+        change.textContent = changeLabel(moved);
+        change.className = `change ${moved.pct > 0 ? 'up' : moved.pct < 0 ? 'down' : ''}`;
+        const span = durationLabel(moved.spanMs);
+        vol.textContent = `vol ${usdFmt.format(history.volumeUsdSince(s.ts - moved.spanMs))}/${span}`;
       }
       paintEvent();
       meter.render(s, loadingHistory);
@@ -310,8 +324,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     },
     showEvent(e) {
       chartDirty = true;
-      const times = e.count > 1 ? ` ×${e.count}` : '';
-      shownEvent = { text: `${eventLabel(e.kind, e.side, e.usd)}${times}`, at: Date.now() };
+      shownEvent = { text: cueLabel(e.kind, e), at: Date.now() };
       lastEvent.className = isDown(e.side) ? 'down' : 'up';
       paintEvent();
     },
@@ -324,11 +337,14 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       // Hidden tab: nothing to see. Reduced motion: no waves, shocks or shake at all.
       if (!fresh(l.ts) || document.hidden || reducedMotion.matches) return;
       fx.liquidation(l.side, l.usd, settings.liqThresholdUsd);
-      if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(0.35);
+      if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(LIQUIDATION_PULSE);
     },
     setSymbols(market, list) {
       if (list.length > 0) listed.add(market);
       pair.setOptions(list, market);
+    },
+    enableClips() {
+      share.enableClips();
     },
   };
 }

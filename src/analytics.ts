@@ -1,5 +1,5 @@
 /**
- * Listening events for Umami (the beacon in index.html counts only on the production host).
+ * Events for Umami (the beacon in index.html counts only on the production host).
  * No identifiers: whether a listener comes back is the number of distinct days this browser has
  * pressed Listen, kept in localStorage and sent with each `listen` event.
  *
@@ -7,6 +7,14 @@
  *   `days` ≥ 2 = returning listeners.
  * - `listen_10m` { pair }: audio kept running for 10 minutes, once per page load: a listener,
  *   not a press-and-leave.
+ * - `link_shared` { pair, method }: the pair's link sent to the share sheet or copied. Visits
+ *   it brings carry `?utm_source=share` (Umami's UTM report).
+ * - `clip_support` { supported, reason }: once per session, the share of browsers that cannot
+ *   make a clip (and see no clip part in Share).
+ * - `clip_recorded` { pair, seconds, render_s }: a clip was made; `render_s` is how long that
+ *   took, the speed on phones.
+ * - `clip_shared` { pair, method }: the video sent to the share sheet or downloaded.
+ * - `clip_failed` { stage, reason }: making or sharing a clip broke.
  */
 declare global {
   interface Window {
@@ -76,5 +84,44 @@ export class ListenTracker {
 
   stopped(): void {
     window.clearTimeout(this.engagedTimer);
+  }
+}
+
+const SUPPORT_KEY = 'crypto-tune.clip-support.v1';
+
+export class ShareTracker {
+  linkShared(pair: string, method: 'share' | 'copy'): void {
+    window.umami?.track('link_shared', { pair, method });
+  }
+
+  /**
+   * Once per session: a reload must not count a browser twice. Marked sent only when Umami is
+   * there to take it (not yet loaded, blocked, or a dev host), so a later load still counts.
+   */
+  clipSupport(result: { supported: boolean; reason?: string }): void {
+    const umami = window.umami;
+    if (!umami) return;
+    try {
+      if (sessionStorage.getItem(SUPPORT_KEY)) return;
+      sessionStorage.setItem(SUPPORT_KEY, '1');
+    } catch {
+      // No session storage: counted on every load, a small overcount.
+    }
+    umami.track('clip_support', {
+      supported: result.supported ? 'yes' : 'no',
+      reason: result.reason ?? 'none',
+    });
+  }
+
+  clipRecorded(pair: string, seconds: number, renderMs: number): void {
+    window.umami?.track('clip_recorded', { pair, seconds, render_s: Math.round(renderMs / 1000) });
+  }
+
+  clipShared(pair: string, method: 'share' | 'download'): void {
+    window.umami?.track('clip_shared', { pair, method });
+  }
+
+  clipFailed(stage: 'audio' | 'video' | 'share', reason: string): void {
+    window.umami?.track('clip_failed', { stage, reason: reason.slice(0, 100) });
   }
 }
