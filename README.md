@@ -158,16 +158,18 @@ Recomputed every 250 ms on the feed clock, never wall time:
 - **Events**:
   - a liquidation above the threshold (default $20K) is an FM gong: a LONG (forced sell, price
     falling) is a low dark gong on the tonic, a SHORT is a bright bell on the fifth an octave up;
-  - a market trade above the threshold (default $200K) is a short pluck, BUY high and right, SELL low
+  - a market trade above the threshold (default $100K) is a short pluck, BUY high and right, SELL low
     and left;
   - loudness grows with log size, from quiet at the threshold to full at 100× the threshold;
   - cascades collapse to at most one hit per kind per 250 ms tick; the side with more volume wins.
     The latest event is shown under the meter with its age (`LIQ LONG $766K (12s ago)`), even with
     sound off, and fades out after a minute;
   - thresholds are shared by all pairs, so lower them for small pairs.
-- **Interaction accents** (opt-in): one dedicated quiet voice for touching particles, on the Events
-  channel, at most 10 strikes per second. They are independent of market-event cues, chart dots and
-  thresholds; Stop or disabling them cancels even an accent already scheduled in audio lookahead.
+- **Interaction accents** (on by default, off in Settings): one dedicated voice for touching
+  particles, a short triangle tick on the Events channel, about as loud as the music's peaks, at most
+  10 strikes per second. Only a particle hit sounds: a press or swipe on empty background is silent.
+  They are independent of market-event cues, chart dots and thresholds; Stop or disabling them
+  cancels even an accent already scheduled in audio lookahead.
 - Every change is smooth: levels and filters ramp over 0.5 s, tempo moves in 1 BPM steps, double time
   lands on the beat and chord changes on bar lines. Tonic, the three layer volumes and both
   thresholds are configurable; a tonic change glides the drone and sub over 3 s.
@@ -375,10 +377,12 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Trade legend**: About shows what each bubble and drop size means
 - [x] **Chart refresh**: smooth line and eased range, glowing event dots that pop in with sparks,
   edge to edge on phones
-- [x] **Particle interaction**: tap/drag/swipe, bounded local pops and mid-air sparks, opt-in quiet
+- [x] **Particle interaction**: tap/drag/swipe, bounded local pops and mid-air sparks, sound
   accents, scroll/pinch ownership, and no invisible immersive controls intercepting a gesture
 - [x] **Gesture feedback**: quiet press rings and short swipe trails, including misses; stationary
   acknowledgment in reduced motion, cleared with cancelled gestures and scene changes
+- [x] **Audible interaction sounds**: the accent was ~12 dB under the music and inaudible; now a
+  louder, longer tick, on by default; large trade threshold default lowered to $100K
 - [x] **Particle collisions**: damped, area-weighted contacts within sell drops and within buy bubbles,
   without a physics dependency
 - [x] **Clips**: the last 15 or 30 s as a vertical mp4 with sound and a watermark, rendered offline
@@ -408,6 +412,16 @@ sound, and Binance covers the pairs that matter.
 7. On a phone (HTTPS preview): **Share link** opens the system sheet with the link; **Share video**
    with the video itself (Messages, Telegram get the file, not a link).
 
+### Audible interaction sounds
+
+1. `pnpm test`: a saved `interactionSound` boolean is kept, anything else falls back to on.
+2. `pnpm dev` in a fresh profile (or after clearing `crypto-tune.settings.v1`) → ⚙: Interaction
+   sounds is checked, Large trade threshold reads $100K. → Simulator → Listen, tap a bubble or drop:
+   a short tick sounds over the music, higher for a bubble, lower for a drop. Tapping empty
+   background stays silent. Untick Interaction sounds: taps are silent again.
+3. Measured in Chromium (simulator, default volumes): music peaks at about −12 dBFS on the master
+   bus; the accent's voice output peaked at −29 dBFS before and −12 dBFS after this change.
+
 ### Gesture feedback
 
 1. `pnpm dev`: click empty background — a faint neutral ring appears immediately and fades in
@@ -427,7 +441,7 @@ sound, and Binance covers the pairs that matter.
 
 1. `pnpm check && pnpm test && pnpm build`: includes stroke geometry (fast crossings, tangent hits,
    corners without shortcuts, quick released taps, multiple taps before a frame, jitter, cancellation
-   and bounded event floods) and strict boolean sound opt-in when loading saved settings.
+   and bounded event floods) and strict boolean sound setting when loading saved settings.
 2. `pnpm dev` → Simulator: tap one of two overlapping bubbles (only the nearest pops), drag a
    corner-shaped path through bubbles/drops (only crossed ones pop), hover or right-click (no pop).
    A drop breaks at its current height, not at the chart; hand gestures never make market labels,
@@ -466,7 +480,7 @@ sound, and Binance covers the pairs that matter.
 1. `pnpm test`: includes the legend steps (`≤ $1K` … `≥ $1M`), the threshold column and the mark
    sizes matching the scene.
 2. `pnpm dev` → ?: under the text, a Buy row of bubbles and a Sell row of drops, captioned
-   `≤ $1K, $10K, $100K, $200K, ≥ $1M`; the last two glow. ⚙ → Large trade threshold $5M, reopen
+   `≤ $1K, $10K, $100K, ≥ $1M`; the last two glow. ⚙ → Large trade threshold $5M, reopen
    About: the columns end in `$1M, ≥ $5M` and only the last glows; the note names $5M.
 3. On a 360 px wide window the marks shrink alike and halos are not cut at the edges.
 
@@ -619,9 +633,9 @@ sound, and Binance covers the pairs that matter.
    loudness by size, voice placement (LONG below SHORT, BUY above and right of SELL).
 2. `pnpm dev` → SIMULATOR → **Start**. On a down impulse low gongs and left-side plucks sound, and the
    event line shows `LIQ LONG …` and `SELL …` in red; on an up impulse the opposite.
-3. LIVE BTCUSDT: trades above $200K happen several times a minute. Threshold sliders move on a log
+3. LIVE BTCUSDT: trades above $100K happen many times a minute. Threshold sliders move on a log
    scale ($1K–$1M and $10K–$10M).
-4. The Events slider changes gongs, plucks and any enabled interaction accents.
+4. The Events slider changes gongs, plucks and interaction accents.
 
 ### Stage 3
 

@@ -34,11 +34,11 @@ const HELP: Record<string, { label: string; text: string }> = {
   },
   'events-volume': {
     label: 'Events',
-    text: 'Volume of liquidation gongs, large-trade plucks and any enabled interaction sounds.',
+    text: 'Volume of liquidation gongs, large-trade plucks and interaction sounds.',
   },
   'interaction-sound': {
     label: 'Interaction sounds',
-    text: 'Optional quiet accents when you tap or drag through particles. They play only while Listen is on.',
+    text: 'Short accents when you tap or drag through particles. They play only while Listen is on.',
   },
   window: {
     label: 'Price-change window',
