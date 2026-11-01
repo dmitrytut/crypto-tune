@@ -252,7 +252,8 @@ them faster than real time. The music comes from the same layers built in an off
 the picture from the same aura, particles and chart on a hidden phone-sized stage (432×768 at 2.5×),
 with the price, its change, the last event and the watermark drawn over it; mediabunny muxes the
 WebCodecs output into an mp4. A clip works before **Listen** and leaves live audio alone: the
-render hands the main thread back after every frame. The first 5 s of every render are a pre-roll and are
+render hands the main thread back after every frame (in a hidden tab the browser throttles it, so
+a render left behind finishes slowly). The first 5 s of every render are a pre-roll and are
 cut off. Until enough has arrived the dialog counts down (`Preparing clip… 12 s`); a pair change or
 a feed gap starts it over. The simulator's clips say **Simulated market**. Browsers that cannot
 encode H.264 + AAC (Firefox, desktop Linux, Safari before 26) do not show the icon; Umami counts

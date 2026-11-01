@@ -136,13 +136,14 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
       failed = true;
       make.textContent = 'Try again';
       say('Could not make the clip.');
-      make.focus();
     } finally {
       if (rendering === controller) {
         rendering = null;
         lengths.disabled = false;
         progress.hidden = true;
         showReadiness();
+        // Enabled again only now: the press that failed may try again from the keyboard.
+        if (failed) make.focus();
       }
     }
   });
