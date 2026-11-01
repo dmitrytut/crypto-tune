@@ -13,7 +13,7 @@ export interface ClipHandlers {
     onProgress: (done: number) => void,
     signal: AbortSignal,
   ): Promise<File>;
-  /** Text and link that go with the file into the share sheet. */
+  /** Text and link for the caption; they go to the clipboard, not into the share sheet. */
   shareData(): { text: string; url: string };
   onShared(method: 'share' | 'download'): void;
   onShareFailed(reason: string): void;
@@ -159,8 +159,15 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
 
   share.addEventListener('click', () => {
     if (!file) return;
-    // Called straight from the press: the share sheet needs its user activation.
-    navigator.share({ files: [file], ...h.shareData() }).then(
+    // With text or a link beside the file, iOS hands most apps (Messages, WhatsApp, Telegram)
+    // the link and drops the video. So the video goes alone and the link waits on the clipboard
+    // for the caption. Both calls run straight from the press: each needs the user activation.
+    const { text, url } = h.shareData();
+    navigator.clipboard?.writeText(`${text} ${url}`).then(
+      () => say('Link copied: paste it with the video.'),
+      () => {},
+    );
+    navigator.share({ files: [file] }).then(
       () => h.onShared('share'),
       (err: unknown) => {
         // Closing the sheet is not a failure.

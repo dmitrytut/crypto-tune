@@ -77,7 +77,8 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   `scene/legend.ts` (marks, captions, threshold note); `chart-tip/` tooltip for chart event markers,
   hit-tested by `Chart.markerAt`; `clip-dialog/` Share a clip modal: length, readiness countdown,
   render progress, preview, Download and (where files can be shared) Share; the share sheet needs
-  its own press),
+  its own press and gets the file alone — iOS drops the file for the link when both are passed —
+  while the link goes to the clipboard),
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, off on
   software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation

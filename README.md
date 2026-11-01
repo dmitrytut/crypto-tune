@@ -245,8 +245,9 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 ### Clips
 
 The share icon (top right, next to About) opens **Share a clip**: pick 15 or 30 s, **Make clip**,
-preview, then **Download** or, where the browser shares files (phones), **Share** with the pair's
-page link (`?utm_source=clip`). Nothing is recorded while you listen: the last 36 s of the live
+preview, then **Download** or, where the browser shares files (phones), **Share**: the video goes
+alone (with a link beside it iOS hands most apps only the link) and the pair's page link
+(`?utm_source=clip`) is copied for the caption. Nothing is recorded while you listen: the last 36 s of the live
 market (trades, liquidations, every tick's metrics and cues) stay in memory, and a clip replays
 them faster than real time. The music comes from the same layers built in an offline audio context,
 the picture from the same aura, particles and chart on a hidden phone-sized stage (432×768 at 2.5×),
@@ -401,7 +402,8 @@ sound, and Binance covers the pairs that matter.
    the clip says `Simulated market`, watermark `crypto-tune.com`.
 6. DevTools device toolbar at 320, 360 and 375 px: three icons fit, the status keeps at least its
    dot. With `delete window.AudioEncoder` before load the icon is invisible and About does not move.
-7. On a phone (HTTPS preview): **Share** opens the system sheet with the video.
+7. On a phone (HTTPS preview): **Share** opens the system sheet with the video itself (Messages,
+   Telegram get the file, not a link); `Link copied` shows and the link pastes into the caption.
 
 ### Gesture feedback
 
