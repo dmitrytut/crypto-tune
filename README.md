@@ -278,9 +278,10 @@ domain. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow
 **Link previews and search.** Open Graph and Twitter card tags in `index.html` point at
 `public/og.jpg` (1200×630): logo, name and tagline over the app's own scene (aura, particles and
 price chart, slightly out of focus), so a preview hints at the picture without showing a price
-that would read as current. The scene is the simulator after a sell-off, captured from the dev
-server with the readouts and controls hidden; the card text stays general ("hear and watch") so
-it outlives changes to the visuals. `max-image-preview:large` lets Google show it large.
+that would read as current. The scene is the simulator between calm and a rise, both buys and
+sells in view, so the card leans to neither side; it was captured from the dev server with the
+readouts and controls hidden. The card text stays general ("hear and watch") so it outlives
+changes to the visuals. `max-image-preview:large` lets Google show it large.
 `index.html` also carries the canonical URL and `WebApplication` structured data (JSON-LD).
 Crawlers need absolute URLs, so all of these hard-code `https://crypto-tune.com/`; update them if
 the site moves. The title and description lead with "hear and watch": the sound is what sets the
