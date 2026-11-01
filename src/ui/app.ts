@@ -23,7 +23,15 @@ import { el } from './dom';
 import { FlowMeter } from './flow';
 import { changeLabel, durationLabel, eventLabel, priceChange, usdFmt } from './format';
 import { mountMediaKeys } from './media-session';
-import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, UP_COLOR } from './palette';
+import {
+  auraTarget,
+  CALM_AURA,
+  css,
+  DOWN_COLOR,
+  isDown,
+  LIQUIDATION_PULSE,
+  UP_COLOR,
+} from './palette';
 import { mountStage } from './scene/stage';
 
 /** Smoothed direction beyond ±this gets an arrow in the tab title; inside it reads as flat. */
@@ -330,7 +338,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       // Hidden tab: nothing to see. Reduced motion: no waves, shocks or shake at all.
       if (!fresh(l.ts) || document.hidden || reducedMotion.matches) return;
       fx.liquidation(l.side, l.usd, settings.liqThresholdUsd);
-      if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(0.35);
+      if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(LIQUIDATION_PULSE);
     },
     setSymbols(market, list) {
       if (list.length > 0) listed.add(market);

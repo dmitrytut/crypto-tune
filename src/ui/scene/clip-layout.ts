@@ -2,16 +2,21 @@
  * The scene of a clip is phone-sized, so bubbles, drops and chart markers look as they do on a
  * phone (where clips are watched) rather than scattered over a desktop-wide canvas. CSS px;
  * times `pixelRatio` it is the clip's frame.
+ * @package
  */
 export const CLIP_STAGE = { width: 432, height: 768, pixelRatio: 2.5 } as const;
 
-/** A centred line of text: baseline `y`, font size and weight, stage px. */
+/**
+ * A centred line of text: baseline `y`, font size and weight, stage px.
+ * @package
+ */
 export interface TextSpot {
   y: number;
   size: number;
   weight: number;
 }
 
+/** @package */
 export interface ClipLayout {
   pair: TextSpot;
   price: TextSpot;

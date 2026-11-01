@@ -253,7 +253,9 @@
         <fieldset class="segmented" id="clip-length" aria-label="Clip length"></fieldset>
         <!-- biome-ignore lint/a11y/useMediaCaption: generative music without words; nothing to caption. -->
         <video id="clip-preview" class="clip-preview" aria-label="Clip preview" controls playsinline preload="metadata" hidden></video>
-        <p id="clip-status" class="clip-status" role="status"></p>
+        <!-- Only state changes are announced; the countdown and percentage are not. -->
+        <p class="clip-status"><span id="clip-status" role="status"></span> <span id="clip-detail"></span></p>
+        <progress id="clip-progress" class="clip-progress" max="1" value="0" aria-label="Rendering" hidden></progress>
         <div class="clip-actions">
           <button id="clip-make" class="clip-btn" type="button">Make clip</button>
         </div>

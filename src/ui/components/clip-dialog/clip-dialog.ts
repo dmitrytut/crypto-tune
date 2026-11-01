@@ -31,7 +31,8 @@ const READINESS_EVERY_MS = 1_000;
  * The clip dialog behind the share icon: pick 15 or 30 s, make the clip of the market just
  * heard, preview it, then download it or (where the browser shares files, i.e. phones) share
  * it. Sharing needs its own press: the share sheet opens only within a user gesture, and the
- * one that started a render has expired by its end.
+ * one that started a render has expired by its end. Screen readers hear state changes only;
+ * the countdown and the progress bar update quietly.
  */
 export function mountClipDialog(h: ClipHandlers): ClipDialog {
   const dialog = el<HTMLDialogElement>('clip');
@@ -39,6 +40,8 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
   const lengths = el<HTMLFieldSetElement>('clip-length');
   const preview = el<HTMLVideoElement>('clip-preview');
   const status = el('clip-status');
+  const detail = el('clip-detail');
+  const progress = el<HTMLProgressElement>('clip-progress');
   const make = el<HTMLButtonElement>('clip-make');
   const done = el('clip-done');
   const download = el<HTMLButtonElement>('clip-download');
@@ -48,7 +51,15 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
   let file: File | null = null;
   let fileUrl = '';
   let rendering: AbortController | null = null;
+  /** The last render failed: its message stays until the next action. */
+  let failed = false;
   let timer = 0;
+
+  /** Announced only when the words change, so a repeated state is not read again. */
+  const say = (text: string, quiet = '') => {
+    if (status.textContent !== text) status.textContent = text;
+    detail.textContent = quiet;
+  };
 
   lengths.replaceChildren(
     ...CLIP_LENGTHS_SEC.map((s) => {
@@ -61,6 +72,7 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
       radio.addEventListener('change', () => {
         if (!radio.checked) return;
         seconds = s;
+        failed = false;
         showReadiness();
       });
       const label = document.createElement('label');
@@ -78,46 +90,58 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
     if (fileUrl) URL.revokeObjectURL(fileUrl);
     fileUrl = '';
   };
-  /** Make is enabled once enough data is in; the status counts down until then. */
+  /** Make is enabled once enough data is in; until then the status counts down. */
   const showReadiness = () => {
     if (rendering) return;
     const r = h.readiness(seconds);
     make.disabled = !r.ready;
-    if (!r.ready) status.textContent = `Preparing clip… ${Math.ceil(r.leftMs / 1000)} s`;
-    else if (!file) status.textContent = `Ready: the last ${seconds} s.`;
+    if (failed || file) return;
+    if (r.ready) say(`Ready: the last ${seconds} s.`);
+    else say('Preparing clip…', `${Math.ceil(r.leftMs / 1000)} s`);
   };
 
   make.addEventListener('click', async () => {
     clearClip();
+    failed = false;
     const controller = new AbortController();
     rendering = controller;
     lengths.disabled = true;
     make.disabled = true;
-    status.textContent = 'Rendering… 0 %';
+    progress.value = 0;
+    progress.hidden = false;
+    say('Rendering…');
     try {
-      file = await h.make(
+      const made = await h.make(
         seconds,
         (part) => {
-          status.textContent = `Rendering… ${Math.floor(part * 100)} %`;
+          progress.value = part;
+          detail.textContent = `${Math.floor(part * 100)} %`;
         },
         controller.signal,
       );
-      fileUrl = URL.createObjectURL(file);
+      // Closed meanwhile: the result belongs to no one.
+      if (controller.signal.aborted) return;
+      file = made;
+      fileUrl = URL.createObjectURL(made);
       preview.src = fileUrl;
       preview.hidden = false;
-      share.hidden = !navigator.canShare?.({ files: [file] });
+      share.hidden = !navigator.canShare?.({ files: [made] });
       done.hidden = false;
       make.textContent = 'Make another';
-      status.textContent = `Your ${seconds} s clip is ready.`;
+      say(`Your ${seconds} s clip is ready.`);
+      (share.hidden ? download : share).focus();
     } catch (err) {
       if (controller.signal.aborted) return;
       console.error('Clip failed', err);
+      failed = true;
       make.textContent = 'Try again';
-      status.textContent = 'Could not make the clip.';
+      say('Could not make the clip.');
+      make.focus();
     } finally {
       if (rendering === controller) {
         rendering = null;
         lengths.disabled = false;
+        progress.hidden = true;
         showReadiness();
       }
     }
@@ -141,7 +165,7 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
         // Closing the sheet is not a failure.
         if (err instanceof DOMException && err.name === 'AbortError') return;
         h.onShareFailed(String(err));
-        status.textContent = 'Could not share. Download it instead.';
+        say('Could not share. Download it instead.');
       },
     );
   });
@@ -154,9 +178,12 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
     window.clearInterval(timer);
     rendering?.abort(new DOMException('Clip dialog closed', 'AbortError'));
     rendering = null;
+    failed = false;
     lengths.disabled = false;
+    progress.hidden = true;
     clearClip();
     make.textContent = 'Make clip';
+    say('');
   });
 
   return {

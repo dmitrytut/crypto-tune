@@ -4,19 +4,26 @@ import type { HistorySeries } from '../../metrics/history';
 import { CLIP_FORMAT } from '../clip-format';
 import { FlowMeter } from '../flow';
 import { changeLabel, eventLabel, priceChange, priceDecimals } from '../format';
-import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, UP_COLOR } from '../palette';
+import {
+  auraTarget,
+  CALM_AURA,
+  css,
+  DOWN_COLOR,
+  isDown,
+  LIQUIDATION_PULSE,
+  UP_COLOR,
+} from '../palette';
 import { Aura } from './aura';
 import { Chart } from './chart';
 import { CLIP_LAYOUT, CLIP_STAGE, type TextSpot } from './clip-layout';
 import { Fx } from './fx';
 
-/** Same as the live readout: a liquidation at the threshold lights the whole aura. */
-const LIQ_PULSE = 0.35;
 /** Pair and watermark sit a step back from the price. */
 const LABEL_ALPHA = 0.75;
 /** Keeps text readable over a bright aura (the CSS --text-shadow-legible, for canvas). */
 const TEXT_SHADOW = { color: 'rgb(0 0 0 / 0.7)', blur: 12, offsetY: 1 };
 
+/** @package */
 export interface ClipVideoInput {
   window: ClipWindow;
   /** The chart's history as it grew: `advanceTo` reveals the window up to a frame. */
@@ -153,7 +160,7 @@ export async function renderClipVideo(
         const l = w.liquidations[li];
         if (!l) continue;
         fx.liquidation(l.side, l.usd, input.liquidationUsd);
-        if (l.usd >= input.liquidationUsd) aura?.pulseBy(LIQ_PULSE);
+        if (l.usd >= input.liquidationUsd) aura?.pulseBy(LIQUIDATION_PULSE);
       }
       for (; ti < w.ticks.length && (w.ticks[ti]?.ts ?? Infinity) <= now; ti++) {
         const tick = w.ticks[ti];

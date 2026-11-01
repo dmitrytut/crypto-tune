@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Trade } from '../../feed/market-feed';
 import { CLIP_PREROLL_SEC, ClipBuffer, replayHistory } from '../clip-buffer';
 import type { EventCues } from '../events';
-import { MarketHistory } from '../history';
+import { MarketHistory, VOLUME_BUCKET_MS } from '../history';
 
 const T0 = 1_700_000_000_000;
 const NO_CUES: EventCues = { trade: null, liquidation: null };
@@ -107,6 +107,10 @@ describe('replayHistory', () => {
     const inWindow = (h: { prices: readonly { ts: number }[] }) =>
       h.prices.filter((p) => p.ts > w.start);
     expect(inWindow(r.series)).toEqual(inWindow(live));
-    expect(r.series.volumes.at(-1)).toEqual(live.volumes.at(-1));
+    // Every bar the clip can show, the one the window starts in included, as live drew it.
+    const bars = (h: { volumes: readonly { ts: number }[] }) =>
+      h.volumes.filter((v) => v.ts + VOLUME_BUCKET_MS > w.start);
+    expect(bars(r.series)).toHaveLength(3);
+    expect(bars(r.series)).toEqual(bars(live));
   });
 });

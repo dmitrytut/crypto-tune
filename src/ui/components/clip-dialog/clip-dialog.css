@@ -11,8 +11,18 @@
     font-size: var(--font-size-md);
     color: var(--muted);
   }
-  .clip-status:empty {
+  .clip-status:has(#clip-status:empty) {
     display: none;
+  }
+
+  .clip-progress {
+    display: block;
+    width: 100%;
+    accent-color: var(--text);
+
+    &[hidden] {
+      display: none;
+    }
   }
 
   .clip-preview {
@@ -27,6 +37,11 @@
   .clip-actions {
     display: flex;
     gap: var(--space-sm);
+
+    /* The display above would otherwise beat the hidden attribute. */
+    &[hidden] {
+      display: none;
+    }
   }
   .clip-btn {
     flex: 1;

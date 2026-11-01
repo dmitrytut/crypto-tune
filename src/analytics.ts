@@ -88,15 +88,20 @@ export class ListenTracker {
 const SUPPORT_KEY = 'crypto-tune.clip-support.v1';
 
 export class ClipTracker {
-  /** Once per session: a reload must not count a browser twice. */
+  /**
+   * Once per session: a reload must not count a browser twice. Marked sent only when Umami is
+   * there to take it (not yet loaded, blocked, or a dev host), so a later load still counts.
+   */
   support(result: { supported: boolean; reason?: string }): void {
+    const umami = window.umami;
+    if (!umami) return;
     try {
       if (sessionStorage.getItem(SUPPORT_KEY)) return;
       sessionStorage.setItem(SUPPORT_KEY, '1');
     } catch {
       // No session storage: counted on every load, a small overcount.
     }
-    window.umami?.track('clip_support', {
+    umami.track('clip_support', {
       supported: result.supported ? 'yes' : 'no',
       reason: result.reason ?? 'none',
     });

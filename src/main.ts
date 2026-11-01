@@ -133,6 +133,8 @@ async function makeClip(
       (done) => onProgress(CLIP_AUDIO_SHARE + (1 - CLIP_AUDIO_SHARE) * done),
       signal,
     );
+    // Closed after the last frame: not a clip anyone got.
+    signal.throwIfAborted();
     clipEvents.recorded(analyticsPair(s), seconds, performance.now() - startedAt);
     return new File([blob], words.fileName, { type: 'video/mp4' });
   } catch (err) {
@@ -300,6 +302,9 @@ async function loadSymbols(market: BinanceMarket): Promise<void> {
 startPipeline();
 for (const market of BINANCE_MARKETS) void loadSymbols(market);
 void clipSupport().then((support) => {
-  clipEvents.support(support);
   if (support.supported) view.enableClips();
+  // The Umami script is deferred after this module: report once the page has loaded.
+  const report = () => clipEvents.support(support);
+  if (document.readyState === 'complete') report();
+  else window.addEventListener('load', report, { once: true });
 });

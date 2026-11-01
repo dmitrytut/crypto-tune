@@ -1,7 +1,7 @@
 import type { Liquidation, Trade } from '../feed/market-feed';
 import type { MetricsSnapshot } from './engine';
 import type { EventCues } from './events';
-import type { HistorySeries, MarketHistory } from './history';
+import { type HistorySeries, type MarketHistory, VOLUME_BUCKET_MS } from './history';
 
 /** Clip lengths a listener can pick, seconds. */
 export const CLIP_LENGTHS_SEC = [15, 30] as const;
@@ -9,6 +9,7 @@ export type ClipSeconds = (typeof CLIP_LENGTHS_SEC)[number];
 /**
  * Data rendered before the clip starts and cut off: the music fades in over 3 s and the reverb
  * needs a tail, the aura and particles need a moment to fill the screen.
+ * @package
  */
 export const CLIP_PREROLL_SEC = 5;
 /**
@@ -33,6 +34,11 @@ export interface ClipWindow {
   end: number;
   prerollMs: number;
   trades: Trade[];
+  /**
+   * Trades of the volume bucket the window starts in, before `start`: the chart rebuilds that
+   * bucket whole; nothing else shows them.
+   */
+  bucketTrades: Trade[];
   liquidations: Liquidation[];
   ticks: ClipTick[];
 }
@@ -61,8 +67,11 @@ export class ClipBuffer {
     const cutoff = tick.ts - KEEP_MS;
     if ((this.ticks[0]?.ts ?? cutoff) < cutoff)
       this.ticks = this.ticks.filter((t) => t.ts >= cutoff);
-    if ((this.trades[0]?.ts ?? cutoff) < cutoff)
-      this.trades = this.trades.filter((t) => t.ts >= cutoff);
+    // Trades a bucket longer: the first chart bar of a clip is rebuilt from all of its trades.
+    const tradeCutoff = cutoff - VOLUME_BUCKET_MS;
+    if ((this.trades[0]?.ts ?? tradeCutoff) < tradeCutoff) {
+      this.trades = this.trades.filter((t) => t.ts >= tradeCutoff);
+    }
     if ((this.liquidations[0]?.ts ?? cutoff) < cutoff) {
       this.liquidations = this.liquidations.filter((l) => l.ts >= cutoff);
     }
@@ -88,6 +97,7 @@ export class ClipBuffer {
     const end = this.ticks.at(-1)?.ts;
     if (end === undefined || !this.readiness(seconds).ready) return null;
     const start = end - (seconds + CLIP_PREROLL_SEC) * 1000;
+    const bucketStart = Math.floor(start / VOLUME_BUCKET_MS) * VOLUME_BUCKET_MS;
     const after = <T extends { ts: number }>(xs: T[]) =>
       xs.filter((x) => x.ts > start && x.ts <= end);
     return {
@@ -95,6 +105,7 @@ export class ClipBuffer {
       end,
       prerollMs: CLIP_PREROLL_SEC * 1000,
       trades: after(this.trades),
+      bucketTrades: this.trades.filter((t) => t.ts >= bucketStart && t.ts <= start),
       liquidations: after(this.liquidations),
       ticks: after(this.ticks),
     };
@@ -111,6 +122,8 @@ export function replayHistory(
   w: ClipWindow,
 ): { series: HistorySeries; advanceTo(ts: number): void } {
   const h = base.before(w.start);
+  // `before` drops the bucket the window starts in; its earlier trades bring it back.
+  for (const t of w.bucketTrades) h.addTrade(t);
   let ti = 0;
   let ki = 0;
   return {
