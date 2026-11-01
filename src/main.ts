@@ -1,5 +1,6 @@
 import { ListenTracker } from './analytics';
-import { AudioEngine, type AudioParams } from './audio/engine';
+import { AudioEngine } from './audio/engine';
+import type { AudioParams } from './audio/graph';
 import {
   BINANCE_MARKETS,
   BinanceFuturesFeed,
