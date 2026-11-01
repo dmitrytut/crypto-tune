@@ -10,10 +10,8 @@ import { Mixer } from './mixer';
 import { TensionLayer } from './tension-layer';
 import { CALM_BPM, INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from './tension-map';
 
-/** @package */
-export const FADE_IN_SEC = 3;
-/** @package */
-export const MASTER_DB = -2;
+const FADE_IN_SEC = 3;
+const MASTER_DB = -2;
 /**
  * Headroom before playback so Tone has a moment to prepare the first scheduled event.
  * @package

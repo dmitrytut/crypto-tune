@@ -1,14 +1,14 @@
 import { pagePath, pairPageOf } from './pair-pages';
 import type { Settings } from './settings';
 
-/** What a clip says about itself: on screen, in the share sheet and as a file. */
+/** What a clip says about itself: on screen, in the caption and as a file. */
 export interface ClipShare {
   /** Top line of the clip. */
   pair: string;
   /** Typed from the screen, so it names the pair's page: links in Shorts are not clickable. */
   watermark: string;
-  text: string;
-  url: string;
+  /** Text and the pair's page link (`?utm_source=clip`), copied for the post's caption. */
+  caption: string;
   fileName: string;
 }
 
@@ -28,11 +28,11 @@ export function clipShare(
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${at.getFullYear()}${pad(at.getMonth() + 1)}${pad(at.getDate())}-${pad(at.getHours())}${pad(at.getMinutes())}`;
   const name = page?.slug ?? (live ? s.symbol.toLowerCase() : 'simulated');
+  const url = `${new URL(pagePath(page), site).href}?utm_source=clip`;
   return {
     pair: live ? s.symbol : 'Simulated market',
     watermark: page ? `${host}/${page.slug}` : host,
-    text: live ? `${s.symbol} live on Crypto Tune` : 'A simulated market on Crypto Tune',
-    url: `${new URL(pagePath(page), site).href}?utm_source=clip`,
+    caption: `${live ? `${s.symbol} live on Crypto Tune` : 'A simulated market on Crypto Tune'} ${url}`,
     fileName: `crypto-tune-${name}-${stamp}.mp4`,
   };
 }

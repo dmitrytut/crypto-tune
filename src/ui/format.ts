@@ -65,6 +65,17 @@ export function eventLabel(kind: 'trade' | 'liquidation', side: string, usd: num
 }
 
 /**
+ * A tick's cue as the readout shows it: the event, and how many merged into it (`SELL $5.3M ×2`).
+ * @package
+ */
+export function cueLabel(
+  kind: 'trade' | 'liquidation',
+  cue: { side: string; usd: number; count: number },
+): string {
+  return `${eventLabel(kind, cue.side, cue.usd)}${cue.count > 1 ? ` ×${cue.count}` : ''}`;
+}
+
+/**
  * Change of `price` at `ts` over `periodMs`, or over all the history there is while it is
  * shorter; within ±0.005 % it reads as flat. Null without history or a price.
  * @package

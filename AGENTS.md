@@ -112,7 +112,7 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   opens the pair from the path without saving it, and `replaceState`s the path on a pair change.
   Page texts land in attributes and JSON-LD: no `&<>"\`.
 - `src/clip-share.ts` — what a clip says: top line, watermark (`crypto-tune.com/<slug>` for pair
-  pages), share text, link with `?utm_source=clip`, file name. Simulated markets say so.
+  pages), caption (text and link with `?utm_source=clip`), file name. Simulated markets say so.
 - `src/analytics.ts` — Umami events `listen` / `listen_10m`, `clip_support` (once per session),
   `clip_recorded`, `clip_shared`, `clip_failed` (beacon in `index.html`, counts only on the
   production host). No identifiers: returning listeners come from a day counter in localStorage.

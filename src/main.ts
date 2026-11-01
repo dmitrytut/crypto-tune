@@ -165,10 +165,7 @@ const view = mountApp(settings, {
   clip: {
     readiness: (seconds) => clips.readiness(seconds),
     make: makeClip,
-    shareData() {
-      const { text, url } = clipShare(site, settings, new Date());
-      return { text, url };
-    },
+    caption: () => clipShare(site, settings, new Date()).caption,
     onShared: (method) => clipEvents.shared(analyticsPair(settings), method),
     onShareFailed: (reason) => clipEvents.failed('share', reason),
   },

@@ -21,7 +21,7 @@ import { PriceReadout } from './components/price-readout/price-readout';
 import { mountSettingsPanel } from './components/settings-panel/settings-panel';
 import { el } from './dom';
 import { FlowMeter } from './flow';
-import { changeLabel, durationLabel, eventLabel, priceChange, usdFmt } from './format';
+import { changeLabel, cueLabel, durationLabel, priceChange, usdFmt } from './format';
 import { mountMediaKeys } from './media-session';
 import {
   auraTarget,
@@ -324,8 +324,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     },
     showEvent(e) {
       chartDirty = true;
-      const times = e.count > 1 ? ` ×${e.count}` : '';
-      shownEvent = { text: `${eventLabel(e.kind, e.side, e.usd)}${times}`, at: Date.now() };
+      shownEvent = { text: cueLabel(e.kind, e), at: Date.now() };
       lastEvent.className = isDown(e.side) ? 'down' : 'up';
       paintEvent();
     },

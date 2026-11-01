@@ -13,8 +13,8 @@ export interface ClipHandlers {
     onProgress: (done: number) => void,
     signal: AbortSignal,
   ): Promise<File>;
-  /** Text and link for the caption; they go to the clipboard, not into the share sheet. */
-  shareData(): { text: string; url: string };
+  /** Text and link for the post's caption; copied, not put in the share sheet. */
+  caption(): string;
   onShared(method: 'share' | 'download'): void;
   onShareFailed(reason: string): void;
 }
@@ -162,8 +162,7 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
     // With text or a link beside the file, iOS hands most apps (Messages, WhatsApp, Telegram)
     // the link and drops the video. So the video goes alone and the link waits on the clipboard
     // for the caption. Both calls run straight from the press: each needs the user activation.
-    const { text, url } = h.shareData();
-    navigator.clipboard?.writeText(`${text} ${url}`).then(
+    navigator.clipboard?.writeText(h.caption()).then(
       () => say('Link copied: paste it with the video.'),
       () => {},
     );

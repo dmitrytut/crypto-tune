@@ -112,15 +112,18 @@ export class ClipBuffer {
   }
 }
 
+/** The chart's history during a clip; `advanceTo` reveals the window up to a frame. */
+export interface HistoryReplay {
+  series: HistorySeries;
+  advanceTo(ts: number): void;
+}
+
 /**
  * The chart's history as it grew during a clip: everything complete before the window, then the
  * window's trades, snapshots and markers up to the frame being drawn. One object for the whole
  * render, so the chart sees new markers arrive as it does live.
  */
-export function replayHistory(
-  base: MarketHistory,
-  w: ClipWindow,
-): { series: HistorySeries; advanceTo(ts: number): void } {
+export function replayHistory(base: MarketHistory, w: ClipWindow): HistoryReplay {
   const h = base.before(w.start);
   // `before` drops the bucket the window starts in; its earlier trades bring it back.
   for (const t of w.bucketTrades) h.addTrade(t);
@@ -129,11 +132,8 @@ export function replayHistory(
   return {
     series: h,
     advanceTo(ts) {
-      for (; ti < w.trades.length && (w.trades[ti] as Trade).ts <= ts; ti++) {
-        h.addTrade(w.trades[ti] as Trade);
-      }
-      for (; ki < w.ticks.length && (w.ticks[ki] as ClipTick).ts <= ts; ki++) {
-        const tick = w.ticks[ki] as ClipTick;
+      for (let t = w.trades[ti]; t && t.ts <= ts; t = w.trades[++ti]) h.addTrade(t);
+      for (let tick = w.ticks[ki]; tick && tick.ts <= ts; tick = w.ticks[++ki]) {
         if (tick.snap) h.addSnapshot(tick.snap);
         h.addCues(tick.ts, tick.cues);
       }

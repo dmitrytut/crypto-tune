@@ -57,8 +57,9 @@
 - тики: `{ ts, snap: MetricsSnapshot | null, cues: EventCues }` — из них звук, аура, цена,
   подпись события.
 
-Методы: `addTrade`, `addLiquidation`, `addTick`, `readiness(now, seconds)`
-(`{ ready, collectedMs, needMs }`), `window(seconds)` — копия данных клипа с разогревом.
+Методы: `addTrade`, `addLiquidation`, `addTick`, `readiness(seconds)` (`{ ready, leftMs }`),
+`window(seconds)` — копия данных клипа с разогревом (и сделки начала первого 10-с бакета объёма,
+чтобы его столбик в клипе был целым).
 Сбрасывается при пересборке конвейера (`startPipeline`: другая пара или источник) и когда лента
 не `open` (дыра в данных). История из REST и кэша в буфер не идёт: только то, что пришло вживую.
 `main.ts` кладёт в буфер в тех же местах, где кормит `view` и `audio`.

@@ -1,9 +1,8 @@
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output } from 'mediabunny';
-import type { ClipWindow } from '../../metrics/clip-buffer';
-import type { HistorySeries } from '../../metrics/history';
+import type { ClipWindow, HistoryReplay } from '../../metrics/clip-buffer';
 import { CLIP_FORMAT } from '../clip-format';
 import { FlowMeter } from '../flow';
-import { changeLabel, eventLabel, priceChange, priceDecimals } from '../format';
+import { changeLabel, cueLabel, priceChange, priceDecimals, splitPrice } from '../format';
 import {
   auraTarget,
   CALM_AURA,
@@ -26,8 +25,7 @@ const TEXT_SHADOW = { color: 'rgb(0 0 0 / 0.7)', blur: 12, offsetY: 1 };
 /** @package */
 export interface ClipVideoInput {
   window: ClipWindow;
-  /** The chart's history as it grew: `advanceTo` reveals the window up to a frame. */
-  history: { series: HistorySeries; advanceTo(ts: number): void };
+  history: HistoryReplay;
   /** The clip's music, without the pre-roll. */
   audio: AudioBuffer;
   /** Top line, e.g. `BTCUSDT` or `Simulated market`. */
@@ -139,7 +137,8 @@ export async function renderClipVideo(
     };
     const decimals = priceDecimals(w.ticks.find((t) => t.snap)?.snap?.price ?? Number.NaN);
     let snap = w.ticks[0]?.snap ?? null;
-    let event: { text: string; down: boolean } | null = null;
+    // Set from the tick callback below: typed wide so the check before drawing is not narrowed.
+    let event = null as { text: string; down: boolean } | null;
     let tr = 0;
     let li = 0;
     let ti = 0;
@@ -150,38 +149,26 @@ export async function renderClipVideo(
       signal.throwIfAborted();
       const now = w.start + f * dt * 1000;
       clockMs = f * dt * 1000;
-      for (; tr < w.trades.length && (w.trades[tr]?.ts ?? Infinity) <= now; tr++) {
-        const t = w.trades[tr];
-        if (!t) continue;
+      tr = upTo(w.trades, tr, now, (t) => {
         flow.add(t.side, t.price * t.qty, t.ts);
         fx.trade(t.side, t.price * t.qty);
-      }
-      for (; li < w.liquidations.length && (w.liquidations[li]?.ts ?? Infinity) <= now; li++) {
-        const l = w.liquidations[li];
-        if (!l) continue;
+      });
+      li = upTo(w.liquidations, li, now, (l) => {
         fx.liquidation(l.side, l.usd, input.liquidationUsd);
         if (l.usd >= input.liquidationUsd) aura?.pulseBy(LIQUIDATION_PULSE);
-      }
-      for (; ti < w.ticks.length && (w.ticks[ti]?.ts ?? Infinity) <= now; ti++) {
-        const tick = w.ticks[ti];
-        if (!tick) continue;
+      });
+      ti = upTo(w.ticks, ti, now, (tick) => {
         if (tick.snap) {
           snap = tick.snap;
           aura?.setTarget(auraTarget(tick.snap, flow.read(tick.ts)));
         }
         // Liquidation last: it is rarer and more important, so it wins the readout.
-        for (const [kind, cue] of [
-          ['trade', tick.cues.trade],
-          ['liquidation', tick.cues.liquidation],
-        ] as const) {
-          if (!cue) continue;
-          const times = cue.count > 1 ? ` ×${cue.count}` : '';
-          event = {
-            text: `${eventLabel(kind, cue.side, cue.usd)}${times}`,
-            down: isDown(cue.side),
-          };
+        const { trade, liquidation } = tick.cues;
+        if (trade) event = { text: cueLabel('trade', trade), down: isDown(trade.side) };
+        if (liquidation) {
+          event = { text: cueLabel('liquidation', liquidation), down: isDown(liquidation.side) };
         }
-      }
+      });
       history.advanceTo(now);
       aura?.frame(dt);
       fx.frame(dt, input.bigTradeUsd);
@@ -204,14 +191,8 @@ export async function renderClipVideo(
       g.shadowOffsetY = TEXT_SHADOW.offsetY * ratio;
       text(L.pair, input.pair, look.color, LABEL_ALPHA);
       if (snap && !Number.isNaN(snap.price)) {
-        text(
-          L.price,
-          snap.price.toLocaleString('en-US', {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals,
-          }),
-          look.color,
-        );
+        const { int, frac } = splitPrice(snap.price, decimals);
+        text(L.price, int + frac, look.color);
         const moved = priceChange(history.series, snap.ts, snap.price, input.periodMs);
         if (moved) {
           const color =
@@ -248,4 +229,16 @@ function nextTask(): Promise<void> {
   ch.port1.onmessage = () => resolve();
   ch.port2.postMessage(null);
   return promise;
+}
+
+/** Calls `fn` for the items of `xs` from index `i` up to time `now`; returns the next index. */
+function upTo<T extends { ts: number }>(
+  xs: readonly T[],
+  i: number,
+  now: number,
+  fn: (x: T) => void,
+): number {
+  let next = i;
+  for (let x = xs[next]; x && x.ts <= now; x = xs[++next]) fn(x);
+  return next;
 }
