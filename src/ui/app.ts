@@ -13,6 +13,7 @@ import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { mountAbout } from './components/about/about';
 import { mountChartTip } from './components/chart-tip/chart-tip';
+import { type ClipHandlers, mountClipDialog } from './components/clip-dialog/clip-dialog';
 import { isHintOpen } from './components/hint/hint';
 import { TensionMeter } from './components/meter/meter';
 import { mountPicker } from './components/picker/picker';
@@ -43,6 +44,8 @@ export interface AppHandlers {
   onToggleAudio(): void;
   /** Optional sound for a manually touched particle; no market event is emitted. */
   onParticleTouch(side: TradeSide, strength: number): void;
+  /** Data, rendering and wording behind the clip dialog. */
+  clip: ClipHandlers;
 }
 
 /** What the Start/Stop button shows. */
@@ -68,6 +71,8 @@ export interface AppView {
   trade(t: Trade): void;
   /** Every liquidation, for the shock waves; a stale catch-up is ignored. */
   liquidation(l: Liquidation): void;
+  /** The browser can make clips: the share icon shows. */
+  enableClips(): void;
 }
 
 function statusText(s: FeedStatus, source: Settings['source']): string {
@@ -106,6 +111,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   };
   const panel = mountSettingsPanel(initial, update);
   const about = mountAbout(() => settings.tradeThresholdUsd);
+  const clip = mountClipDialog(handlers.clip);
   // CSS reads the side colours from the palette, so text and canvas never drift apart.
   document.documentElement.style.setProperty('--up', css(UP_COLOR));
   document.documentElement.style.setProperty('--down', css(DOWN_COLOR));
@@ -220,7 +226,8 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => {
       // Never fade the chrome out from under an open dialog or a tip someone is reading.
-      if (!panel.isOpen() && !about.isOpen() && !isHintOpen()) document.body.classList.add('idle');
+      const dialogOpen = panel.isOpen() || about.isOpen() || clip.isOpen();
+      if (!dialogOpen && !isHintOpen()) document.body.classList.add('idle');
     }, IDLE_MS);
   };
   for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const) {
@@ -328,6 +335,9 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     setSymbols(market, list) {
       if (list.length > 0) listed.add(market);
       pair.setOptions(list, market);
+    },
+    enableClips() {
+      clip.enable();
     },
   };
 }

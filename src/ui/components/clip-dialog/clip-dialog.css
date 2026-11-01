@@ -1,0 +1,61 @@
+/* Clip dialog (clip-dialog.ts); the dialog shell is .modal (modal.css), lengths are .segmented. */
+@layer components {
+  /* Kept in the header layout before the browser check, so About and Settings never shift. */
+  .clip-open:not(.ready) {
+    visibility: hidden;
+  }
+
+  .clip-note,
+  .clip-status {
+    margin: 0;
+    font-size: var(--font-size-md);
+    color: var(--muted);
+  }
+  .clip-status:empty {
+    display: none;
+  }
+
+  .clip-preview {
+    justify-self: center;
+    /* 9:16, short enough that the actions stay on a phone screen. */
+    height: min(48vh, 360px);
+    aspect-ratio: 9 / 16;
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+  }
+
+  .clip-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+  .clip-btn {
+    flex: 1;
+    height: 44px;
+    border: var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--surface-strong);
+    }
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+  /* The action once the clip exists: brighter, but not the accent (that is Listen's). */
+  .clip-btn--primary {
+    background: var(--text);
+    color: var(--bg);
+
+    &:hover:not(:disabled) {
+      background: var(--text);
+      opacity: 0.9;
+    }
+  }
+}

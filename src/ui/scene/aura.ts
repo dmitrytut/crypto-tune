@@ -201,6 +201,11 @@ export class Aura {
     this.target = t;
   }
 
+  /** Frees the GPU context now (a clip's aura), instead of whenever it is collected. */
+  dispose(): void {
+    this.gl.getExtension('WEBGL_lose_context')?.loseContext();
+  }
+
   /** Brief overall brightening; `strength` 0…1. */
   pulseBy(strength: number): void {
     this.pulse = Math.min(1, this.pulse + strength);

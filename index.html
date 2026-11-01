@@ -55,6 +55,12 @@
         <div class="picker picker-chip" id="pair"></div>
         <div class="top-right">
           <span id="status" class="status" role="status" data-state="idle">idle</span>
+          <!-- Hidden (its place kept) until clip-format.ts finds the browser can encode a clip. -->
+          <button id="clip-open" class="icon-btn clip-open" type="button" aria-label="Share a clip">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2v13" /><path d="m16 6-4-4-4 4" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            </svg>
+          </button>
           <button id="about-open" class="icon-btn" type="button" aria-label="About">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" />
@@ -231,6 +237,30 @@
           browser, no sign-up.
         </p>
         <!-- pair-pages:links -->
+      </form>
+    </dialog>
+
+    <!-- Lengths, preview and actions are filled by ui/components/clip-dialog. -->
+    <dialog id="clip" class="modal clip" aria-labelledby="clip-title">
+      <form method="dialog" class="modal-body">
+        <header class="modal-head">
+          <h2 id="clip-title">Share a clip</h2>
+          <button class="icon-btn" type="submit" value="close" aria-label="Close">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </button>
+        </header>
+        <p class="clip-note">The last seconds of this market with its sound, as a vertical video.</p>
+        <fieldset class="segmented" id="clip-length" aria-label="Clip length"></fieldset>
+        <!-- biome-ignore lint/a11y/useMediaCaption: generative music without words; nothing to caption. -->
+        <video id="clip-preview" class="clip-preview" aria-label="Clip preview" controls playsinline preload="metadata" hidden></video>
+        <p id="clip-status" class="clip-status" role="status"></p>
+        <div class="clip-actions">
+          <button id="clip-make" class="clip-btn" type="button">Make clip</button>
+        </div>
+        <div id="clip-done" class="clip-actions" hidden>
+          <button id="clip-download" class="clip-btn" type="button">Download</button>
+          <button id="clip-share" class="clip-btn clip-btn--primary" type="button" hidden>Share</button>
+        </div>
       </form>
     </dialog>
 
