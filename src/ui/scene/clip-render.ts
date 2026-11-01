@@ -79,6 +79,8 @@ export async function renderClipVideo(
   frame.height = CLIP_FORMAT.height;
   const g = frame.getContext('2d');
   const aura = Aura.create(auraCanvas, CALM_AURA);
+  let output: Output<Mp4OutputFormat, BufferTarget> | null = null;
+  let finished = false;
   try {
     if (!g) throw new Error('2D canvas unavailable');
     let clockMs = 0;
@@ -106,7 +108,7 @@ export async function renderClipVideo(
     const look = getComputedStyle(stage);
     const background = getComputedStyle(document.body).backgroundColor;
 
-    const output = new Output({
+    output = new Output({
       format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
       target: new BufferTarget(),
     });
@@ -138,10 +140,7 @@ export async function renderClipVideo(
     const frames = Math.round(((w.end - w.start) / 1000) * CLIP_FORMAT.fps);
     const clipFrom = Math.round((w.prerollMs / 1000) * CLIP_FORMAT.fps);
     for (let f = 0; f < frames; f++) {
-      if (signal.aborted) {
-        await output.cancel();
-        throw signal.reason;
-      }
+      signal.throwIfAborted();
       const now = w.start + f * dt * 1000;
       clockMs = f * dt * 1000;
       for (; tr < w.trades.length && (w.trades[tr]?.ts ?? Infinity) <= now; tr++) {
@@ -223,10 +222,13 @@ export async function renderClipVideo(
     }
     await audio.add(input.audio);
     await output.finalize();
+    finished = true;
     const bytes = output.target.buffer;
     if (!bytes) throw new Error('Encoder produced no file');
     return new Blob([bytes], { type: 'video/mp4' });
   } finally {
+    // Aborted or failed: release the encoders now; a cancel after an encoder error may throw too.
+    if (output && !finished) await output.cancel().catch(() => {});
     aura?.dispose();
     stage.remove();
   }
