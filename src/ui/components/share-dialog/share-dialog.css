@@ -1,8 +1,21 @@
-/* Clip dialog (clip-dialog.ts); the dialog shell is .modal (modal.css), lengths are .segmented. */
+/* Share dialog (share-dialog.ts); the dialog shell is .modal (modal.css), lengths are .segmented. */
 @layer components {
-  /* Kept in the header layout before the browser check, so About and Settings never shift. */
-  .clip-open:not(.ready) {
-    visibility: hidden;
+  /* The clip part sits under the link, set off by a rule; its own gaps match the dialog's. */
+  .clip-section {
+    display: grid;
+    gap: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: var(--border);
+
+    /* The display above would otherwise beat the hidden attribute. */
+    &[hidden] {
+      display: none;
+    }
+    & h3 {
+      margin: 0;
+      font-size: var(--font-size-md);
+      font-weight: 600;
+    }
   }
 
   .clip-note,
@@ -34,16 +47,15 @@
     background: var(--bg);
   }
 
-  .clip-actions {
+  .share-actions {
     display: flex;
     gap: var(--space-sm);
 
-    /* The display above would otherwise beat the hidden attribute. */
     &[hidden] {
       display: none;
     }
   }
-  .clip-btn {
+  .share-btn {
     flex: 1;
     height: 44px;
     border: var(--border);
@@ -64,7 +76,7 @@
     }
   }
   /* The action once the clip exists: brighter, but not the accent (that is Listen's). */
-  .clip-btn--primary {
+  .share-btn--primary {
     background: var(--text);
     color: var(--bg);
 

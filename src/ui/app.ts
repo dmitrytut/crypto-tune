@@ -13,12 +13,12 @@ import { TENSION_LEVELS } from '../metrics/tension';
 import { type Settings, SYMBOL_PATTERN } from '../settings';
 import { mountAbout } from './components/about/about';
 import { mountChartTip } from './components/chart-tip/chart-tip';
-import { type ClipHandlers, mountClipDialog } from './components/clip-dialog/clip-dialog';
 import { isHintOpen } from './components/hint/hint';
 import { TensionMeter } from './components/meter/meter';
 import { mountPicker } from './components/picker/picker';
 import { PriceReadout } from './components/price-readout/price-readout';
 import { mountSettingsPanel } from './components/settings-panel/settings-panel';
+import { mountShareDialog, type ShareHandlers } from './components/share-dialog/share-dialog';
 import { el } from './dom';
 import { FlowMeter } from './flow';
 import { changeLabel, cueLabel, durationLabel, priceChange, usdFmt } from './format';
@@ -52,8 +52,8 @@ export interface AppHandlers {
   onToggleAudio(): void;
   /** Optional sound for a manually touched particle; no market event is emitted. */
   onParticleTouch(side: TradeSide, strength: number): void;
-  /** Data, rendering and wording behind the clip dialog. */
-  clip: ClipHandlers;
+  /** The link, clip data and rendering behind the Share dialog. */
+  share: ShareHandlers;
 }
 
 /** What the Start/Stop button shows. */
@@ -79,7 +79,7 @@ export interface AppView {
   trade(t: Trade): void;
   /** Every liquidation, for the shock waves; a stale catch-up is ignored. */
   liquidation(l: Liquidation): void;
-  /** The browser can make clips: the share icon shows. */
+  /** The browser can make clips: the Share dialog shows its clip part. */
   enableClips(): void;
 }
 
@@ -119,7 +119,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   };
   const panel = mountSettingsPanel(initial, update);
   const about = mountAbout(() => settings.tradeThresholdUsd);
-  const clip = mountClipDialog(handlers.clip);
+  const share = mountShareDialog(handlers.share);
   // CSS reads the side colours from the palette, so text and canvas never drift apart.
   document.documentElement.style.setProperty('--up', css(UP_COLOR));
   document.documentElement.style.setProperty('--down', css(DOWN_COLOR));
@@ -234,7 +234,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => {
       // Never fade the chrome out from under an open dialog or a tip someone is reading.
-      const dialogOpen = panel.isOpen() || about.isOpen() || clip.isOpen();
+      const dialogOpen = panel.isOpen() || about.isOpen() || share.isOpen();
       if (!dialogOpen && !isHintOpen()) document.body.classList.add('idle');
     }, IDLE_MS);
   };
@@ -344,7 +344,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       pair.setOptions(list, market);
     },
     enableClips() {
-      clip.enable();
+      share.enableClips();
     },
   };
 }

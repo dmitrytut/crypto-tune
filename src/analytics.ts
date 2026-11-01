@@ -7,11 +7,13 @@
  *   `days` ≥ 2 = returning listeners.
  * - `listen_10m` { pair }: audio kept running for 10 minutes, once per page load: a listener,
  *   not a press-and-leave.
+ * - `link_shared` { pair, method }: the pair's link sent to the share sheet or copied. Visits
+ *   it brings carry `?utm_source=share` (Umami's UTM report).
  * - `clip_support` { supported, reason }: once per session, the share of browsers that cannot
- *   make a clip (and see no clip button).
+ *   make a clip (and see no clip part in Share).
  * - `clip_recorded` { pair, seconds, render_s }: a clip was made; `render_s` is how long that
  *   took, the speed on phones.
- * - `clip_shared` { pair, method }: sent to the share sheet or downloaded.
+ * - `clip_shared` { pair, method }: the video sent to the share sheet or downloaded.
  * - `clip_failed` { stage, reason }: making or sharing a clip broke.
  */
 declare global {
@@ -87,12 +89,16 @@ export class ListenTracker {
 
 const SUPPORT_KEY = 'crypto-tune.clip-support.v1';
 
-export class ClipTracker {
+export class ShareTracker {
+  linkShared(pair: string, method: 'share' | 'copy'): void {
+    window.umami?.track('link_shared', { pair, method });
+  }
+
   /**
    * Once per session: a reload must not count a browser twice. Marked sent only when Umami is
    * there to take it (not yet loaded, blocked, or a dev host), so a later load still counts.
    */
-  support(result: { supported: boolean; reason?: string }): void {
+  clipSupport(result: { supported: boolean; reason?: string }): void {
     const umami = window.umami;
     if (!umami) return;
     try {
@@ -107,15 +113,15 @@ export class ClipTracker {
     });
   }
 
-  recorded(pair: string, seconds: number, renderMs: number): void {
+  clipRecorded(pair: string, seconds: number, renderMs: number): void {
     window.umami?.track('clip_recorded', { pair, seconds, render_s: Math.round(renderMs / 1000) });
   }
 
-  shared(pair: string, method: 'share' | 'download'): void {
+  clipShared(pair: string, method: 'share' | 'download'): void {
     window.umami?.track('clip_shared', { pair, method });
   }
 
-  failed(stage: 'audio' | 'video' | 'share', reason: string): void {
+  clipFailed(stage: 'audio' | 'video' | 'share', reason: string): void {
     window.umami?.track('clip_failed', { stage, reason: reason.slice(0, 100) });
   }
 }

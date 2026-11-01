@@ -1,8 +1,7 @@
-import { ClipTracker, ListenTracker } from './analytics';
+import { ListenTracker, ShareTracker } from './analytics';
 import { AudioEngine } from './audio/engine';
 import type { AudioParams } from './audio/graph';
 import { renderClipAudio } from './audio/offline';
-import { clipShare } from './clip-share';
 import {
   BINANCE_MARKETS,
   BinanceFuturesFeed,
@@ -19,6 +18,7 @@ import { EventBuffer, type EventThresholds } from './metrics/events';
 import { MarketHistory } from './metrics/history';
 import { pagePath, pairPageAt, pairPageOf } from './pair-pages';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
+import { shareTexts } from './share';
 import { mountApp } from './ui/app';
 import { CLIP_FORMAT, clipSupport } from './ui/clip-format';
 
@@ -84,7 +84,7 @@ function syncPath(s: Settings): void {
 
 const audio = new AudioEngine(audioParams(settings));
 const listens = new ListenTracker();
-const clipEvents = new ClipTracker();
+const shares = new ShareTracker();
 /** The live market of the last seconds, for clips; one per pipeline, emptied by feed gaps. */
 const clips = new ClipBuffer();
 /** Site origin for clip links: the canonical link is the one place it is written. */
@@ -108,7 +108,7 @@ async function makeClip(
   const w = clips.window(seconds);
   if (!w || !history) throw new Error('Not enough live data for a clip yet');
   const s = settings;
-  const words = clipShare(site, s, new Date());
+  const words = shareTexts(site, s, new Date());
   const replay = replayHistory(history, w);
   const startedAt = performance.now();
   let stage: 'audio' | 'video' = 'audio';
@@ -135,10 +135,10 @@ async function makeClip(
     );
     // Closed after the last frame: not a clip anyone got.
     signal.throwIfAborted();
-    clipEvents.recorded(analyticsPair(s), seconds, performance.now() - startedAt);
+    shares.clipRecorded(analyticsPair(s), seconds, performance.now() - startedAt);
     return new File([blob], words.fileName, { type: 'video/mp4' });
   } catch (err) {
-    if (!signal.aborted) clipEvents.failed(stage, String(err));
+    if (!signal.aborted) shares.clipFailed(stage, String(err));
     throw err;
   }
 }
@@ -162,12 +162,13 @@ const view = mountApp(settings, {
   onParticleTouch(side, strength) {
     audio.touch(side, strength);
   },
-  clip: {
+  share: {
+    link: () => shareTexts(site, settings, new Date()).link,
+    onLinkShared: (method) => shares.linkShared(analyticsPair(settings), method),
     readiness: (seconds) => clips.readiness(seconds),
     make: makeClip,
-    caption: () => clipShare(site, settings, new Date()).caption,
-    onShared: (method) => clipEvents.shared(analyticsPair(settings), method),
-    onShareFailed: (reason) => clipEvents.failed('share', reason),
+    onClipShared: (method) => shares.clipShared(analyticsPair(settings), method),
+    onClipShareFailed: (reason) => shares.clipFailed('share', reason),
   },
   onToggleAudio() {
     if (audio.current === 'running') {
@@ -301,7 +302,7 @@ for (const market of BINANCE_MARKETS) void loadSymbols(market);
 void clipSupport().then((support) => {
   if (support.supported) view.enableClips();
   // The Umami script is deferred after this module: report once the page has loaded.
-  const report = () => clipEvents.support(support);
+  const report = () => shares.clipSupport(support);
   if (document.readyState === 'complete') report();
   else window.addEventListener('load', report, { once: true });
 });

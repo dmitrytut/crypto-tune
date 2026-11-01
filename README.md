@@ -56,9 +56,10 @@ looked at the chart.
   switch to the built-in simulator to hear a sell-off on demand.
 - **Favorite pairs first.** Star pairs directly in the picker: each market keeps its own favorites
   above the rest, with BTC, ETH and SOL pinned by default. Saved in this browser, no extra tab.
-- **Share a clip.** The share icon makes a vertical video (1080×1920, H.264 + AAC) of the last 15
-  or 30 seconds with its sound, the pair, the price and a `crypto-tune.com/bitcoin` watermark, ready
-  for Shorts, TikTok or Reels: shared from a phone, downloaded elsewhere.
+- **Share.** The share icon gives the pair's link in one press (the system sheet on a phone, a copy
+  on a computer) and makes a vertical video (1080×1920, H.264 + AAC) of the last 15 or 30 seconds
+  with its sound, the pair, the price and a `crypto-tune.com/bitcoin` watermark, ready for Shorts,
+  TikTok or Reels: shared from a phone, downloaded elsewhere.
 
 | Live BTCUSDT, buyers in control                    | Simulator, liquidation cascade                                 |
 | -------------------------------------------------- | -------------------------------------------------------------- |
@@ -244,10 +245,11 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 
 ### Clips
 
-The share icon (top right, next to About) opens **Share a clip**: pick 15 or 30 s, **Make clip**,
-preview, then **Download** or, where the browser shares files (phones), **Share**: the video goes
-alone (with a link beside it iOS hands most apps only the link) and the pair's page link
-(`?utm_source=clip`) is copied for the caption. Nothing is recorded while you listen: the last 36 s of the live
+The share icon (top right, next to About) opens **Share**. **Share link** sends the pair's page
+(`?utm_source=share`) to the system share sheet on touch devices and copies it elsewhere
+(`Link copied`). Under it, the clip: pick 15 or 30 s, **Make clip**, preview, then **Download** or,
+where the browser shares files (phones), **Share video**. The video goes alone: with a link beside
+it iOS hands most apps only the link. Nothing is recorded while you listen: the last 36 s of the live
 market (trades, liquidations, every tick's metrics and cues) stay in memory, and a clip replays
 them faster than real time. The music comes from the same layers built in an offline audio context,
 the picture from the same aura, particles and chart on a hidden phone-sized stage (432×768 at 2.5×),
@@ -257,8 +259,8 @@ render hands the main thread back after every frame (in a hidden tab the browser
 a render left behind finishes slowly). The first 5 s of every render are a pre-roll and are
 cut off. Until enough has arrived the dialog counts down (`Preparing clip… 12 s`); a pair change or
 a feed gap starts it over. The simulator's clips say **Simulated market**. Browsers that cannot
-encode H.264 + AAC (Firefox, desktop Linux, Safari before 26) do not show the icon; Umami counts
-them (`clip_support`), and clips made, shared and failed.
+encode H.264 + AAC (Firefox, desktop Linux, Safari before 26) get **Share link** only; Umami counts
+them (`clip_support`), links shared (`link_shared`), and clips made, shared and failed.
 
 <img src="docs/media/clip-frame.jpg" alt="A frame of a clip made from the simulator: Simulated market, price, change, bubbles and drops, the chart and the crypto-tune.com watermark" width="270">
 
@@ -392,7 +394,8 @@ sound, and Binance covers the pairs that matter.
 
 1. `pnpm test`: includes the clip buffer (readiness per length, trimming with drifting ticks, reset,
    the window), the history replay (nothing after the frame), the clip layout and share wording.
-2. `pnpm dev`, BTCUSDT: the share icon appears; open it — `Preparing clip… 34 s` counts down.
+2. `pnpm dev`, BTCUSDT: open the share icon — **Share link** copies `…/bitcoin/?utm_source=share`
+   (`Link copied` on the button), and `Preparing clip… 34 s` counts down under it.
    Make a 15 s and a 30 s clip, with and without **Listen**: a few seconds each, preview plays with
    sound, **Download** saves `crypto-tune-bitcoin-<date>-<time>.mp4`.
 3. `ffprobe` on the file: H.264 Main 1080×1920 30 fps, AAC 48 kHz stereo, 15.0 or 30.0 s, `moov`
@@ -401,9 +404,9 @@ sound, and Binance covers the pairs that matter.
 5. Closing the dialog mid-render stops it (no hidden stage left in the page). Settings → Simulator:
    the clip says `Simulated market`, watermark `crypto-tune.com`.
 6. DevTools device toolbar at 320, 360 and 375 px: three icons fit, the status keeps at least its
-   dot. With `delete window.AudioEncoder` before load the icon is invisible and About does not move.
-7. On a phone (HTTPS preview): **Share** opens the system sheet with the video itself (Messages,
-   Telegram get the file, not a link); `Link copied` shows and the link pastes into the caption.
+   dot. With `delete window.AudioEncoder` before load, Share has only **Share link**.
+7. On a phone (HTTPS preview): **Share link** opens the system sheet with the link; **Share video**
+   with the video itself (Messages, Telegram get the file, not a link).
 
 ### Gesture feedback
 

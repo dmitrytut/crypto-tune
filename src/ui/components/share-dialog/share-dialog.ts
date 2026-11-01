@@ -1,10 +1,13 @@
-import './clip-dialog.css';
+import './share-dialog.css';
 import { CLIP_LENGTHS_SEC, type ClipSeconds } from '../../../metrics/clip-buffer';
 import { el } from '../../dom';
 import { type Modal, mountModal } from '../modal/modal';
 
-/** Everything the dialog needs from outside: data, rendering and the share wording. */
-export interface ClipHandlers {
+/** Everything the dialog needs from outside: the link, clip data and rendering, analytics. */
+export interface ShareHandlers {
+  /** The pair's page to share, with a line to go with it. */
+  link(): { text: string; url: string };
+  onLinkShared(method: 'share' | 'copy'): void;
   /** Whether enough of the live market for a clip of `seconds` has arrived. */
   readiness(seconds: ClipSeconds): { ready: boolean; leftMs: number };
   /** Renders the clip; rejects with the signal's reason when the dialog closes. */
@@ -13,30 +16,33 @@ export interface ClipHandlers {
     onProgress: (done: number) => void,
     signal: AbortSignal,
   ): Promise<File>;
-  /** Text and link for the post's caption; copied, not put in the share sheet. */
-  caption(): string;
-  onShared(method: 'share' | 'download'): void;
-  onShareFailed(reason: string): void;
+  onClipShared(method: 'share' | 'download'): void;
+  onClipShareFailed(reason: string): void;
 }
 
-export interface ClipDialog extends Modal {
-  /** The browser can encode a clip: the header button shows. */
-  enable(): void;
+export interface ShareDialog extends Modal {
+  /** The browser can encode a clip: the clip part shows. */
+  enableClips(): void;
 }
 
 const DEFAULT_SECONDS: ClipSeconds = 30;
 const READINESS_EVERY_MS = 1_000;
+/** How long "Link copied" (or a failure) stands in for the link button's label. */
+const FLASH_MS = 1_500;
 
 /**
- * The clip dialog behind the share icon: pick 15 or 30 s, make the clip of the market just
- * heard, preview it, then download it or (where the browser shares files, i.e. phones) share
- * it. Sharing needs its own press: the share sheet opens only within a user gesture, and the
- * one that started a render has expired by its end. Screen readers hear state changes only;
- * the countdown and the progress bar update quietly.
+ * The Share dialog behind the header icon. Share link: the system share sheet on touch devices,
+ * a copy elsewhere (a desktop share sheet rarely beats a paste). The clip part, where the browser
+ * can encode one: pick 15 or 30 s, make the clip of the market just heard, preview it, then
+ * download it or (where the browser shares files, i.e. phones) share the video. Sharing needs
+ * its own press: the share sheet opens only within a user gesture, and the one that started a
+ * render has expired by its end. Screen readers hear state changes only; the countdown and the
+ * progress bar update quietly.
  */
-export function mountClipDialog(h: ClipHandlers): ClipDialog {
-  const dialog = el<HTMLDialogElement>('clip');
-  const opener = el<HTMLButtonElement>('clip-open');
+export function mountShareDialog(h: ShareHandlers): ShareDialog {
+  const dialog = el<HTMLDialogElement>('share');
+  const shareLink = el<HTMLButtonElement>('share-link');
+  const clipSection = el('clip-section');
   const lengths = el<HTMLFieldSetElement>('clip-length');
   const preview = el<HTMLVideoElement>('clip-preview');
   const status = el('clip-status');
@@ -46,6 +52,7 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
   const done = el('clip-done');
   const download = el<HTMLButtonElement>('clip-download');
   const share = el<HTMLButtonElement>('clip-share');
+  const touch = window.matchMedia('(pointer: coarse)');
 
   let seconds: ClipSeconds = DEFAULT_SECONDS;
   let file: File | null = null;
@@ -154,36 +161,67 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
     a.href = fileUrl;
     a.download = file.name;
     a.click();
-    h.onShared('download');
+    h.onClipShared('download');
   });
 
   share.addEventListener('click', () => {
     if (!file) return;
-    // With text or a link beside the file, iOS hands most apps (Messages, WhatsApp, Telegram)
-    // the link and drops the video. So the video goes alone and the link waits on the clipboard
-    // for the caption. Both calls run straight from the press: each needs the user activation.
-    navigator.clipboard?.writeText(h.caption()).then(
-      () => say('Link copied: paste it with the video.'),
-      () => {},
-    );
+    // The video goes alone: with text or a link beside the file, iOS hands most apps (Messages,
+    // WhatsApp, Telegram) the link and drops the video. Share link is the button for the link.
     navigator.share({ files: [file] }).then(
-      () => h.onShared('share'),
+      () => h.onClipShared('share'),
       (err: unknown) => {
         // Closing the sheet is not a failure.
         if (err instanceof DOMException && err.name === 'AbortError') return;
-        h.onShareFailed(String(err));
+        h.onClipShareFailed(String(err));
         say('Could not share. Download it instead.');
       },
     );
   });
 
-  const modal = mountModal('clip', 'clip-open', () => {
+  let labelTimer = 0;
+  /** Says on the link button what just happened, then goes back to its name. */
+  const flash = (label: string) => {
+    shareLink.textContent = label;
+    window.clearTimeout(labelTimer);
+    labelTimer = window.setTimeout(() => {
+      shareLink.textContent = 'Share link';
+    }, FLASH_MS);
+  };
+  const copyLink = (url: string) => {
+    if (!navigator.clipboard) return flash('Could not copy');
+    navigator.clipboard.writeText(url).then(
+      () => {
+        h.onLinkShared('copy');
+        flash('Link copied');
+      },
+      () => flash('Could not copy'),
+    );
+  };
+  shareLink.addEventListener('click', () => {
+    const link = h.link();
+    if (!touch.matches || !navigator.canShare?.(link)) {
+      copyLink(link.url);
+      return;
+    }
+    navigator.share(link).then(
+      () => h.onLinkShared('share'),
+      (err: unknown) => {
+        // Closing the sheet is not a failure; anything else falls back to a copy.
+        if (!(err instanceof DOMException && err.name === 'AbortError')) copyLink(link.url);
+      },
+    );
+  });
+
+  let clips = false;
+  const modal = mountModal('share', 'share-open', () => {
+    if (!clips) return;
     showReadiness();
     timer = window.setInterval(showReadiness, READINESS_EVERY_MS);
   });
   dialog.addEventListener('close', () => {
     window.clearInterval(timer);
-    rendering?.abort(new DOMException('Clip dialog closed', 'AbortError'));
+    rendering?.abort(new DOMException('Share dialog closed', 'AbortError'));
     rendering = null;
     failed = false;
     lengths.disabled = false;
@@ -195,8 +233,9 @@ export function mountClipDialog(h: ClipHandlers): ClipDialog {
 
   return {
     isOpen: modal.isOpen,
-    enable() {
-      opener.classList.add('ready');
+    enableClips() {
+      clips = true;
+      clipSection.hidden = false;
     },
   };
 }

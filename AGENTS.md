@@ -75,10 +75,11 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   settings modal, a hint per setting from its `HELP` texts; `about/` About modal, static text in
   `index.html` so crawlers without JS read it, plus the trade legend drawn on open from
   `scene/legend.ts` (marks, captions, threshold note); `chart-tip/` tooltip for chart event markers,
-  hit-tested by `Chart.markerAt`; `clip-dialog/` Share a clip modal: length, readiness countdown,
-  render progress, preview, Download and (where files can be shared) Share; the share sheet needs
-  its own press and gets the file alone — iOS drops the file for the link when both are passed —
-  while the link goes to the clipboard),
+  hit-tested by `Chart.markerAt`; `share-dialog/` Share modal: one Share link button (system
+  share sheet on touch devices, a copy elsewhere) and, where clips can be encoded, the clip part:
+  length, readiness countdown, render progress, preview, Download and (where files can be shared)
+  Share video; the share sheet needs its own press and gets the file alone — iOS drops the file
+  for the link when both are passed),
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, off on
   software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation
@@ -91,7 +92,7 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   a hidden stage stepped at 30 fps, composited with texts and encoded with mediabunny; loaded by
   `import()` on the first clip, never in the first bundle).
   `clip-format.ts`: the clip file (H.264 Main `avc1.4d0028` + AAC 48 kHz, 1080×1920) and
-  `clipSupport()` from WebCodecs alone; the share icon stays hidden (its place kept) without it.
+  `clipSupport()` from WebCodecs alone; without it Share has the link button only.
   `media-session.ts`: media keys and OS media controls. Browsers grant them only to a playing
   `<audio>`/`<video>` (Web Audio does not count; Chrome ignores media under 5 s), so a looped
   10 s silent WAV plays while Listen runs; play/pause follow the Listen button state.
@@ -111,12 +112,13 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   exact string replacement (a miss fails the build) plus `sitemap.xml` and `robots.txt`; `main.ts`
   opens the pair from the path without saving it, and `replaceState`s the path on a pair change.
   Page texts land in attributes and JSON-LD: no `&<>"\`.
-- `src/clip-share.ts` — what a clip says: top line, watermark (`crypto-tune.com/<slug>` for pair
-  pages), caption (text and link with `?utm_source=clip`), file name. Simulated markets say so.
-- `src/analytics.ts` — Umami events `listen` / `listen_10m`, `clip_support` (once per session),
-  `clip_recorded`, `clip_shared`, `clip_failed` (beacon in `index.html`, counts only on the
-  production host). No identifiers: returning listeners come from a day counter in localStorage.
-  Wired in `main.ts` around audio start/stop and the clip handlers.
+- `src/share.ts` — what sharing says: the link (pair page, or `/`, with `?utm_source=share`) and its
+  line, a clip's top line, watermark (`crypto-tune.com/<slug>` for pair pages) and file name.
+  Simulated markets say so.
+- `src/analytics.ts` — Umami events `listen` / `listen_10m`, `link_shared`, `clip_support` (once
+  per session), `clip_recorded`, `clip_shared`, `clip_failed` (beacon in `index.html`, counts only
+  on the production host). No identifiers: returning listeners come from a day counter in
+  localStorage. Wired in `main.ts` around audio start/stop and the share handlers.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 
 ## Code organization
