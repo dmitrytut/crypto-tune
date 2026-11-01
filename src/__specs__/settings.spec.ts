@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, parseSettings } from '../settings';
 
 describe('parseSettings', () => {
-  it('requires an explicit boolean opt-in for interaction sounds in saved settings', () => {
+  it('keeps a saved boolean for interaction sounds and falls back to on otherwise', () => {
     expect(parseSettings({ interactionSound: true }).interactionSound).toBe(true);
     expect(parseSettings({ interactionSound: false }).interactionSound).toBe(false);
-    for (const interactionSound of [undefined, null, 'true', 1, {}, []]) {
-      expect(parseSettings({ interactionSound }).interactionSound).toBe(false);
+    for (const interactionSound of [undefined, null, 'false', 0, {}, []]) {
+      expect(parseSettings({ interactionSound }).interactionSound).toBe(true);
     }
   });
 
