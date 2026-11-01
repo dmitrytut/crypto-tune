@@ -41,9 +41,10 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   a generator that yields between layers; `Conductor`: tick → mix, tempo, shock, event voices, on
   the graph's own context clock and transport, so live and offline share it), `engine.ts`
   (`AudioEngine`: start/stop/update, built lazily on the first user gesture over a few tasks, a
-  layer or two each, so the press stays responsive; `withHeadroom` raises live `lookAhead` while
-  a clip renders), `offline.ts` (`renderClipAudio`: a clip's music in a `Tone.OfflineContext`; the
-  global context is swapped only during the synchronous build, so live audio never sees it),
+  layer or two each, so the press stays responsive), `offline.ts` (`renderClipAudio`: a clip's
+  music in a `Tone.OfflineContext`; the global context is swapped only during the synchronous
+  build, so live audio never sees it. Never lower a running context's `lookAhead`: Tone's clock
+  then replays ticks it already ran, doubling notes),
   `mixer.ts` (layers → reverb → compressor → limiter → master),
   `base-layer.ts` (drone with chord drift + arpeggio), `ambience-layer.ts` (Eno bell loops + pulse,
   base channel), `tension-layer.ts` (sub, percussion, riser, shock swell), `events-layer.ts`

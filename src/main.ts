@@ -98,7 +98,7 @@ const analyticsPair = (s: Settings) => (s.source === 'simulator' ? 'simulator' :
 
 /**
  * A clip of the last `seconds`: the music offline, then the picture (its code and the encoder
- * load on the first clip), with live audio given more headroom meanwhile.
+ * load on the first clip).
  */
 async function makeClip(
   seconds: ClipSeconds,
@@ -113,28 +113,26 @@ async function makeClip(
   const startedAt = performance.now();
   let stage: 'audio' | 'video' = 'audio';
   try {
-    const blob = await audio.withHeadroom(async () => {
-      const sound = await renderClipAudio(w, audioParams(s), CLIP_FORMAT.sampleRate);
-      signal.throwIfAborted();
-      onProgress(CLIP_AUDIO_SHARE);
-      stage = 'video';
-      // Dynamic on purpose: the renderer and its encoder stay out of the page's first load.
-      const { renderClipVideo } = await import('./ui/scene/clip-render');
-      return renderClipVideo(
-        {
-          window: w,
-          history: replay,
-          audio: sound,
-          pair: words.pair,
-          watermark: words.watermark,
-          periodMs: s.periodMin * 60_000,
-          bigTradeUsd: s.tradeThresholdUsd,
-          liquidationUsd: s.liqThresholdUsd,
-        },
-        (done) => onProgress(CLIP_AUDIO_SHARE + (1 - CLIP_AUDIO_SHARE) * done),
-        signal,
-      );
-    });
+    const sound = await renderClipAudio(w, audioParams(s), CLIP_FORMAT.sampleRate);
+    signal.throwIfAborted();
+    onProgress(CLIP_AUDIO_SHARE);
+    stage = 'video';
+    // Dynamic on purpose: the renderer and its encoder stay out of the page's first load.
+    const { renderClipVideo } = await import('./ui/scene/clip-render');
+    const blob = await renderClipVideo(
+      {
+        window: w,
+        history: replay,
+        audio: sound,
+        pair: words.pair,
+        watermark: words.watermark,
+        periodMs: s.periodMin * 60_000,
+        bigTradeUsd: s.tradeThresholdUsd,
+        liquidationUsd: s.liqThresholdUsd,
+      },
+      (done) => onProgress(CLIP_AUDIO_SHARE + (1 - CLIP_AUDIO_SHARE) * done),
+      signal,
+    );
     clipEvents.recorded(analyticsPair(s), seconds, performance.now() - startedAt);
     return new File([blob], words.fileName, { type: 'video/mp4' });
   } catch (err) {

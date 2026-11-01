@@ -13,12 +13,6 @@ import {
 
 const FADE_OUT_SEC = 1.5;
 const TOUCH_SPACING_SEC = 0.1;
-/**
- * Live scheduling headroom while a clip renders, s (Tone's default is 0.1): building the clip's
- * graph is one synchronous task of 100–200 ms on a slow CPU, which made a live note late.
- */
-const RENDER_LOOKAHEAD_SEC = 0.3;
-
 /** @package */
 export type AudioState = 'stopped' | 'starting' | 'running';
 
@@ -132,21 +126,6 @@ export class AudioEngine {
     }
     if (next.eventsVolumeDb !== prev.eventsVolumeDb) {
       g.mixer.setLevel(g.eventsChannel, next.eventsVolumeDb);
-    }
-  }
-
-  /**
-   * Runs `work` (a clip render) with more live scheduling headroom, so its long tasks do not make
-   * live notes late; live cues sound up to RENDER_LOOKAHEAD_SEC later meanwhile.
-   */
-  async withHeadroom<T>(work: () => Promise<T>): Promise<T> {
-    const ctx = Tone.getContext();
-    const before = ctx.lookAhead;
-    ctx.lookAhead = Math.max(before, RENDER_LOOKAHEAD_SEC);
-    try {
-      return await work();
-    } finally {
-      ctx.lookAhead = before;
     }
   }
 

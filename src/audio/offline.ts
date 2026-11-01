@@ -25,6 +25,10 @@ export async function renderClipAudio(
   Tone.setContext(ctx);
   let g: Graph;
   try {
+    // shortcut: one synchronous task, ~100–200 ms at 4–6× CPU slowdown, so live audio can play
+    // one note up to ~0.1 s late on a slow phone. Raising the live lookAhead meanwhile does not
+    // help: lowering it back makes Tone's clock replay ticks it already ran (doubled notes). Build
+    // with an explicit `context` per node across tasks if `clip_recorded` shows slow renders.
     const steps = buildGraph(params);
     let step = steps.next();
     while (!step.done) step = steps.next();

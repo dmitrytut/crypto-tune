@@ -42,7 +42,7 @@ Steps: spec first (retention 35 s, readiness per length after reset, window boun
 
 **Interfaces:**
 - `graph.ts`: `AudioParams` (moved from engine), `Graph` (+ `context`), `function* buildGraph(p)` (yields between layers), `class Conductor { bpm; update(s, g, sounding); play(cues, g) }` using `g.context` time and transport; `MASTER_DB`, `FADE_IN_SEC`, `LOOKAHEAD_SEC`.
-- `engine.ts`: uses `buildGraph` with `wait(0)` per yield and `Conductor`; `withHeadroom(fn)` raises live `lookAhead` to 0.3 s while `fn` runs.
+- `engine.ts`: uses `buildGraph` with `wait(0)` per yield and `Conductor`. (A `withHeadroom` that raised live `lookAhead` during a render was dropped: lowering it back makes Tone's clock replay ticks.)
 - `offline.ts`: `renderClipAudio(w: ClipWindow, p: AudioParams, sampleRate): Promise<AudioBuffer>` — sync build under swapped global context, ticks via `ctx.setTimeout`, pre-roll trimmed.
 
 No specs (Tone files); verified by the browser smoke in Task 6.
