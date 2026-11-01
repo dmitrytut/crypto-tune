@@ -31,10 +31,11 @@ const READINESS_EVERY_MS = 1_000;
 const FLASH_MS = 1_500;
 
 /**
- * The Share dialog behind the header icon. Share link: the system share sheet on touch devices,
- * a copy elsewhere (a desktop share sheet rarely beats a paste). The clip part, where the browser
- * can encode one: pick 15 or 30 s, make the clip of the market just heard, preview it, then
- * download it or (where the browser shares files, i.e. phones) share the video. Sharing needs
+ * The Share dialog behind the header icon. First the clip part, where the browser can encode
+ * one: pick 15 or 30 s, make the clip of the market just heard, preview it, then download it or
+ * (where the browser shares files, i.e. phones) share the video. Then, after an "or", Share
+ * link: the system share sheet on touch devices, a copy elsewhere (a desktop share sheet rarely
+ * beats a paste). Sharing the video needs
  * its own press: the share sheet opens only within a user gesture, and the one that started a
  * render has expired by its end. Screen readers hear state changes only; the countdown and the
  * progress bar update quietly.

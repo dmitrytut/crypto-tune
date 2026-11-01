@@ -247,10 +247,11 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 
 ### Clips
 
-The share icon (top right, next to About) opens **Share**. **Share link** sends the pair's page
+The share icon (top right, next to About) opens **Share**. First the clip: pick 15 or 30 s,
+**Make clip**, preview, then **Download** or, where the browser shares files (phones),
+**Share video**. Under a `── or ──` divider, **Share link** sends the pair's page
 (`?utm_source=share`) to the system share sheet on touch devices and copies it elsewhere
-(`Link copied`). Under it, the clip: pick 15 or 30 s, **Make clip**, preview, then **Download** or,
-where the browser shares files (phones), **Share video**. The video goes alone: with a link beside
+(`Link copied`). The video goes alone: with a link beside
 it iOS hands most apps only the link. Nothing is recorded while you listen: the last 36 s of the live
 market (trades, liquidations, every tick's metrics and cues) stay in memory, and a clip replays
 them faster than real time. The music comes from the same layers built in an offline audio context,
@@ -398,8 +399,8 @@ sound, and Binance covers the pairs that matter.
 
 1. `pnpm test`: includes the clip buffer (readiness per length, trimming with drifting ticks, reset,
    the window), the history replay (nothing after the frame), the clip layout and share wording.
-2. `pnpm dev`, BTCUSDT: open the share icon — **Share link** copies `…/bitcoin/?utm_source=share`
-   (`Link copied` on the button), and `Preparing clip… 34 s` counts down under it.
+2. `pnpm dev`, BTCUSDT: open the share icon — `Preparing clip… 34 s` counts down; under `or`,
+   **Share link** copies `…/bitcoin/?utm_source=share` (`Link copied` on the button).
    Make a 15 s and a 30 s clip, with and without **Listen**: a few seconds each, preview plays with
    sound, **Download** saves `crypto-tune-bitcoin-<date>-<time>.mp4`.
 3. `ffprobe` on the file: H.264 Main 1080×1920 30 fps, AAC 48 kHz stereo, 15.0 or 30.0 s, `moov`

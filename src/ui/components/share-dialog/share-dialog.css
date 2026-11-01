@@ -1,20 +1,30 @@
 /* Share dialog (share-dialog.ts); the dialog shell is .modal (modal.css), lengths are .segmented. */
 @layer components {
-  /* The clip part sits under the link, set off by a rule; its own gaps match the dialog's. */
+  /* The clip part comes first; its own gaps match the dialog's. */
   .clip-section {
     display: grid;
     gap: var(--space-lg);
-    padding-top: var(--space-lg);
-    border-top: var(--border);
 
     /* The display above would otherwise beat the hidden attribute. */
     &[hidden] {
       display: none;
     }
-    & h3 {
-      margin: 0;
-      font-size: var(--font-size-md);
-      font-weight: 600;
+  }
+
+  /* ──── or ────: the clip above, the link below. */
+  .share-or {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--muted);
+
+    &::before,
+    &::after {
+      content: "";
+      flex: 1;
+      border-top: var(--border);
     }
   }
 

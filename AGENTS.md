@@ -75,11 +75,11 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   settings modal, a hint per setting from its `HELP` texts; `about/` About modal, static text in
   `index.html` so crawlers without JS read it, plus the trade legend drawn on open from
   `scene/legend.ts` (marks, captions, threshold note); `chart-tip/` tooltip for chart event markers,
-  hit-tested by `Chart.markerAt`; `share-dialog/` Share modal: one Share link button (system
-  share sheet on touch devices, a copy elsewhere) and, where clips can be encoded, the clip part:
-  length, readiness countdown, render progress, preview, Download and (where files can be shared)
-  Share video; the share sheet needs its own press and gets the file alone — iOS drops the file
-  for the link when both are passed),
+  hit-tested by `Chart.markerAt`; `share-dialog/` Share modal: where clips can be encoded, the clip
+  part first (length, readiness countdown, render progress, preview, Download and, where files can
+  be shared, Share video), then an `or` divider; one Share link button last (system share sheet
+  on touch devices, a copy elsewhere). Share video needs its own press and gets the file alone —
+  iOS drops the file for the link when both are passed),
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, off on
   software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation

@@ -248,10 +248,8 @@
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </button>
         </header>
-        <button id="share-link" class="share-btn" type="button">Share link</button>
         <!-- Shown once clip-format.ts finds the browser can encode a clip. -->
-        <section id="clip-section" class="clip-section" aria-labelledby="clip-title" hidden>
-          <h3 id="clip-title">Clip</h3>
+        <section id="clip-section" class="clip-section" aria-label="Clip" hidden>
           <p class="clip-note">The last seconds of the market, with sound.</p>
           <fieldset class="segmented" id="clip-length" aria-label="Clip length"></fieldset>
           <!-- biome-ignore lint/a11y/useMediaCaption: generative music without words; nothing to caption. -->
@@ -266,7 +264,10 @@
             <button id="clip-download" class="share-btn" type="button">Download</button>
             <button id="clip-share" class="share-btn share-btn--primary" type="button" hidden>Share video</button>
           </div>
+          <!-- Inside the clip part: with no clip, Share link stands alone and needs no "or". -->
+          <p class="share-or">or</p>
         </section>
+        <button id="share-link" class="share-btn" type="button">Share link</button>
       </form>
     </dialog>
 
