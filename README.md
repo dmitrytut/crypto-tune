@@ -259,6 +259,8 @@ a feed gap starts it over. The simulator's clips say **Simulated market**. Brows
 encode H.264 + AAC (Firefox, desktop Linux, Safari before 26) do not show the icon; Umami counts
 them (`clip_support`), and clips made, shared and failed.
 
+<img src="docs/media/clip-frame.jpg" alt="A frame of a clip made from the simulator: Simulated market, price, change, bubbles and drops, the chart and the crypto-tune.com watermark" width="270">
+
 ### Accessibility
 
 Audited for WCAG 2.2 AA: Lighthouse and axe-core, keyboard, zoom, hover and contrast checks over the
