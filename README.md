@@ -276,11 +276,17 @@ load the same `/assets/`; the old `dmitrytut.github.io/crypto-tune/` address red
 domain. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow.
 
 **Link previews and search.** Open Graph and Twitter card tags in `index.html` point at
-`public/og.jpg` (1200×630). `index.html` also carries the canonical URL and `WebApplication`
-structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-code
-`https://crypto-tune.com/`; update them if the site moves. The description appears
-three times (meta, Open Graph, JSON-LD): keep them identical. The About dialog (the ? button next to
-the gear) is static HTML on purpose: AI crawlers that skip JavaScript read what the app does from it.
+`public/og.jpg` (1200×630): a frame of the app itself, so previews show what the page looks like.
+It is a simulator sell-off captured from the dev server at 1200×630, with the simulator's start
+price set near the live BTC price for the shot only, the chip and status relabelled `BTCUSDT` and
+`Live`, and a brand badge drawn in the free top centre. The JSON-LD lists it as both `image` and
+`screenshot`, and `max-image-preview:large` lets Google show it large. `index.html` also carries
+the canonical URL and `WebApplication` structured data (JSON-LD). Crawlers need absolute URLs, so
+all of these hard-code `https://crypto-tune.com/`; update them if the site moves. The title and
+description lead with "hear and watch": the sound is what sets the app apart, the picture is what
+a preview can show. The description appears three times (meta, Open Graph, JSON-LD): keep them
+identical. The About dialog (the ? button next to the gear) is static HTML on purpose: AI crawlers
+that skip JavaScript read what the app does from it.
 
 **Pair pages.** `src/pair-pages.ts` lists twelve popular USDⓈ-M pairs (slug and symbol: all the
 app needs); their words (name, ticker, intro) are in `src/pair-page-texts.ts`, which only the

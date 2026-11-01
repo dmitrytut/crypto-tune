@@ -5,26 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#07060d" />
-    <meta name="description" content="Hear the crypto market: live trades and liquidations from any futures pair, turned into calm generative music. Free, in the browser." />
+    <meta name="description" content="Hear and watch the crypto market live: calm generative music that tightens when price jumps, buys rising as bubbles, sells falling as drops. Free, in the browser." />
+    <!-- Lets Google show the large preview image (Discover, image results). -->
+    <meta name="robots" content="max-image-preview:large" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>Crypto Tune: the market, played as sound</title>
+    <title>Crypto Tune: hear and watch the crypto market live</title>
     <!-- Query strings (?debug, share-tracking params) must not become duplicates. Pair pages
          (/bitcoin/ …) get their own canonical, title and description at build: vite.config.ts. -->
     <link rel="canonical" href="https://crypto-tune.com/" />
     <!-- Link previews (Telegram, Slack, X, Discord). Crawlers need absolute URLs. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Crypto Tune" />
-    <meta property="og:title" content="Crypto Tune: the market, played as sound" />
-    <meta property="og:description" content="Hear the crypto market: live trades and liquidations from any futures pair, turned into calm generative music. Free, in the browser." />
+    <meta property="og:title" content="Crypto Tune: hear and watch the crypto market live" />
+    <meta property="og:description" content="Hear and watch the crypto market live: calm generative music that tightens when price jumps, buys rising as bubbles, sells falling as drops. Free, in the browser." />
     <meta property="og:url" content="https://crypto-tune.com/" />
     <meta property="og:image" content="https://crypto-tune.com/og.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Crypto Tune logo and tagline over the app's aura" />
+    <meta property="og:image:alt" content="Crypto Tune on BTCUSDT in a sell-off: price, tension meter, buy bubbles and sell drops over the price chart" />
     <meta name="twitter:card" content="summary_large_image" />
     <script type="application/ld+json">
       {
@@ -32,8 +34,9 @@
         "@type": "WebApplication",
         "name": "Crypto Tune",
         "url": "https://crypto-tune.com/",
-        "description": "Hear the crypto market: live trades and liquidations from any futures pair, turned into calm generative music. Free, in the browser.",
+        "description": "Hear and watch the crypto market live: calm generative music that tightens when price jumps, buys rising as bubbles, sells falling as drops. Free, in the browser.",
         "image": "https://crypto-tune.com/og.jpg",
+        "screenshot": "https://crypto-tune.com/og.jpg",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Any",
         "browserRequirements": "Requires JavaScript and the Web Audio API",
@@ -69,7 +72,7 @@
         </div>
       </header>
       <section class="hero">
-        <h1 class="visually-hidden">Crypto Tune: the market, played as sound</h1>
+        <h1 class="visually-hidden">Crypto Tune: hear and watch the crypto market live</h1>
         <div class="price" id="price">—</div>
         <div class="change" id="change">&nbsp;</div>
 
