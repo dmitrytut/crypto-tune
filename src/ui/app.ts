@@ -20,7 +20,7 @@ import { PriceReadout } from './components/price-readout/price-readout';
 import { mountSettingsPanel } from './components/settings-panel/settings-panel';
 import { el } from './dom';
 import { FlowMeter } from './flow';
-import { durationLabel, eventLabel, usdFmt } from './format';
+import { changeLabel, durationLabel, eventLabel, priceChange, usdFmt } from './format';
 import { mountMediaKeys } from './media-session';
 import { auraTarget, CALM_AURA, css, DOWN_COLOR, isDown, UP_COLOR } from './palette';
 import { mountStage } from './scene/stage';
@@ -248,20 +248,19 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
       // Change, volume and chart cover the same period: the chosen one, or all the history
       // there is while it is shorter. While history loads, a second of live data would read as
       // "0.00% in 1s, vol $0/1s": the readouts stay blank for those few seconds instead.
-      const first = history?.prices[0];
-      if (!history || !first || Number.isNaN(s.price) || loadingHistory) {
+      const moved =
+        history && !loadingHistory
+          ? priceChange(history, s.ts, s.price, settings.periodMin * 60_000)
+          : null;
+      if (!history || !moved) {
         change.textContent = '\u00a0';
         change.className = 'change';
         vol.textContent = '—';
       } else {
-        const spanMs = Math.min(settings.periodMin * 60_000, s.ts - first.ts);
-        const span = durationLabel(spanMs);
-        const pct = (s.price / history.priceAt(s.ts - spanMs) - 1) * 100;
-        const shown = Math.abs(pct) < 0.005 ? 0 : pct;
-        const arrow = shown > 0 ? '▲ ' : shown < 0 ? '▼ ' : '';
-        change.textContent = `${arrow}${Math.abs(shown).toFixed(2)}% in ${span}`;
-        change.className = `change ${shown > 0 ? 'up' : shown < 0 ? 'down' : ''}`;
-        vol.textContent = `vol ${usdFmt.format(history.volumeUsdSince(s.ts - spanMs))}/${span}`;
+        change.textContent = changeLabel(moved);
+        change.className = `change ${moved.pct > 0 ? 'up' : moved.pct < 0 ? 'down' : ''}`;
+        const span = durationLabel(moved.spanMs);
+        vol.textContent = `vol ${usdFmt.format(history.volumeUsdSince(s.ts - moved.spanMs))}/${span}`;
       }
       paintEvent();
       meter.render(s, loadingHistory);

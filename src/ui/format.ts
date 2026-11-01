@@ -1,3 +1,5 @@
+import type { HistorySeries } from '../metrics/history';
+
 /**
  * Fraction digits that keep about six significant digits (BTC 81,298.4,
  * ETH 2,380.12, 0.560600). Chosen once per pair so the readout width never
@@ -60,4 +62,31 @@ export const usdFmt = new Intl.NumberFormat('en-US', {
  */
 export function eventLabel(kind: 'trade' | 'liquidation', side: string, usd: number): string {
   return `${kind === 'liquidation' ? 'LIQ ' : ''}${side.toUpperCase()} ${usdFmt.format(usd)}`;
+}
+
+/**
+ * Change of `price` at `ts` over `periodMs`, or over all the history there is while it is
+ * shorter; within ±0.005 % it reads as flat. Null without history or a price.
+ * @package
+ */
+export function priceChange(
+  h: HistorySeries,
+  ts: number,
+  price: number,
+  periodMs: number,
+): { pct: number; spanMs: number } | null {
+  const first = h.prices[0];
+  if (!first || Number.isNaN(price)) return null;
+  const spanMs = Math.min(periodMs, ts - first.ts);
+  const pct = (price / h.priceAt(ts - spanMs) - 1) * 100;
+  return { pct: Math.abs(pct) < 0.005 ? 0 : pct, spanMs };
+}
+
+/**
+ * `▲ 0.42% in 15m`; flat has no arrow.
+ * @package
+ */
+export function changeLabel(c: { pct: number; spanMs: number }): string {
+  const arrow = c.pct > 0 ? '▲ ' : c.pct < 0 ? '▼ ' : '';
+  return `${arrow}${Math.abs(c.pct).toFixed(2)}% in ${durationLabel(c.spanMs)}`;
 }

@@ -103,7 +103,9 @@ export class Chart {
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly reducedMotion: MediaQueryList,
+    private readonly reducedMotion: Pick<MediaQueryList, 'matches'>,
+    /** A clip draws at its own pixel ratio, on the clock of its frames; live uses the device's. */
+    private readonly opts: { pixelRatio?: number; clock?: () => number } = {},
   ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas unavailable');
@@ -122,7 +124,7 @@ export class Chart {
       // Another period is another picture, not a move: no easing into it.
       this.scale.history = null;
     }
-    const dpr = fitCanvas(canvas);
+    const dpr = fitCanvas(canvas, this.opts.pixelRatio);
     const w = canvas.clientWidth;
     const ht = canvas.clientHeight;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -192,7 +194,7 @@ export class Chart {
     hi += span * PRICE_PAD;
     // A new high or low eases the range over instead of jumping the whole line.
     const s = this.scale;
-    const wall = performance.now();
+    const wall = this.opts.clock?.() ?? performance.now();
     const snap = s.history !== h || this.reducedMotion.matches || wall - s.at > SCALE_SNAP_AFTER_MS;
     const k = snap ? 1 : 1 - Math.exp(-Math.min(wall - s.at, SCALE_MAX_STEP_MS) / SCALE_TAU_MS);
     s.lo += (lo - s.lo) * k;
@@ -278,7 +280,7 @@ export class Chart {
    */
   private drawMarkers(h: HistorySeries, now: number): boolean {
     const { ctx, view } = this;
-    const wall = performance.now();
+    const wall = this.opts.clock?.() ?? performance.now();
     const newest = h.markers.at(-1)?.ts ?? Number.NEGATIVE_INFINITY;
     if (h !== this.arrivalHistory) {
       // A new pair or freshly loaded history (its clock may differ): what is there is not news.
