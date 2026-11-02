@@ -277,7 +277,8 @@ to the address: `https://crypto-tune.com/bitcoin/?obs`.
   tension meter and the volume and last-event line stay on screen; only the controls fade after
   10 s, and the clip's watermark (`crypto-tune.com/bitcoin` on a pair page) takes their corner.
   Readouts and the trade and liquidation labels are about half again as large, read in a small
-  player. No film grain: a video encoder turns it into blocks.
+  player. No film grain: a video encoder turns it into blocks. No ⓘ beside Tension: a viewer
+  cannot hover a video (the tips in settings stay for Interact).
 - When OBS hides the source (its eye icon, a scene without it) the music stops and nothing is drawn;
   showing it starts both again.
 - Settings work as usual through OBS's **Interact** window and are remembered.
