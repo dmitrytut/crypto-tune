@@ -216,10 +216,7 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
   /** Shows the rows matching the query; highlights the current value or the best match. */
   const render = (onCurrent: boolean) => {
     // Rows outlive a render: drop the old highlight before the list changes under it.
-    for (const control of list.children[active]?.querySelectorAll('button') ?? []) {
-      control.tabIndex = -1;
-    }
-    list.children[active]?.removeAttribute('data-active');
+    highlight(-1);
     const query = search?.value.trim() ?? '';
     const of = lists.get(view);
     shown = matchOptions(
@@ -239,7 +236,6 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     selected = list.children[at] ?? null;
     selected?.setAttribute('aria-selected', 'true');
     empty.textContent = shown.length > 0 ? '' : (cfg.search?.empty ?? '');
-    active = -1;
     highlight(onCurrent && at >= 0 ? at : shown.length > 0 ? 0 : -1);
   };
 
@@ -323,17 +319,17 @@ export function mountPicker(host: HTMLElement, cfg: PickerConfig): Picker {
     const i = rowIndex(e);
     if (i >= 0 && i !== active) highlight(i);
   });
-  menu.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
+  host.addEventListener('keydown', (e) => {
+    if (menu.hidden || e.key !== 'Escape') return;
     // Inside the settings dialog Esc closes only the menu, not the dialog.
     e.preventDefault();
     e.stopPropagation();
     close(true);
   });
-  // Focus tabbing out of the menu, either way, closes it. A press on a row moves focus to
-  // nothing (relatedTarget null): that one is a pick, not a leave.
-  menu.addEventListener('focusout', (e) => {
-    if (e.relatedTarget instanceof Node && !menu.contains(e.relatedTarget)) close(false);
+  // Leaving the whole picker closes it; focus moving to its toggle must not race its click.
+  // A row press with relatedTarget null is a pick, not a leave.
+  host.addEventListener('focusout', (e) => {
+    if (e.relatedTarget instanceof Node && !host.contains(e.relatedTarget)) close(false);
   });
   list.addEventListener('mouseover', (e) => {
     const i = rowIndex(e);

@@ -53,10 +53,6 @@ export class RollingStats {
     else if (this.m2 < 0) this.m2 = 0;
   }
 
-  clear(): void {
-    this.next = this.n = this.avg = this.m2 = this.sinceRecompute = 0;
-  }
-
   private recompute(): void {
     this.sinceRecompute = 0;
     // Buffer is full here (recompute fires only after `capacity` pushes).

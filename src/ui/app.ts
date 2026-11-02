@@ -39,15 +39,16 @@ const DIRECTION_ARROW_MIN = 0.2;
 /** Chrome fades after this long without pointer or keyboard input. */
 const IDLE_MS = 10_000;
 const TITLE_EVERY_MS = 1_000;
-/** Events older than this (wall clock) are catch-up, not news: no sparks, no flow. */
+/** Events older than this are catch-up, not news: no sparks, no flow. */
 const VISUAL_MAX_AGE_MS = 2_000;
-const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
 /** The last big trade or liquidation stays readable this long, then fades out. */
 const EVENT_SHOW_MS = 60_000;
 /** Trade and liquidation labels on a stream: read in a small player, not at arm's length. */
 const STREAM_LABEL_SCALE = 1.6;
 
 export interface AppHandlers {
+  /** Current time in the events' clock, independent of metrics catch-up progress. */
+  marketNow(): number;
   /** Called with the full updated settings after any control change. */
   onSettings(next: Settings): void;
   /** Start/Stop pressed; runs inside the click so the AudioContext may start. */
@@ -130,6 +131,7 @@ export function mountApp(
   stream: StreamOptions | null = null,
 ): AppView {
   let settings = initial;
+  const fresh = (ts: number) => ts >= handlers.marketNow() - VISUAL_MAX_AGE_MS;
   const soundOnly = stream?.layout === 'audio';
   if (stream) {
     document.body.classList.add('stream', `stream-${stream.layout}`);
@@ -327,7 +329,7 @@ export function mountApp(
       }
       paintEvent();
       meter.render(s, loadingHistory);
-      aura?.setTarget(auraTarget(s, flow.read(Date.now())));
+      aura?.setTarget(auraTarget(s, flow.read(handlers.marketNow())));
       updateTitle(s);
     },
     reset(h) {
@@ -364,10 +366,15 @@ export function mountApp(
             ? 'Reconnecting…'
             : status.textContent;
       paintStream();
-      // No snapshot yet: say what the empty readout is waiting for.
-      if (!last && s.state === 'connecting') vol.textContent = 'Connecting to the market…';
-      // Connected but no snapshot yet: waiting for the first live trade.
-      if (!last && s.state === 'open') vol.textContent = 'Waiting for trades…';
+      // Before the first snapshot, the main readout must reflect failures too.
+      if (!last) {
+        vol.textContent =
+          s.state === 'open'
+            ? 'Waiting for trades…'
+            : s.state === 'connecting'
+              ? 'Connecting to the market…'
+              : outage;
+      }
     },
     setPlayback(state) {
       playback = state;

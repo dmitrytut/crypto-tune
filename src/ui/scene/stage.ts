@@ -17,7 +17,7 @@ const SHAKE_MS = 420;
 export type AuraMode = 'auto' | 'on' | 'off';
 
 export interface StageOptions {
-  /** Element liquidations burst from (its centre), tracked through resizes. */
+  /** Element liquidations burst from (its centre), tracked through resizes and scrolling. */
   origin: HTMLElement;
   reducedMotion: MediaQueryList;
   /** Trades at or above this notional get the big-trade treatment; read every frame. */
@@ -82,20 +82,19 @@ export function mountStage(o: StageOptions): Stage {
   const chartCanvas = el<HTMLCanvasElement>('chart');
   const chart = new Chart(chartCanvas, reducedMotion);
 
-  const placeOrigin = () => {
+  // The overlay is fixed; both anchors move when a short or zoomed page scrolls.
+  let chartBox = chartCanvas.getBoundingClientRect();
+  const place = () => {
     const r = o.origin.getBoundingClientRect();
     fx.setOrigin(r.left + r.width / 2, r.top + r.height / 2);
-  };
-  new ResizeObserver(placeOrigin).observe(o.origin);
-  window.addEventListener('resize', placeOrigin);
-  // Drops land on the price line; beside it, or while history is loading, they fall to the
-  // screen bottom.
-  let chartBox = chartCanvas.getBoundingClientRect();
-  const placeChart = () => {
     chartBox = chartCanvas.getBoundingClientRect();
   };
-  new ResizeObserver(placeChart).observe(chartCanvas);
-  window.addEventListener('resize', placeChart);
+  const placement = new ResizeObserver(place);
+  placement.observe(o.origin);
+  placement.observe(chartCanvas);
+  window.addEventListener('resize', place);
+  window.addEventListener('scroll', place, { passive: true });
+  // Beside the price line, or while history loads, drops fall to the screen bottom.
   fx.setFloor((x) => {
     const y = chartBox.height > 0 ? chart.lineY(x - chartBox.left) : null;
     return y === null ? null : chartBox.top + y;

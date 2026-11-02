@@ -21,7 +21,7 @@ export class Mixer {
   private readonly master = new Tone.Volume(Number.NEGATIVE_INFINITY);
 
   constructor() {
-    this.reverb.chain(this.compressor, this.limiter, this.master, Tone.getDestination());
+    this.reverb.chain(this.compressor, this.limiter, this.master.toDestination());
   }
 
   /** Resolves once the reverb impulse response is generated (it is silent before). */

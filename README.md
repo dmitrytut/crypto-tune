@@ -81,7 +81,7 @@ Native pull-to-refresh can start over controls or the chart, not over a backgrou
 Effects follow the order in which the gesture crosses the particles, not their creation order.
 A thin neutral ring acknowledges each scene press, even a miss (280 ms); a held swipe leaves a
 short fading trail (180 ms). Both use the existing overlay, with fixed storage for 128 marks.
-Enable **Settings → Sound → Interaction sounds** for quiet accents, off by default. They follow
+**Settings → Sound → Interaction sounds** controls the accents, on by default. They follow
 the Events volume and current tonic, never start Listen, and stop when you switch them off or Stop.
 
 To run it locally:
@@ -327,6 +327,21 @@ ARIA and motion. What that changed:
 Before committing: `pnpm check && pnpm test && pnpm build`. Code layout, module boundaries and
 conventions are in [`AGENTS.md`](AGENTS.md).
 
+**Repository review (2026-11-02).** History now refills a short cache left by an outage, while
+busy pairs still reuse a cache that reaches beyond the REST page budget. COIN-M contract
+loading times out instead of waiting forever. Clip replay preserves markers at its start.
+Visual freshness and flow use wall time with a fixed market-clock correction, including after
+system sleep; scrolling keeps particle impacts aligned with the chart. The aura rebuilds its
+GPU resources after context loss.
+Picker toggling, dialog drag selection, pair-page media artwork and clip readiness transitions
+are corrected. Stopped audio tracks tempo without appending transport automation.
+
+Verify with `pnpm test && pnpm build`, then `pnpm preview`: toggle the pair picker twice,
+drag About text past its edge, start Listen from `/bitcoin/`, scroll a short viewport, and
+render a clip while listening. Use `WEBGL_lose_context` to lose and restore the aura context.
+The [full review](docs/reviews/2026-11-02-repository-review.md) records reproductions, limitations
+and remaining improvement ideas.
+
 **Deploy.** Every push to `master` builds the site and publishes it to GitHub Pages
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): check, test, build, upload
 `dist/`) at the custom domain `crypto-tune.com`, set in Settings → Pages (an Actions deploy needs no
@@ -508,9 +523,9 @@ sound, and Binance covers the pairs that matter.
 4. On a fitting phone screen, swipe vertically through several particles. Pinch cancels the game
    gesture and zooms; on a short/zoomed page a vertical swipe scrolls without popping the particle
    under the first touch. A tap there pops on release; a horizontal swipe still works.
-5. Interaction sounds start off; enable them in Settings, then Listen. Dense hits make bounded quiet
-   accents; switching the option off or Stop suppresses new and scheduled accents. No sound before
-   Listen. Reduced motion clears the game effects and pending gesture.
+5. Interaction sounds start on; disable them in Settings to keep touches silent. With Listen on,
+   dense hits make bounded accents; switching the option off or Stop suppresses new and scheduled
+   accents. No sound before Listen. Reduced motion clears the game effects and pending gesture.
 6. Implementation proof: Chromium trusted mouse/touch input at 1440×900 and 390×844, a 390×400
    scrolling layout, native pinch and reduced-motion emulation; offline audio verified a cancelled
    scheduled strike is silent and the next permitted strike sounds. A synthetic dense 1500-particle

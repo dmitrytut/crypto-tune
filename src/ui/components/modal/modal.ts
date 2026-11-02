@@ -17,9 +17,13 @@ export function mountModal(id: string, openerId: string, onOpen?: () => void): M
     dialog.showModal();
     onOpen?.();
   });
+  let downOnBackdrop = false;
+  dialog.addEventListener('pointerdown', (e) => {
+    downOnBackdrop = e.target === dialog;
+  });
   dialog.addEventListener('click', (e) => {
-    // A click on the dialog element itself (not its content) is a click on the backdrop.
-    if (e.target === dialog) dialog.close();
+    // A drag from dialog content can also end with the dialog as the click target.
+    if (downOnBackdrop && e.target === dialog) dialog.close();
   });
   return { isOpen: () => dialog.open };
 }

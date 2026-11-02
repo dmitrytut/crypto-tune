@@ -103,9 +103,16 @@ export function mountShareDialog(h: ShareHandlers): ShareDialog {
     if (rendering) return;
     const r = h.readiness(seconds);
     make.disabled = !r.ready;
-    if (failed || file) return;
-    if (r.ready) say(`Ready: the last ${seconds} s.`);
-    else say('Preparing clip…', `${Math.ceil(r.leftMs / 1000)} s`);
+    if (file) return;
+    const countdown = r.ready ? '' : `${Math.ceil(r.leftMs / 1000)} s`;
+    if (failed) say('Could not make the clip.', r.ready ? '' : `Preparing clip… ${countdown}`);
+    else if (r.ready) say(`Ready: the last ${seconds} s.`);
+    else say('Preparing clip…', countdown);
+  };
+  const watchReadiness = () => {
+    window.clearInterval(timer);
+    showReadiness();
+    timer = window.setInterval(showReadiness, READINESS_EVERY_MS);
   };
 
   make.addEventListener('click', async () => {
@@ -216,9 +223,7 @@ export function mountShareDialog(h: ShareHandlers): ShareDialog {
 
   let clips = false;
   const modal = mountModal('share', 'share-open', () => {
-    if (!clips) return;
-    showReadiness();
-    timer = window.setInterval(showReadiness, READINESS_EVERY_MS);
+    if (clips) watchReadiness();
   });
   dialog.addEventListener('close', () => {
     window.clearInterval(timer);
@@ -237,6 +242,7 @@ export function mountShareDialog(h: ShareHandlers): ShareDialog {
     enableClips() {
       clips = true;
       clipSection.hidden = false;
+      if (modal.isOpen()) watchReadiness();
     },
   };
 }
