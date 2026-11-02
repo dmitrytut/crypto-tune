@@ -1,7 +1,9 @@
 import type { AuraTarget, Rgb } from '../palette';
+import type { QualityLevel } from './quality';
 
 /** Render at this fraction of the screen; the soft upscale is part of the look and keeps the GPU idle. */
 const RESOLUTION_SCALE = 0.33;
+const LITE_RESOLUTION_SCALE = 0.2;
 /** Seconds for colours / motion to settle on a new target. Short enough to feel a single trade burst. */
 const COLOR_TAU_SEC = 0.9;
 const MOTION_TAU_SEC = 0.6;
@@ -217,7 +219,8 @@ export class Aura {
     if (this.blooms.length > MAX_BLOOMS) this.blooms.shift();
   }
 
-  frame(dtSec: number): void {
+  /** `quality` lowers the backing store live; a clip always draws at full. */
+  frame(dtSec: number, quality: QualityLevel = 'full'): void {
     const dt = Math.min(dtSec, 0.1);
     const t = this.target;
     const c = this.current;
@@ -240,7 +243,7 @@ export class Aura {
     const fade = Math.exp(-BLOOM_DECAY_PER_SEC * dt);
     for (const b of this.blooms) b.strength *= fade;
     this.blooms = this.blooms.filter((b) => b.strength > 0.01);
-    this.draw();
+    this.draw(quality);
   }
 
   /** CSS px → shader space: centred, y up, unit = screen height. */
@@ -250,11 +253,12 @@ export class Aura {
     return { x: (x - w / 2) / h, y: (h / 2 - y) / h };
   }
 
-  private draw(): void {
+  private draw(quality: QualityLevel): void {
     const { gl, canvas, u, current: c } = this;
     if (!u) return;
-    const w = Math.max(1, Math.round(canvas.clientWidth * RESOLUTION_SCALE));
-    const h = Math.max(1, Math.round(canvas.clientHeight * RESOLUTION_SCALE));
+    const scale = quality === 'lite' ? LITE_RESOLUTION_SCALE : RESOLUTION_SCALE;
+    const w = Math.max(1, Math.round(canvas.clientWidth * scale));
+    const h = Math.max(1, Math.round(canvas.clientHeight * scale));
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;

@@ -47,6 +47,8 @@ looked at the chart.
   along the bottom, over the period you pick: 1m, 5m, 15m or 1h.
 - **A scene you can touch.** Tap a bubble or drop, or drag through several, for local pops and sparks.
   Optional quiet interaction sounds play only while Listen is on; no points or fake market events.
+- **Adaptive graphics.** Auto reduces visual load when the scene struggles; Full and Lite let you
+  choose. Data, chart resolution and music stay unchanged.
 - **Ready in seconds.** The live market shows the moment the socket opens. The last 30 minutes of
   trades load in the background (the pages in parallel, mostly from an IndexedDB cache on a
   reload), and tension calibrates as soon as they land instead of after a five-minute warm-up.
@@ -83,6 +85,10 @@ A thin neutral ring acknowledges each scene press, even a miss (280 ms); a held 
 short fading trail (180 ms). Both use the existing overlay, with fixed storage for 128 marks.
 **Settings → Sound → Interaction sounds** controls the accents, on by default. They follow
 the Events volume and current tonic, never start Listen, and stop when you switch them off or Stop.
+
+**Settings → Graphics** defaults to **Auto**. Choose **Full** to keep all effects or **Lite** for
+fewer particles, no particle collisions and a lower-cost animated aura. Taps and swipes still work.
+The choice is saved in this browser; reduced-motion preferences take priority over every mode.
 
 To run it locally:
 
@@ -207,12 +213,12 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   screen into a ring and droplets; a drop breaks on the price line into sparks that bounce, roll
   along the line and cool. Bigger particles throw more (2–3 for the smallest, up to 28). Trades above
   the threshold get a halo, a floating amount (`+$864K`) and a flash in the aura. In a cascade small
-  particles merge, so frames don't drop. About explains them with a legend: a bubble and a drop
+  particles merge to bound spawning work. About explains them with a legend: a bubble and a drop
   per size step and at the large trade threshold, drawn with the same sprites and sizes.
   Falling sell drops bounce off other drops; rising buy bubbles bounce off other bubbles, with
   bigger particles displacing smaller ones more. Impacts retain most of their normal speed, and
   slow contacts get a small separation kick so particles do not stick rim-to-rim. Bubble sway is
-  part of the collision velocity; residual horizontal drift fades in the air. Both groups use
+  part of the collision velocity; residual horizontal drift fades in the air. In Full, both groups use
   movement steps of at most 1/120 s and a horizontal neighbour sweep within the existing
   1,500-particle cap. Sweep bounds are frozen before contacts move particles, so a rebound cannot
   hide another pair. Bubbles and drops pass through each other; spray and sparks
@@ -221,6 +227,33 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   threshold it adds shards, a `LIQUIDATION LONG $1.2M` label and a shockwave that bends the aura; at
   10× the threshold, a light screen shake. Small liquidations leave faint rings, so you can watch a
   cascade build.
+- **Adaptive quality** measures visible-frame cadence and the scene's own JS work, not device
+  identity. After a 1 s warm-up, Auto checks 1 s windows. Two consecutive overloaded windows
+  select Lite; 20 consecutive headroom windows allow a return to Full. If Full fails again sooner
+  than that return took, the next one needs twice as long (40, 80 … windows), so a host that only
+  copes in Lite settles there instead of flipping every ~20 s; a longer stretch in Full (a passing
+  market burst on a healthy host, a clip render) restores 20, and so does picking a mode. One stall
+  is insufficient. Visibility changes reset the
+  measurement and the clock; resizing/zoom and reduced-motion changes reset only the measurement,
+  so the scene keeps moving during a resize. Neither touches the selected level. Full/Lite
+  overrides never switch automatically. No memory/core hints, startup
+  benchmark or browser-specific timing API is required.
+
+  | Budget                                     | Full               | Lite                |
+  | ------------------------------------------ | ------------------ | ------------------- |
+  | Primary particles                          | 1500               | 400                 |
+  | Spawns per frame, merging overflow by side | 120                | 40                  |
+  | Droplets / sparks, each                    | 1200               | 160                 |
+  | Detailed manual hits per frame             | 24                 | 4                   |
+  | Pop rings / impact flashes, each           | 128                | 64                  |
+  | Liquidation rings, shards and labels, each | Existing behavior  | 64                  |
+  | FX canvas DPR cap                          | 2                  | 1                   |
+  | Particle contacts                          | On                 | Off                 |
+  | Aura resolution scale / cadence            | 0.33 / every frame | 0.2 / at most 15 Hz |
+
+  Existing arrays are capped too, keeping newer particles; a queued hit still tests the last drawn
+  positions first. Overflow degrades to simpler feedback, never a delayed queue. Price, chart,
+  legend, feeds, metrics and audio keep their existing behavior and resolution.
 - **Price** uses thin tabular digits with fixed precision per pair, so the width never jumps. Only the
   digits that changed flash. Film grain sits over everything.
 - **Chart** over the same period: a smooth price line (flat stretches stay flat, the curve never
@@ -288,7 +321,7 @@ to the address: `https://crypto-tune.com/bitcoin/?obs`.
 | `obs`                  | stream mode                                                                              |
 | `layout=audio`         | sound only: a transparent page, nothing drawn                                            |
 | `aura=on` / `aura=off` | draw the aura even on software WebGL (a GPU-less server streaming the picture), or never |
-| `fps=10…60`            | cap the scene's frame rate                                                               |
+| `fps=10…60`            | cap the scene's frame rate; under 30, match OBS's rate (else Auto sees overload)         |
 | `pair=SYMBOL`          | open any pair, with or without `obs`; `market=coinm` for a COIN-M one (`BTCUSD_PERP`)    |
 
 **OBS:** Sources → **+** → **Browser**; URL `https://crypto-tune.com/bitcoin/?obs`, 1920 × 1080,
@@ -440,12 +473,45 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Stream mode**: `?obs` for OBS and TVs: music without a press where allowed, readouts that
   stay on screen at a stream size, a watermark, no grain, pause while OBS hides the source, a
   sound-only layout, `?pair=` for any pair
+- [x] **Adaptive quality**: Auto / Full / Lite, sustained-load detection, bounded Lite effects,
+  slower/lower-resolution aura and a persisted override independent of data and music
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Adaptive graphics
+
+1. `pnpm check && pnpm test && pnpm build`: policy specs cover isolated stalls, sustained overload,
+   broken streaks, recovery, its backoff after quick relapses and its reset after a healthy stretch,
+   interruptions, 30/60/120 Hz cadence, the frame cap (down and back up), overrides and settings
+   migration.
+2. While Listen runs, switch Full → Lite → Auto in Settings. Bubbles stop colliding in Lite but
+   still move, pop, splash and respond to gestures. Music continues; changing graphics does not
+   reconnect the feed or restart its history. Arrow keys select radios; reload preserves the choice.
+3. In a coherent mobile device profile, inspect the Graphics group/hint and repeat the interaction
+   checks below, including hidden Listen with reduced motion. FX DPR becomes 1 in Lite while the
+   chart retains its normal cap. Verify native scrolling on a short page and pinch zoom.
+4. Actual Auto smoke: injected 20 ms of work into the real frame path, rather than replacing the
+   controller's result. Full → Lite took about 3.05 s; after removing load it stayed Lite at 2 s and
+   returned to Full after about 21.03 s. Explicit Full survived sustained load. The same audio graph
+   kept running and the simulator did not reconnect. Reload retained Lite and the selected period.
+   With stream mode merged: `/?obs&fps=10` in Auto stays Full (FX canvas at the browser DPR) for
+   15 s idle, since only the cap's time beyond a display frame is excused; 150 ms of injected work
+   per frame still drops it to Lite within 3 s. Plain `/`: Lite after ~2 s of 50 ms frames, Full
+   again ~21 s after.
+   A resize event every frame (`dispatchEvent(new Event('resize'))` in a rAF loop) keeps particles
+   moving: no particle sprite is drawn at the previous frame's position (all were before the fix).
+5. Synthetic mixed-side 1500-particle fixture, 390×844 desktop-hosted Chromium, CPU ×4: FX-call p95
+   Full/Lite was about 18/1.2 ms at normal steps and 38.2/1.8 ms at 100 ms simulation steps. Lite
+   retained 400 primaries. The timing probe used browser DPR 1.25; separate DPR-3 device emulation
+   verified FX caps 2/1 and unchanged chart cap 2. This is not full GPU time or field CWV.
+6. Resize reset was exercised natively. Hidden/resume handlers were exercised with a simulated
+   visibility change: the managed browser keeps native visibility visible even when another owned
+   tab is foregrounded. No claim of a physical background-tab lifecycle test.
+7. Physical Safari/iOS/Android, battery/thermal behavior and field CWV still need real-device data.
 
 ### Stream mode
 

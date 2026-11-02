@@ -10,6 +10,15 @@ describe('parseSettings', () => {
     }
   });
 
+  it('preserves explicit graphics modes and migrates old or malformed settings to Auto', () => {
+    for (const graphics of ['auto', 'full', 'lite']) {
+      expect(parseSettings({ graphics }).graphics).toBe(graphics);
+    }
+    for (const graphics of [undefined, null, 'low', 'FULL', 1, true, {}, []]) {
+      expect(parseSettings({ graphics }).graphics).toBe('auto');
+    }
+  });
+
   it('reads settings stored before markets existed as USDⓈ-M', () => {
     expect(parseSettings({ symbol: 'ETHUSDT' })).toMatchObject({
       market: 'usdm',

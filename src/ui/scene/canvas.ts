@@ -1,5 +1,5 @@
-/** Backing stores beyond 2× cost fill rate without a visible gain. */
-const MAX_DPR = 2;
+/** Backing stores beyond 2× cost fill rate without a visible gain. @package */
+export const MAX_DPR = 2;
 
 /**
  * Matches the canvas backing store to its CSS size at `dpr`, by default the device pixel ratio

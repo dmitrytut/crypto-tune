@@ -1,10 +1,11 @@
 import type { LiquidationSide, TradeSide } from '../../feed/market-feed';
 import { usdFmt } from '../format';
 import { css, DOWN_COLOR, type Rgb, sideColor, UP_COLOR } from '../palette';
-import { fitCanvas } from './canvas';
+import { fitCanvas, MAX_DPR } from './canvas';
 import { type CollisionBody, CollisionSolver } from './collisions';
 import type { PointerStroke } from './interaction';
 import { popDroplets, popHeight } from './pop';
+import type { QualityLevel } from './quality';
 import { floorSparks, sparkColor } from './sparks';
 import {
   type BubbleStart,
@@ -17,10 +18,48 @@ import {
 } from './spawn';
 import { bubbleSprite, dropSprite, haloSprite } from './sprites';
 
-/** Live bubbles cap; above it the oldest are recycled. */
-const MAX_BUBBLES = 1_500;
-/** Bubbles created per frame; a burst beyond this merges into larger ones. */
-const SPAWN_BUDGET = 120;
+interface FxLimits {
+  bubbles: number;
+  spawns: number;
+  secondary: number;
+  touches: number;
+  transients: number;
+  decorations: number;
+  dpr: number;
+  collisions: boolean;
+}
+
+/** Per-kind caps; overload keeps newer particles and simpler feedback, never a replay queue. */
+const FX_LIMITS: Record<QualityLevel, FxLimits> = {
+  full: {
+    bubbles: 1_500,
+    spawns: 120,
+    secondary: 1_200,
+    touches: 24,
+    transients: 128,
+    decorations: Infinity,
+    dpr: MAX_DPR,
+    collisions: true,
+  },
+  lite: {
+    bubbles: 400,
+    spawns: 40,
+    secondary: 160,
+    touches: 4,
+    transients: 64,
+    decorations: 64,
+    dpr: 1,
+    collisions: false,
+  },
+};
+
+function keepNewest<T>(items: T[], limit: number): void {
+  const excess = items.length - limit;
+  if (excess <= 0) return;
+  items.copyWithin(0, excess);
+  items.length = limit;
+}
+
 /** Short movement steps keep ordinary fast particles from skipping contacts on a slow frame. */
 const CONTACT_STEP_SEC = 1 / 120;
 /** Horizontal motion decays in the air, 1/s, rather than drifting forever after impact. */
@@ -37,8 +76,6 @@ const LIQ_LABEL_HOLD_SEC = 1.5;
 /** Bubble pop: the torn film snaps outward over FILM_SNAP_SEC, the ring spreads over POP_SEC. */
 const FILM_SNAP_SEC = 0.12;
 const POP_SEC = 0.45;
-/** Live droplets cap: past it a cascade of whale bubbles pops with the ring only. */
-const MAX_LIVE_DROPLETS = 1_200;
 /** Droplets fall back, px/s², and slow in the air, 1/s. */
 const DROPLET_GRAVITY = 260;
 const DROPLET_DRAG = 2.4;
@@ -54,14 +91,8 @@ const SPARK_ROLL_DRAG = 21;
 /** Most a spark is lifted back onto the line in one frame (a rising stretch, a redraw), px. */
 const SPARK_CLIMB_PX = 8;
 const IMPACT_SEC = 0.15;
-/** Live sparks cap: past it a cascade of whale drops lands with the flash only. */
-const MAX_LIVE_SPARKS = 1_200;
 /** Precomputed spark colours along the cooling, so a frame builds no colour strings. */
 const SPARK_COLOR_STEPS = 16;
-/** Detailed sprays per user frame; overload degrades to rings/flashes, then removal alone. */
-const TOUCH_FX_BUDGET = 24;
-const MAX_LIVE_POPS = 128;
-const MAX_LIVE_IMPACTS = 128;
 const MAX_PARTICLE_RADIUS = bubbleRadius(SIZE_MIN_USD * 10 ** SIZE_DECADES, true);
 
 /**
@@ -166,6 +197,7 @@ interface Label {
  */
 export class Fx {
   private readonly ctx: CanvasRenderingContext2D;
+  private limits = FX_LIMITS.full;
   private readonly sprites: Record<TradeSide, HTMLCanvasElement>;
   private readonly halos: Record<TradeSide, HTMLCanvasElement>;
   private bubbles: Bubble[] = [];
@@ -206,6 +238,11 @@ export class Fx {
     this.fontFamily = getComputedStyle(canvas).fontFamily;
     this.sprites = { buy: bubbleSprite(UP_COLOR), sell: dropSprite(DOWN_COLOR) };
     this.halos = { buy: haloSprite(UP_COLOR), sell: haloSprite(DOWN_COLOR) };
+  }
+
+  setQuality(level: QualityLevel): void {
+    // Cull in frame(), after pending input has tested the last rendered positions.
+    this.limits = FX_LIMITS[level];
   }
 
   /** Where liquidations burst, CSS pixels (centre of the price). */
@@ -306,7 +343,7 @@ export class Fx {
       this.bubbles.length = alive;
       if (!tap) this.touched.sort(compareTouches);
       for (const b of this.touched) {
-        const detailed = hits++ < TOUCH_FX_BUDGET;
+        const detailed = hits++ < this.limits.touches;
         if (b.popY === null) this.splash(b, b.y, detailed);
         else this.pop(b, detailed, false);
         if (!strongest || b.r > strongest.r) strongest = b;
@@ -324,8 +361,20 @@ export class Fx {
 
   frame(dtSec: number, bigTradeUsd: number): void {
     const dt = Math.min(dtSec, 0.1);
-    const dpr = fitCanvas(this.canvas, this.pixelRatio);
+    // A clip's fixed ratio wins; live, the quality level caps the device's.
+    const dpr = fitCanvas(
+      this.canvas,
+      this.pixelRatio ?? Math.min(this.limits.dpr, window.devicePixelRatio || 1),
+    );
     this.spawn(bigTradeUsd);
+    keepNewest(this.bubbles, this.limits.bubbles);
+    keepNewest(this.sprays, this.limits.secondary);
+    keepNewest(this.sparks, this.limits.secondary);
+    keepNewest(this.pops, this.limits.transients);
+    keepNewest(this.impacts, this.limits.transients);
+    keepNewest(this.shards, this.limits.decorations);
+    keepNewest(this.rings, this.limits.decorations);
+    keepNewest(this.labels, this.limits.decorations);
     const { ctx } = this;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
@@ -349,7 +398,7 @@ export class Fx {
     if (this.queued.length === 0) return;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
-    for (const s of planSpawns(this.queued, SPAWN_BUDGET, bigTradeUsd)) {
+    for (const s of planSpawns(this.queued, this.limits.spawns, bigTradeUsd)) {
       const b = bubbleStart(s.side, s.usd, s.big, w, h, Math.random);
       const phase = Math.random() * Math.PI * 2;
       this.bubbles.push({
@@ -380,8 +429,6 @@ export class Fx {
       }
     }
     this.queued.length = 0;
-    if (this.bubbles.length > MAX_BUBBLES)
-      this.bubbles.splice(0, this.bubbles.length - MAX_BUBBLES);
   }
 
   private moveParticles(dt: number, h: number): void {
@@ -409,14 +456,17 @@ export class Fx {
         b.vy += b.ay * step;
         b.x += b.vx * step;
         b.y += b.vy * step;
+        if (!this.limits.collisions) continue;
         if (b.popY === null) {
           if (b.y < (this.floorAt(b.x) ?? h)) this.drops.push(b);
         } else {
           if (b.y > b.popY) this.rising.push(b);
         }
       }
-      this.collisions.resolve(this.drops);
-      this.collisions.resolve(this.rising);
+      if (this.limits.collisions) {
+        this.collisions.resolve(this.drops);
+        this.collisions.resolve(this.rising);
+      }
     }
     this.drops.length = 0;
     this.rising.length = 0;
@@ -454,24 +504,24 @@ export class Fx {
 
   /** A drop hits the floor like hot metal: a flash and, within the cap, sparks that skitter. */
   private splash(b: Bubble, floor: number, detailed = true): void {
-    if (this.impacts.length < MAX_LIVE_IMPACTS) {
+    if (this.impacts.length < this.limits.transients) {
       this.impacts.push({ x: b.x, y: floor, r: b.r, age: 0 });
     }
-    if (!detailed || this.sparks.length >= MAX_LIVE_SPARKS) return;
+    if (!detailed || this.sparks.length >= this.limits.secondary) return;
     for (const s of floorSparks(b.r, Math.random)) {
-      if (this.sparks.length === MAX_LIVE_SPARKS) break;
+      if (this.sparks.length === this.limits.secondary) break;
       this.sparks.push({ x: b.x, y: floor - 1, age: 0, ...s });
     }
   }
 
   /** A bubble bursts: its film snaps away, a ring spreads and, within the cap, droplets fly. */
   private pop(b: Bubble, detailed = true, market = true): void {
-    if (this.pops.length < MAX_LIVE_POPS) {
+    if (this.pops.length < this.limits.transients) {
       this.pops.push({ x: b.x, y: b.y, r: b.r, age: 0, sprite: b.sprite });
     }
-    if (detailed && this.sprays.length < MAX_LIVE_DROPLETS) {
+    if (detailed && this.sprays.length < this.limits.secondary) {
       for (const d of popDroplets(b.r, Math.random)) {
-        if (this.sprays.length === MAX_LIVE_DROPLETS) break;
+        if (this.sprays.length === this.limits.secondary) break;
         // Droplets fly off the film, so they start on the rim, heading outward.
         const k = b.r / Math.hypot(d.vx, d.vy);
         this.sprays.push({ x: b.x + d.vx * k, y: b.y + d.vy * k, age: 0, ...d });

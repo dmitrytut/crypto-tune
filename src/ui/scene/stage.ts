@@ -1,4 +1,5 @@
 import type { TradeSide } from '../../feed/market-feed';
+import type { GraphicsMode } from '../../settings';
 import { el } from '../dom';
 import { CALM_AURA } from '../palette';
 import { Aura } from './aura';
@@ -7,8 +8,10 @@ import { Fx } from './fx';
 import { GestureFeedback } from './gesture-feedback';
 import { PointerStroke } from './interaction';
 import { mountParticleInput } from './particle-input';
+import { cappedQualityParams, QualityController } from './quality';
 
 const SHAKE_MS = 420;
+const LITE_AURA_INTERVAL_SEC = 1 / 15;
 
 /**
  * `auto`: the aura on hardware WebGL only; `on`: on software WebGL too (a GPU-less server that
@@ -20,6 +23,7 @@ export interface StageOptions {
   /** Element liquidations burst from (its centre), tracked through resizes and scrolling. */
   origin: HTMLElement;
   reducedMotion: MediaQueryList;
+  graphics(): GraphicsMode;
   /** Trades at or above this notional get the big-trade treatment; read every frame. */
   bigTradeUsd(): number;
   /** Runs at the end of every animation frame, e.g. to redraw the chart. */
@@ -50,6 +54,17 @@ export interface Stage {
  */
 export function mountStage(o: StageOptions): Stage {
   const { reducedMotion } = o;
+  // The 1 ms slack keeps a 60 Hz display at 30 fps under a 30 cap instead of rounding to 20.
+  const minFrameMs = o.maxFps ? 1000 / o.maxFps - 1 : 0;
+  // The cap's interval is not overload: Auto excuses its time beyond a display frame.
+  const quality = new QualityController(o.graphics(), cappedQualityParams(minFrameMs));
+  let prevFrame: number | null = null;
+  let auraElapsed = 0;
+  const resetTiming = () => {
+    quality.reset();
+    prevFrame = null;
+    auraElapsed = 0;
+  };
   const aura = o.aura === 'off' ? null : Aura.create(el('aura'), CALM_AURA, o.aura === 'on');
   const stage = el('stage');
   const canvas = el<HTMLCanvasElement>('fx');
@@ -100,21 +115,34 @@ export function mountStage(o: StageOptions): Stage {
     return y === null ? null : chartBox.top + y;
   });
   document.addEventListener('visibilitychange', () => {
-    // No old-pair gestures or particles should burst when a hidden scene returns.
-    if (!document.hidden) clear();
+    // Never sample hidden throttling or replay old particles after returning.
+    clear();
+    resetTiming();
   });
 
-  // The 1 ms slack keeps a 60 Hz display at 30 fps under a 30 cap instead of rounding to 20.
-  const minFrameMs = o.maxFps ? 1000 / o.maxFps - 1 : 0;
-  let prevFrame = performance.now();
+  // Layout and motion changes skew a sample, not the clock: resetting time would stall a resize.
+  const resetSampling = () => quality.reset();
+  window.addEventListener('resize', resetSampling);
+  window.visualViewport?.addEventListener('resize', resetSampling);
+  reducedMotion.addEventListener('change', resetSampling);
   let raf = 0;
   const frame = (t: number) => {
     raf = requestAnimationFrame(frame);
-    if (t - prevFrame < minFrameMs) return;
-    const dt = (t - prevFrame) / 1000;
+    if (document.hidden) return;
+    if (prevFrame !== null && t - prevFrame < minFrameMs) return;
+    const start = performance.now();
+    const frameMs = prevFrame === null ? 0 : t - prevFrame;
+    const dt = frameMs / 1000;
     prevFrame = t;
-    // Reduced motion: the aura barely drifts and no particles fly.
-    aura?.frame(reducedMotion.matches ? dt * 0.1 : dt);
+    quality.setMode(o.graphics());
+    fx.setQuality(quality.level);
+    auraElapsed += dt;
+    // The 1 ms slack keeps frame-time rounding from stretching Lite's 15 Hz to every 5th frame.
+    if (quality.level === 'full' || auraElapsed >= LITE_AURA_INTERVAL_SEC - 0.001) {
+      // Reduced motion: the aura barely drifts, regardless of graphics mode.
+      aura?.frame(reducedMotion.matches ? auraElapsed * 0.1 : auraElapsed, quality.level);
+      auraElapsed = 0;
+    }
     // Keep the non-moving press acknowledgment in reduced motion, but no market particles.
     if (reducedMotion.matches) {
       stroke.cancel();
@@ -123,6 +151,7 @@ export function mountStage(o: StageOptions): Stage {
     fx.frame(dt, o.bigTradeUsd());
     feedback.draw(t);
     o.onFrame();
+    quality.sample(frameMs, performance.now() - start);
   };
   let paused = false;
   raf = requestAnimationFrame(frame);
@@ -133,11 +162,20 @@ export function mountStage(o: StageOptions): Stage {
       cancelAnimationFrame(raf);
       return;
     }
-    // The time away is not one long frame, and its particles are stale.
+    // The time away is not one long frame or a quality sample, and its particles are stale.
     clear();
-    prevFrame = performance.now();
+    resetTiming();
     raf = requestAnimationFrame(frame);
   };
 
-  return { aura, fx, chart, clear, setPaused };
+  return {
+    aura,
+    fx,
+    chart,
+    clear() {
+      clear();
+      resetTiming();
+    },
+    setPaused,
+  };
 }
