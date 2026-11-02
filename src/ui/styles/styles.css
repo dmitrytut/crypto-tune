@@ -381,6 +381,11 @@
       --font-size-sm: 19px;
       --font-size-md: 21px;
       --font-size-lg: 24px;
+
+      /* The ⓘ invites a hover nobody watching a video can make; the label stays. */
+      & .hint-btn .icon {
+        display: none;
+      }
     }
   }
   .stream-pair {
