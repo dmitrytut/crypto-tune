@@ -10,6 +10,12 @@ import { mountParticleInput } from './particle-input';
 
 const SHAKE_MS = 420;
 
+/**
+ * `auto`: the aura on hardware WebGL only; `on`: on software WebGL too (a GPU-less server that
+ * streams the picture, where the CPU is there for it); `off`: never.
+ */
+export type AuraMode = 'auto' | 'on' | 'off';
+
 export interface StageOptions {
   /** Element liquidations burst from (its centre), tracked through resizes. */
   origin: HTMLElement;
@@ -20,6 +26,13 @@ export interface StageOptions {
   onFrame(): void;
   /** A manual particle hit, independent of market cues. */
   onParticleTouch(side: TradeSide, strength: number): void;
+  aura: AuraMode;
+  /** Frame-rate cap; null: every display frame. */
+  maxFps: number | null;
+  /** Text size multiplier for trade and liquidation labels. */
+  labelScale: number;
+  /** Start without drawing (stream mode, sound only). */
+  paused: boolean;
 }
 
 /** The visual layers: WebGL aura (null without hardware WebGL), event overlay and history chart. */
@@ -29,6 +42,8 @@ export interface Stage {
   chart: Chart;
   /** Erases both queued input and the old scene before a new pipeline begins. */
   clear(): void;
+  /** Stops or restarts the animation loop; the scene restarts empty. */
+  setPaused(paused: boolean): void;
 }
 
 /**
@@ -37,7 +52,7 @@ export interface Stage {
  */
 export function mountStage(o: StageOptions): Stage {
   const { reducedMotion } = o;
-  const aura = Aura.create(el('aura'), CALM_AURA);
+  const aura = o.aura === 'off' ? null : Aura.create(el('aura'), CALM_AURA, o.aura === 'on');
   const stage = el('stage');
   const canvas = el<HTMLCanvasElement>('fx');
   const stroke = new PointerStroke();
@@ -61,6 +76,7 @@ export function mountStage(o: StageOptions): Stage {
       );
     },
   });
+  fx.labelScale = o.labelScale;
   const clear = () => {
     cancelInput();
     fx.clear();
@@ -91,8 +107,13 @@ export function mountStage(o: StageOptions): Stage {
     if (!document.hidden) clear();
   });
 
+  // The 1 ms slack keeps a 60 Hz display at 30 fps under a 30 cap instead of rounding to 20.
+  const minFrameMs = o.maxFps ? 1000 / o.maxFps - 1 : 0;
   let prevFrame = performance.now();
+  let raf = 0;
   const frame = (t: number) => {
+    raf = requestAnimationFrame(frame);
+    if (t - prevFrame < minFrameMs) return;
     const dt = (t - prevFrame) / 1000;
     prevFrame = t;
     // Reduced motion: the aura barely drifts and no particles fly.
@@ -105,9 +126,21 @@ export function mountStage(o: StageOptions): Stage {
     fx.frame(dt, o.bigTradeUsd());
     feedback.draw(t);
     o.onFrame();
-    requestAnimationFrame(frame);
   };
-  requestAnimationFrame(frame);
+  let paused = o.paused;
+  if (!paused) raf = requestAnimationFrame(frame);
+  const setPaused = (next: boolean) => {
+    if (next === paused) return;
+    paused = next;
+    if (paused) {
+      cancelAnimationFrame(raf);
+      return;
+    }
+    // The time away is not one long frame, and its particles are stale.
+    clear();
+    prevFrame = performance.now();
+    raf = requestAnimationFrame(frame);
+  };
 
-  return { aura, fx, chart, clear };
+  return { aura, fx, chart, clear, setPaused };
 }

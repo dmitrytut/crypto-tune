@@ -15,6 +15,11 @@
  *   took, the speed on phones.
  * - `clip_shared` { pair, method }: the video sent to the share sheet or downloaded.
  * - `clip_failed` { stage, reason }: making or sharing a clip broke.
+ * - `stream_start` { pair, layout }: stream mode (`?obs`) started its music: on load in OBS, on a
+ *   press elsewhere, or when OBS shows the source again. Stream mode sends no `listen`: a
+ *   broadcast is not a daily listener.
+ * - `stream_hour` { pair }: every hour the stream's music keeps running, so the hours on air add
+ *   up; the pair is the one it started with.
  */
 declare global {
   interface Window {
@@ -24,6 +29,7 @@ declare global {
 }
 
 const ENGAGED_MS = 10 * 60_000;
+const STREAM_HOUR_MS = 60 * 60_000;
 const KEY = 'crypto-tune.listen-days.v1';
 
 /** The part of `Storage` the day counter needs; specs pass an in-memory one. */
@@ -84,6 +90,26 @@ export class ListenTracker {
 
   stopped(): void {
     window.clearTimeout(this.engagedTimer);
+  }
+}
+
+export class StreamTracker {
+  private hourTimer = 0;
+
+  started(pair: string, layout: string): void {
+    // In OBS the music starts on load, possibly before the deferred Umami script has run.
+    const send = () => window.umami?.track('stream_start', { pair, layout });
+    if (window.umami || document.readyState === 'complete') send();
+    else window.addEventListener('load', send, { once: true });
+    window.clearInterval(this.hourTimer);
+    this.hourTimer = window.setInterval(
+      () => window.umami?.track('stream_hour', { pair }),
+      STREAM_HOUR_MS,
+    );
+  }
+
+  stopped(): void {
+    window.clearInterval(this.hourTimer);
   }
 }
 

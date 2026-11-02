@@ -17,9 +17,10 @@ const TOUCH_SPACING_SEC = 0.1;
 export type AudioState = 'stopped' | 'starting' | 'running';
 
 /**
- * Owns the Tone.js graph. Built lazily on the first start(), which must run
- * inside a user gesture (browser autoplay policy). Stop fades out and keeps
- * the graph for the next start.
+ * Owns the Tone.js graph. Built lazily on the first start(), which must run inside a user
+ * gesture (browser autoplay policy) unless the page may autoplay (an OBS browser source). A
+ * start without one waits for resume() from a press. Stop fades out and keeps the graph for the
+ * next start.
  */
 export class AudioEngine {
   private graph: Graph | null = null;
@@ -33,6 +34,16 @@ export class AudioEngine {
 
   get current(): AudioState {
     return this.state;
+  }
+
+  /** A start the autoplay policy holds: the context waits for resume() from a press. */
+  get blocked(): boolean {
+    return this.state === 'starting' && Tone.getContext().state !== 'running';
+  }
+
+  /** Call inside a press: lets a blocked start go on (its pending resume settles too). */
+  resume(): void {
+    void Tone.start();
   }
 
   async start(): Promise<void> {

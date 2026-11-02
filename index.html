@@ -77,6 +77,8 @@
       </header>
       <section class="hero">
         <h1 class="visually-hidden">Crypto Tune: hear and watch the crypto market live</h1>
+        <!-- Stream mode (?obs) names the pair here: the picker fades with the controls. -->
+        <div class="stream-pair" id="stream-pair" hidden></div>
         <div class="price" id="price">—</div>
         <div class="change" id="change">&nbsp;</div>
 
@@ -111,6 +113,8 @@
         <span class="chart-tip-when"></span>
       </div>
     </main>
+    <!-- Stream mode: where the broadcast comes from. Text, not a link: nobody clicks a video. -->
+    <div class="stream-mark" id="stream-mark" aria-hidden="true" hidden>crypto-tune.com</div>
 
     <dialog id="settings" class="modal settings" aria-labelledby="settings-title">
       <form method="dialog" class="modal-body">

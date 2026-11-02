@@ -1,4 +1,4 @@
-import { ListenTracker, ShareTracker } from './analytics';
+import { ListenTracker, ShareTracker, StreamTracker } from './analytics';
 import { AudioEngine } from './audio/engine';
 import type { AudioParams } from './audio/graph';
 import { renderClipAudio } from './audio/offline';
@@ -19,20 +19,24 @@ import { MarketHistory } from './metrics/history';
 import { pagePath, pairPageAt, pairPageOf } from './pair-pages';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { shareTexts } from './share';
+import { dropPairParams, pairParamOf, streamOptionsOf } from './stream';
 import { mountApp } from './ui/app';
 import { CLIP_FORMAT, clipSupport } from './ui/clip-format';
 
+const params = new URLSearchParams(location.search);
+/** Stream mode (`?obs`): OBS, a TV; null on the ordinary page. */
+const stream = streamOptionsOf(params);
 const stored = loadSettings();
-/** A pair page (/bitcoin/) plays its pair over the stored one. */
+/** A pair the address names (`?pair=`, or a pair page like /bitcoin/) plays over the stored one. */
 const landing = pairPageAt(location.pathname);
-let settings: Settings = landing
-  ? { ...stored, source: 'live', market: 'usdm', symbol: landing.symbol }
-  : stored;
+const opened =
+  pairParamOf(params) ?? (landing ? { market: 'usdm' as const, symbol: landing.symbol } : null);
+let settings: Settings = opened ? { ...stored, source: 'live', ...opened } : stored;
 /**
- * The pair to save while the page's pair plays: the user's own, until they pick one. Coming in by
- * a link and turning the volume down must not replace the pair `/` opens.
+ * The pair to save while the address's pair plays: the user's own, until they pick one. Coming in
+ * by a link and turning the volume down must not replace the pair `/` opens.
  */
-let savedPair: Pick<Settings, 'source' | 'market' | 'symbol'> | null = landing
+let savedPair: Pick<Settings, 'source' | 'market' | 'symbol'> | null = opened
   ? { source: stored.source, market: stored.market, symbol: stored.symbol }
   : null;
 let feed: MarketFeed | null = null;
@@ -76,15 +80,19 @@ const metricsEngine = (s: Settings) =>
 function syncPath(s: Settings): void {
   const page = s.source === 'live' && s.market === 'usdm' ? pairPageOf(s.symbol) : undefined;
   const path = pagePath(page);
-  if (path !== location.pathname) {
+  if (path !== location.pathname || dropPairParams(location.search) !== location.search) {
     // `window.`: the module's `history` is the chart's MarketHistory.
-    window.history.replaceState(window.history.state, '', path + location.search + location.hash);
+    const search = dropPairParams(location.search);
+    window.history.replaceState(window.history.state, '', path + search + location.hash);
   }
 }
 
 const audio = new AudioEngine(audioParams(settings));
 const listens = new ListenTracker();
+const streams = new StreamTracker();
 const shares = new ShareTracker();
+/** How long a start may take before it counts as held by the autoplay policy. */
+const AUTOPLAY_CHECK_MS = 1_000;
 /** The live market of the last seconds, for clips; one per pipeline, emptied by feed gaps. */
 const clips = new ClipBuffer();
 /** Site origin for clip links: the canonical link is the one place it is written. */
@@ -95,6 +103,33 @@ const CLIP_AUDIO_SHARE = 0.4;
 
 /** Pair as analytics name it: an exchange symbol, or `simulator`. */
 const analyticsPair = (s: Settings) => (s.source === 'simulator' ? 'simulator' : s.symbol);
+
+function startAudio(): void {
+  view.setPlayback('starting');
+  audio.start().then(
+    () => {
+      view.setPlayback('running');
+      if (stream) streams.started(analyticsPair(settings), stream.layout);
+      else listens.started(analyticsPair(settings));
+    },
+    (err: unknown) => {
+      console.error('Audio failed to start', err);
+      view.setPlayback('stopped');
+    },
+  );
+  // Without a press only an autoplaying page (OBS) gets sound; elsewhere Listen is the press.
+  window.setTimeout(() => {
+    if (audio.blocked) view.setPlayback('blocked');
+  }, AUTOPLAY_CHECK_MS);
+}
+
+function stopAudio(): void {
+  if (audio.current !== 'running') return;
+  audio.stop();
+  listens.stopped();
+  streams.stopped();
+  view.setPlayback('stopped');
+}
 
 /**
  * A clip of the last `seconds`: the music offline, then the picture (its code and the encoder
@@ -142,54 +177,46 @@ async function makeClip(
     throw err;
   }
 }
-const view = mountApp(settings, {
-  onSettings(next) {
-    const prev = settings;
-    settings = next;
-    const pairChanged =
-      next.source !== prev.source || next.market !== prev.market || next.symbol !== prev.symbol;
-    if (pairChanged) savedPair = null;
-    if (pairChanged || next.windowSec !== prev.windowSec) {
-      startPipeline();
-      syncPath(next);
-    } else if (next.sensitivity !== prev.sensitivity) {
-      engine?.setTensionParams(tensionParams(next));
-    }
-    audio.setParams(audioParams(next));
-    events?.setThresholds(eventThresholds(next));
-    saveSettings(savedPair ? { ...next, ...savedPair } : next);
+
+const view = mountApp(
+  settings,
+  {
+    onSettings(next) {
+      const prev = settings;
+      settings = next;
+      const pairChanged =
+        next.source !== prev.source || next.market !== prev.market || next.symbol !== prev.symbol;
+      if (pairChanged) savedPair = null;
+      if (pairChanged || next.windowSec !== prev.windowSec) {
+        startPipeline();
+        syncPath(next);
+      } else if (next.sensitivity !== prev.sensitivity) {
+        engine?.setTensionParams(tensionParams(next));
+      }
+      audio.setParams(audioParams(next));
+      events?.setThresholds(eventThresholds(next));
+      saveSettings(savedPair ? { ...next, ...savedPair } : next);
+    },
+    onParticleTouch(side, strength) {
+      audio.touch(side, strength);
+    },
+    share: {
+      link: () => shareTexts(site, settings, new Date()).link,
+      onLinkShared: (method) => shares.linkShared(analyticsPair(settings), method),
+      readiness: (seconds) => clips.readiness(seconds),
+      make: makeClip,
+      onClipShared: (method) => shares.clipShared(analyticsPair(settings), method),
+      onClipShareFailed: (reason) => shares.clipFailed('share', reason),
+    },
+    onToggleAudio() {
+      if (audio.current === 'running') stopAudio();
+      // A start the autoplay policy holds: this press is the gesture it waits for.
+      else if (audio.current === 'starting') audio.resume();
+      else startAudio();
+    },
   },
-  onParticleTouch(side, strength) {
-    audio.touch(side, strength);
-  },
-  share: {
-    link: () => shareTexts(site, settings, new Date()).link,
-    onLinkShared: (method) => shares.linkShared(analyticsPair(settings), method),
-    readiness: (seconds) => clips.readiness(seconds),
-    make: makeClip,
-    onClipShared: (method) => shares.clipShared(analyticsPair(settings), method),
-    onClipShareFailed: (reason) => shares.clipFailed('share', reason),
-  },
-  onToggleAudio() {
-    if (audio.current === 'running') {
-      audio.stop();
-      listens.stopped();
-      view.setPlayback('stopped');
-      return;
-    }
-    view.setPlayback('starting');
-    audio.start().then(
-      () => {
-        view.setPlayback('running');
-        listens.started(analyticsPair(settings));
-      },
-      (err: unknown) => {
-        console.error('Audio failed to start', err);
-        view.setPlayback('stopped');
-      },
-    );
-  },
-});
+  stream,
+);
 
 /** Feeds fetch this much history in the background: exactly the window the tension statistics need. */
 const HISTORY_MS = DEFAULT_METRICS_CONFIG.statsWindowMin * 60_000;
@@ -306,3 +333,14 @@ void clipSupport().then((support) => {
   if (document.readyState === 'complete') report();
   else window.addEventListener('load', report, { once: true });
 });
+
+if (stream) {
+  startAudio();
+  // OBS hides a source with its eye icon or a scene switch: no drawing, no music until it is back.
+  window.addEventListener('obsSourceVisibleChanged', (e) => {
+    const { visible } = (e as CustomEvent<{ visible: boolean }>).detail;
+    view.setSourceVisible(visible);
+    if (!visible) stopAudio();
+    else if (audio.current === 'stopped') startAudio();
+  });
+}

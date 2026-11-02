@@ -176,13 +176,18 @@ export class Aura {
     };
   }
 
-  static create(canvas: HTMLCanvasElement, initial: AuraTarget): Aura | null {
+  /** `allowSoftware`: draw on a software renderer too, for a machine that has the CPU to spare. */
+  static create(
+    canvas: HTMLCanvasElement,
+    initial: AuraTarget,
+    allowSoftware = false,
+  ): Aura | null {
     // A software renderer (no GPU or a blocklisted one; Chrome falls back to SwiftShader) draws
     // this shader on the CPU: tens of ms every frame, competing with audio. Plain background then.
     const gl = canvas.getContext('webgl', {
       antialias: false,
       alpha: false,
-      failIfMajorPerformanceCaveat: true,
+      failIfMajorPerformanceCaveat: !allowSoftware,
     });
     if (!gl) return null;
     const program = link(gl);

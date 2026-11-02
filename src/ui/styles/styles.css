@@ -366,6 +366,63 @@
       margin-inline: calc(-1 * var(--gutter));
     }
   }
+
+  /* ── stream mode (?obs): a broadcast seen in a small player ── */
+  body.stream {
+    /* Grain is fine noise: the worst case for a video encoder, which turns it into blocks. */
+    &::after {
+      content: none;
+    }
+
+    /* The text scale one size up the whole hero: the readouts stay legible after scaling down. */
+    & .hero {
+      width: min(760px, 100%);
+      --font-size-xs: 17px;
+      --font-size-sm: 19px;
+      --font-size-md: 21px;
+      --font-size-lg: 24px;
+    }
+  }
+  .stream-pair {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-shadow: var(--text-shadow-legible);
+  }
+  /* In the corner the controls use: shown while they are faded out. */
+  .stream-mark {
+    position: fixed;
+    top: 20px;
+    right: var(--gutter);
+    z-index: var(--z-stage);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgb(255 255 255 / 0.55);
+    text-shadow: var(--text-shadow-legible);
+    pointer-events: none;
+    transition: opacity var(--duration-fade) ease;
+
+    body:not(.idle) & {
+      opacity: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+  /* Sound only: nothing drawn, a transparent page; Listen shows only when a press must start it. */
+  :root:has(body.stream-audio),
+  body.stream-audio {
+    background: transparent;
+  }
+  body.stream-audio {
+    & :is(#aura, #fx, .top, .chart, .stream-mark),
+    & .hero > :not(.play),
+    & .play:not([data-state="blocked"]) {
+      display: none;
+    }
+  }
 }
 
 @layer utilities {

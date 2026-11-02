@@ -267,6 +267,35 @@ them (`clip_support`), links shared (`link_shared`), and clips made, shared and 
 
 <img src="docs/media/clip-frame.jpg" alt="A frame of a clip made from the simulator: Simulated market, price, change, bubbles and drops, the chart and the crypto-tune.com watermark" width="270">
 
+### Stream mode
+
+For a broadcast (an OBS browser source on Twitch or YouTube) or a screen nobody touches, add `?obs`
+to the address: `https://crypto-tune.com/bitcoin/?obs`.
+- The music starts by itself where the browser allows it: OBS does (its browser autoplays). An
+  ordinary browser holds it until a press, so Listen stays on screen and one press starts it.
+- The pair (`BTCUSDT · Binance Futures`, or the outage, `· Reconnecting…`), the tension meter and
+  the volume and last-event line stay on screen; only the controls fade after 10 s, and
+  `crypto-tune.com` takes their corner. Readouts and the trade and liquidation labels are a size
+  larger, read in a small player. No film grain: a video encoder turns it into blocks.
+- When OBS hides the source (its eye icon, a scene without it) the music stops and nothing is drawn;
+  showing it starts both again.
+- Settings work as usual through OBS's **Interact** window and are remembered.
+
+| Parameter              | Effect                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| `obs`                  | stream mode                                                                              |
+| `layout=audio`         | sound only: a transparent page, nothing drawn                                            |
+| `aura=on` / `aura=off` | draw the aura even on software WebGL (a GPU-less server streaming the picture), or never |
+| `fps=10…60`            | cap the scene's frame rate                                                               |
+| `pair=SYMBOL`          | open any pair, with or without `obs`; `market=coinm` for a COIN-M one (`BTCUSD_PERP`)    |
+
+**OBS:** Sources → **+** → **Browser**; URL `https://crypto-tune.com/bitcoin/?obs`, 1920 × 1080,
+**Control audio via OBS** checked (the sound goes to the OBS mixer); keep Settings → Advanced →
+Sources → _Enable Browser Source Hardware Acceleration_ on, or the aura is off. Stream at 30 fps.
+
+In stream mode the music sends `stream_start` and `stream_hour` instead of `listen`: a broadcast is
+not a daily listener.
+
 ### Accessibility
 
 Audited for WCAG 2.2 AA: Lighthouse and axe-core, keyboard, zoom, hover and contrast checks over the
@@ -335,12 +364,15 @@ visible content.
 
 **Analytics.** Umami Cloud (EU region, cookieless, no consent banner): the beacon at the end of
 `index.html`, counting only on `crypto-tune.com`. Visits, referrers and countries are in the Umami
-dashboard. `src/analytics.ts` sends two events:
+dashboard. `src/analytics.ts` sends these listening events (clip events are under Clips, stream
+events under Stream mode):
 
-| Event        | When                                                               | Data                                                                                            |
-| ------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `listen`     | audio starts (button, media key)                                   | `pair` (symbol or `simulator`), `days`: distinct days this browser has listened, today included |
-| `listen_10m` | 10 minutes without a stop since the last start, once per page load | `pair` as it was at that start                                                                  |
+| Event          | When                                                                                | Data                                                                                            |
+| -------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `listen`       | audio starts (button, media key)                                                    | `pair` (symbol or `simulator`), `days`: distinct days this browser has listened, today included |
+| `listen_10m`   | 10 minutes without a stop since the last start, once per page load                  | `pair` as it was at that start                                                                  |
+| `stream_start` | stream mode started its music: on load, on a press, or OBS showing the source again | `pair`, `layout` (`full` or `audio`)                                                            |
+| `stream_hour`  | every hour the stream's music keeps running                                         | `pair` as it was at that start                                                                  |
 
 Daily listeners are the unique visitors of `listen` per day; returning listeners are those with
 `days` ≥ 2. Nothing identifies a visitor: `days` is a counter in localStorage. A stop resets the
@@ -388,12 +420,31 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
   without a physics dependency
 - [x] **Clips**: the last 15 or 30 s as a vertical mp4 with sound and a watermark, rendered offline
   from the live data; share or download
+- [x] **Stream mode**: `?obs` for OBS and TVs: music without a press where allowed, readouts that
+  stay on screen at a stream size, a watermark, no grain, pause while OBS hides the source, a
+  sound-only layout, `?pair=` for any pair
 
 Replay (record and play back) and a MEXC adapter were dropped: the simulator is enough for tuning the
 sound, and Binance covers the pairs that matter.
 
 <details>
 <summary><b>Manual checks per stage</b></summary>
+
+### Stream mode
+
+1. `pnpm test`: includes the address parameters (defaults, unknown values, the frame cap's range,
+   pair and market, dropping the pair on a pick).
+2. `pnpm build && pnpm preview --host 127.0.0.1`, open `/bitcoin/?obs` in Chromium started with
+   `--autoplay-policy=no-user-gesture-required` (what OBS runs): the music plays with no press;
+   after 10 s the controls fade, the pair line, meter and volume line stay, `crypto-tune.com` shows
+   top right; no grain.
+3. In the console: `dispatchEvent(new CustomEvent('obsSourceVisibleChanged', {detail: {visible:
+   false}}))`: Listen reads Listen again and the scene stops; `visible: true` starts both again.
+4. `/?obs&layout=audio&pair=ethusdt`: an empty transparent page, ETHUSDT playing (tab title).
+5. In an ordinary browser, `/?obs`: Listen stays; one press starts the music. Pick another pair:
+   `pair=` leaves the address, `obs` stays.
+6. OBS: a browser source on `/bitcoin/?obs`, then Start Streaming: picture and sound with no
+   Interact click; hide and show the source with the eye icon.
 
 ### Clips
 
