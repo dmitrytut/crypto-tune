@@ -300,7 +300,7 @@ describe('BinanceFuturesFeed history', () => {
 
   it('restores the cache and fetches only the gap after it', async () => {
     const rest = stubRest(5002);
-    const cache = Array.from({ length: 991 }, (_, i) => cachedRow(4000 + i));
+    const cache = Array.from({ length: 1791 }, (_, i) => cachedRow(3200 + i));
     const { feed, histories, history, ws } = connect({
       load: async () => cache,
       save: async () => {},
@@ -309,10 +309,49 @@ describe('BinanceFuturesFeed history', () => {
     await vi.waitFor(() => expect(histories).toHaveLength(1));
 
     expect(rest).toHaveBeenCalledTimes(1);
-    expect(history()[0]).toBe(4000);
+    expect(history()[0]).toBe(3202);
     expect(history().at(-1)).toBe(5000);
     contiguous(history());
     feed.disconnect();
+  });
+
+  it('refills history when a reconnect left only a short cached run', async () => {
+    stubRest(5002);
+    const cache = Array.from({ length: 90 }, (_, i) => cachedRow(4910 + i));
+    const { feed, histories, history, ws } = connect({
+      load: async () => cache,
+      save: async () => {},
+    });
+    try {
+      ws.live(5001);
+      await vi.waitFor(() => expect(histories).toHaveLength(1));
+      expect(history()[0]).toBeLessThanOrEqual(5001 - 1800);
+      expect(history().at(-1)).toBe(5000);
+      contiguous(history());
+    } finally {
+      feed.disconnect();
+    }
+  });
+
+  it('keeps a busy-pair cache that already reaches beyond the capped REST wave', async () => {
+    const rest = stubBusyRest();
+    const cache = Array.from({ length: 20_000 }, (_, i) => ({
+      ...cachedRow(980_000 + i),
+      ts: at(4999),
+    }));
+    const { feed, histories, ws } = connect({
+      load: async () => cache,
+      save: async () => {},
+    });
+    try {
+      ws.live(1_001_000, at(5001));
+      await vi.waitFor(() => expect(histories).toHaveLength(1));
+      expect(rest).toHaveBeenCalledTimes(1);
+      expect(histories[0]?.[0]?.ts).toBe(at(4999));
+      expect(histories[0]).toHaveLength(21_000);
+    } finally {
+      feed.disconnect();
+    }
   });
 
   it('drops a cache the capped wave could not reach, rather than leave a hole', async () => {
@@ -441,6 +480,31 @@ describe('BinanceFuturesFeed history', () => {
       feed.connect();
       return { feed, trades, statuses };
     }
+
+    it('reports an error when contract specs stall instead of connecting forever', async () => {
+      vi.useFakeTimers();
+      vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), ms);
+        return controller.signal;
+      });
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.stubGlobal('fetch', (_url: string, { signal }: { signal: AbortSignal }) => {
+        const { promise, reject } = Promise.withResolvers<Response>();
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        return promise;
+      });
+      const { feed, statuses } = coinM('BTCUSD_PERP');
+      try {
+        await vi.advanceTimersByTimeAsync(15_000);
+        expect(statuses.at(-1)).toBe('error');
+        expect(FakeWebSocket.last).toBeNull();
+      } finally {
+        feed.disconnect();
+        vi.restoreAllMocks();
+        vi.useRealTimers();
+      }
+    });
 
     it('opens the stream once contract specs arrive, and reports base quantity', async () => {
       const specs = Promise.withResolvers<unknown>();

@@ -1,0 +1,94 @@
+/* Share dialog (share-dialog.ts); the dialog shell is .modal (modal.css), lengths are .segmented. */
+@layer components {
+  /* The clip part comes first; its own gaps match the dialog's. */
+  .clip-section {
+    display: grid;
+    gap: var(--space-lg);
+
+    /* The display above would otherwise beat the hidden attribute. */
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  /* ──── or ────: the clip above, the link below. */
+  .share-or {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--muted);
+
+    &::before,
+    &::after {
+      content: "";
+      flex: 1;
+      border-top: var(--border);
+    }
+  }
+
+  .clip-note,
+  .clip-status {
+    margin: 0;
+    font-size: var(--font-size-md);
+    color: var(--muted);
+  }
+  .clip-progress {
+    display: block;
+    width: 100%;
+    accent-color: var(--text);
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .clip-preview {
+    justify-self: center;
+    /* 9:16, short enough that the actions stay on a phone screen. */
+    height: min(48vh, 360px);
+    aspect-ratio: 9 / 16;
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+  }
+
+  .share-actions {
+    display: flex;
+    gap: var(--space-sm);
+
+    &[hidden] {
+      display: none;
+    }
+  }
+  .share-btn {
+    flex: 1;
+    height: 44px;
+    border: var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--surface-strong);
+    }
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+  /* The action once the clip exists: brighter, but not the accent (that is Listen's). */
+  .share-btn--primary {
+    background: var(--text);
+    color: var(--bg);
+
+    &:hover:not(:disabled) {
+      background: var(--text);
+      opacity: 0.9;
+    }
+  }
+}

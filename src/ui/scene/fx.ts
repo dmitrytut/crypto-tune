@@ -223,10 +223,14 @@ export class Fx {
   private origin = { x: 0, y: 0 };
   /** The page font stack (--font-sans), inherited by the canvas: one source for CSS and labels. */
   private readonly fontFamily: string;
+  /** Text size multiplier for trade and liquidation labels (larger on a stream). */
+  labelScale = 1;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly hooks: FxHooks,
+    /** Fixed backing-store ratio (a clip); by default the device's. */
+    private readonly pixelRatio?: number,
   ) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas unavailable');
@@ -357,7 +361,11 @@ export class Fx {
 
   frame(dtSec: number, bigTradeUsd: number): void {
     const dt = Math.min(dtSec, 0.1);
-    const dpr = fitCanvas(this.canvas, this.limits.dpr);
+    // A clip's fixed ratio wins; live, the quality level caps the device's.
+    const dpr = fitCanvas(
+      this.canvas,
+      this.pixelRatio ?? Math.min(this.limits.dpr, window.devicePixelRatio || 1),
+    );
     this.spawn(bigTradeUsd);
     keepNewest(this.bubbles, this.limits.bubbles);
     keepNewest(this.sprays, this.limits.secondary);
@@ -674,7 +682,7 @@ export class Fx {
       const t = l.age / l.life;
       const fade = l.age < l.hold ? 1 : 1 - (l.age - l.hold) / (l.life - l.hold);
       ctx.globalAlpha = Math.min(1, l.age / 0.15) * fade ** 1.5;
-      ctx.font = `700 ${l.size}px ${this.fontFamily}`;
+      ctx.font = `700 ${l.size * this.labelScale}px ${this.fontFamily}`;
       // Side-coloured text over a neutral dark scrim: readable on any aura, no glow.
       ctx.fillStyle = css(l.color, 1);
       ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';

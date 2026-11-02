@@ -31,6 +31,21 @@ export const DEFAULT_QUALITY_PARAMS: QualityParams = {
   recoverWindows: 20,
 };
 
+/**
+ * Thresholds for a scene capped to frames of at least `minFrameMs`: frame times count only
+ * beyond the cap, so a 10 fps stream is not taken for overload. @package
+ */
+export function cappedQualityParams(
+  minFrameMs: number,
+  base: QualityParams = DEFAULT_QUALITY_PARAMS,
+): QualityParams {
+  return {
+    ...base,
+    slowFrameMs: base.slowFrameMs + minFrameMs,
+    headroomFrameMs: base.headroomFrameMs + minFrameMs,
+  };
+}
+
 /** Actual page load, not a device classification; no DOM, timers or per-frame allocations. @package */
 export class QualityController {
   private current: QualityLevel;

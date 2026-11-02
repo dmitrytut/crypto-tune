@@ -2,59 +2,30 @@ import * as Tone from 'tone';
 import type { TradeSide } from '../feed/market-feed';
 import type { MetricsSnapshot } from '../metrics/engine';
 import type { EventCues } from '../metrics/events';
-import { AmbienceLayer } from './ambience-layer';
-import { BaseLayer } from './base-layer';
-import { EventsLayer } from './events-layer';
-import { eventVelocity } from './events-map';
-import { InteractionVoice } from './interaction-voice';
-import { Mixer } from './mixer';
-import { TensionLayer } from './tension-layer';
-import { CALM_BPM, INITIAL_SHOCK, type ShockState, stepShock, tensionMix } from './tension-map';
+import {
+  type AudioParams,
+  buildGraph,
+  Conductor,
+  type Graph,
+  LOOKAHEAD_SEC,
+  startGraph,
+} from './graph';
 
-const FADE_IN_SEC = 3;
 const FADE_OUT_SEC = 1.5;
-const MASTER_DB = -2;
-/** Headroom before playback so Tone has a moment to prepare the first scheduled event. */
-const LOOKAHEAD_SEC = 0.05;
 const TOUCH_SPACING_SEC = 0.1;
-
-export interface AudioParams {
-  /** Tonic pitch class, 0 = C … 11 = B. */
-  tonicPc: number;
-  baseVolumeDb: number;
-  tensionVolumeDb: number;
-  eventsVolumeDb: number;
-  interactionSound: boolean;
-}
-
 /** @package */
 export type AudioState = 'stopped' | 'starting' | 'running';
 
-interface Graph {
-  mixer: Mixer;
-  base: BaseLayer;
-  ambience: AmbienceLayer;
-  baseChannel: Tone.Volume;
-  tension: TensionLayer;
-  tensionChannel: Tone.Volume;
-  events: EventsLayer;
-  interaction: InteractionVoice;
-  eventsChannel: Tone.Volume;
-}
-
 /**
- * Owns the Tone.js graph. Built lazily on the first start(), which must run
- * inside a user gesture (browser autoplay policy). Stop fades out and keeps
- * the graph for the next start.
+ * Owns the Tone.js graph. Built lazily on the first start(), which must run inside a user
+ * gesture (browser autoplay policy) unless the page may autoplay (an OBS browser source). A
+ * start without one waits for resume() from a press. Stop fades out and keeps the graph for the
+ * next start.
  */
 export class AudioEngine {
   private graph: Graph | null = null;
   private state: AudioState = 'stopped';
-  /** Hysteresis state for double time, carried between ticks. */
-  private doubleTime = false;
-  /** Last tempo written to the transport, whole BPM; tracks the market while stopped too. */
-  private bpm = CALM_BPM;
-  private shock: ShockState = INITIAL_SHOCK;
+  private readonly conductor = new Conductor();
   /** Context time at which the last stop's scheduled teardown (sources, transport) runs. */
   private stopAt = 0;
   private lastTouchAt = Number.NEGATIVE_INFINITY;
@@ -63,6 +34,16 @@ export class AudioEngine {
 
   get current(): AudioState {
     return this.state;
+  }
+
+  /** A start the autoplay policy holds: the context waits for resume() from a press. */
+  get blocked(): boolean {
+    return this.state === 'starting' && Tone.getContext().state !== 'running';
+  }
+
+  /** Call inside a press: lets a blocked start go on (its pending resume settles too). */
+  resume(): void {
+    void Tone.start();
   }
 
   async start(): Promise<void> {
@@ -80,15 +61,9 @@ export class AudioEngine {
       // transport.start while the pending stop still reads "started", then stops.
       const pending = this.stopAt - Tone.now();
       if (pending > 0) await wait(pending * 1000);
-      const transport = Tone.getTransport();
       // Resume at the market's current tempo: update() keeps tracking it while stopped,
       // so restarting mid-move does not drop to calm and jump back on the next tick.
-      transport.bpm.value = this.bpm;
-      const t = Tone.now() + LOOKAHEAD_SEC;
-      g.base.start(t);
-      g.tension.start(t);
-      transport.start(t);
-      g.mixer.fadeMaster(MASTER_DB, FADE_IN_SEC);
+      startGraph(g, this.conductor.bpm, Tone.now() + LOOKAHEAD_SEC);
       this.lastTouchAt = Number.NEGATIVE_INFINITY;
       this.state = 'running';
     } catch (err) {
@@ -107,44 +82,23 @@ export class AudioEngine {
     this.stopAt = end;
     g.base.stop(end);
     g.tension.stop(end);
-    Tone.getTransport().stop(end);
+    g.mixer.context.transport.stop(end);
     this.lastTouchAt = Number.NEGATIVE_INFINITY;
     this.state = 'stopped';
   }
 
   update(s: MetricsSnapshot): void {
-    const mix = tensionMix(s.tension, s.direction, this.doubleTime);
-    this.doubleTime = mix.doubleTime;
-    // Tempo moves in whole-BPM steps, written only on change. Re-issuing
-    // bpm.rampTo every tick crashes Tone 15's transport clock after ~1 min of
-    // live tension (TickSource.getTicksAtTime: "reading 'time'"). 1-BPM steps
-    // are inaudible, and the smoothed tension already makes them gradual.
-    // Tracked even before the graph exists, so the first start() lands on it.
-    const bpm = Math.round(mix.bpm);
-    const bpmChanged = bpm !== this.bpm;
-    this.bpm = bpm;
-    const g = this.graph;
-    if (!g) return;
-    g.base.setTrend(s.emaZ);
-    g.base.applyMix(mix);
-    const shock = stepShock(this.shock, s.tension, s.ts);
-    this.shock = shock.state;
-    if (shock.fired && this.state === 'running') g.tension.shock(s.ret >= 0, Tone.now());
-    g.tension.applyMix(mix);
-    if (bpmChanged) Tone.getTransport().bpm.setValueAtTime(bpm, Tone.now());
+    this.conductor.update(s, this.graph, this.state === 'running');
   }
 
   /** Once per tick: plays the tick's event cues if audio is running. */
   play(cues: EventCues): void {
     const g = this.graph;
     if (this.state !== 'running' || !g) return;
-    const t = Tone.now();
-    const { liquidation: liq, trade } = cues;
-    if (liq) g.events.liquidation(liq.side, eventVelocity(liq.size), t);
-    if (trade) g.events.trade(trade.side, eventVelocity(trade.size), t);
+    this.conductor.play(cues, g);
   }
 
-  /** Immediate, opt-in particle accent; never wakes audio or enters the market cue pipeline. */
+  /** Immediate particle accent if enabled; never wakes audio or enters the market cue pipeline. */
   touch(side: TradeSide, strength: number): void {
     const g = this.graph;
     if (
@@ -194,31 +148,15 @@ export class AudioEngine {
    */
   private async build(): Promise<Graph> {
     const p = this.params;
+    const steps = buildGraph(p);
     // Each wait(0) ends the task, so the browser can paint and handle input between steps.
     await wait(0);
-    const mixer = new Mixer();
-    const baseChannel = mixer.createChannel(p.baseVolumeDb);
-    const tensionChannel = mixer.createChannel(p.tensionVolumeDb);
-    const eventsChannel = mixer.createChannel(p.eventsVolumeDb);
-    await wait(0);
-    const base = new BaseLayer(baseChannel, p.tonicPc);
-    await wait(0);
-    const ambience = new AmbienceLayer(baseChannel, p.tonicPc);
-    await wait(0);
-    const tension = new TensionLayer(tensionChannel, p.tonicPc);
-    const events = new EventsLayer(eventsChannel, p.tonicPc);
-    const interaction = new InteractionVoice(eventsChannel, p.tonicPc);
-    this.graph = {
-      mixer,
-      baseChannel,
-      tensionChannel,
-      eventsChannel,
-      base,
-      ambience,
-      tension,
-      events,
-      interaction,
-    };
+    let step = steps.next();
+    while (!step.done) {
+      await wait(0);
+      step = steps.next();
+    }
+    this.graph = step.value;
     // Settings changed while building: setParams diffs against what the layers were built with.
     const latest = this.params;
     this.params = p;

@@ -10,7 +10,6 @@ describe('tensionMix', () => {
       const m = tensionMix(t, 1, false);
       expect(m).toMatchObject({
         intensity: 0,
-        peak: 0,
         bpm: 60,
         doubleTime: false,
         contour: 'calm',
@@ -78,7 +77,7 @@ describe('tensionMix', () => {
     let prev = tensionMix(0, 0, false);
     for (let t = 0.01; t <= 5; t += 0.01) {
       const m = tensionMix(t, 0, false);
-      for (const k of ['subLevel', 'percLevel', 'riserLevel', 'intensity', 'peak'] as const) {
+      for (const k of ['subLevel', 'percLevel', 'riserLevel', 'intensity'] as const) {
         expect(Math.abs(m[k] - prev[k])).toBeLessThan(0.03);
       }
       expect(Math.abs(m.bpm - prev.bpm)).toBeLessThan(0.5);

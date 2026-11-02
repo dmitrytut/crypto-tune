@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphicsMode } from '../../../settings';
-import { QualityController, type QualityParams } from '../quality';
+import { cappedQualityParams, QualityController, type QualityParams } from '../quality';
 
 const params: QualityParams = {
   warmupMs: 100,
@@ -51,6 +51,16 @@ describe('QualityController', () => {
       expect(c.level).toBe('full');
     },
   );
+
+  it('judges a frame-capped scene by the time beyond the cap', () => {
+    const capMs = 1000 / 10 - 1;
+    const capped = new QualityController('auto', cappedQualityParams(capMs, params));
+    capped.sample(params.warmupMs, 0);
+    advance(capped, 30, 2, 100);
+    expect(capped.level).toBe('full');
+    advance(capped, 4, 2, capMs + 50);
+    expect(capped.level).toBe('lite');
+  });
 
   it('uses the share of bad frames rather than the worst sample', () => {
     const c = ready();

@@ -138,8 +138,6 @@ type UniformName =
  * @package
  */
 export class Aura {
-  private readonly gl: WebGLRenderingContext;
-  private readonly u: Record<UniformName, WebGLUniformLocation | null>;
   private current: AuraTarget;
   private target: AuraTarget;
   /** Noise-space time and drift; integrating them keeps speed changes from jumping the picture. */
@@ -155,52 +153,53 @@ export class Aura {
 
   private constructor(
     private readonly canvas: HTMLCanvasElement,
-    gl: WebGLRenderingContext,
-    program: WebGLProgram,
+    private readonly gl: WebGLRenderingContext,
+    private u: Record<UniformName, WebGLUniformLocation | null> | null,
     initial: AuraTarget,
   ) {
-    this.gl = gl;
     this.current = initial;
     this.target = initial;
-    const loc = (n: string) => gl.getUniformLocation(program, n);
-    this.u = {
-      res: loc('uRes'),
-      time: loc('uTime'),
-      drift: loc('uDrift'),
-      a: loc('uA'),
-      b: loc('uB'),
-      warp: loc('uWarp'),
-      glow: loc('uGlow'),
-      shift: loc('uShift'),
-      shock: loc('uShock'),
-      bloom: loc('uBloom'),
-      bloomColor: loc('uBloomColor'),
-    };
+    canvas.addEventListener('webglcontextlost', this.contextLost);
+    canvas.addEventListener('webglcontextrestored', this.contextRestored);
   }
 
-  static create(canvas: HTMLCanvasElement, initial: AuraTarget): Aura | null {
+  private readonly contextLost = (event: Event) => {
+    event.preventDefault();
+    this.u = null;
+  };
+
+  private readonly contextRestored = () => {
+    this.u = prepare(this.gl);
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+  };
+
+  /** `allowSoftware`: draw on a software renderer too, for a machine that has the CPU to spare. */
+  static create(
+    canvas: HTMLCanvasElement,
+    initial: AuraTarget,
+    allowSoftware = false,
+  ): Aura | null {
     // A software renderer (no GPU or a blocklisted one; Chrome falls back to SwiftShader) draws
     // this shader on the CPU: tens of ms every frame, competing with audio. Plain background then.
     const gl = canvas.getContext('webgl', {
       antialias: false,
       alpha: false,
-      failIfMajorPerformanceCaveat: true,
+      failIfMajorPerformanceCaveat: !allowSoftware,
     });
     if (!gl) return null;
-    const program = link(gl);
-    if (!program) return null;
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const pos = gl.getAttribLocation(program, 'aPos');
-    gl.enableVertexAttribArray(pos);
-    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-    gl.useProgram(program);
-    return new Aura(canvas, gl, program, initial);
+    const uniforms = prepare(gl);
+    return uniforms ? new Aura(canvas, gl, uniforms, initial) : null;
   }
 
   setTarget(t: AuraTarget): void {
     this.target = t;
+  }
+
+  /** Frees the GPU context now (a clip's aura), instead of whenever it is collected. */
+  dispose(): void {
+    this.canvas.removeEventListener('webglcontextlost', this.contextLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.contextRestored);
+    this.gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 
   /** Brief overall brightening; `strength` 0…1. */
@@ -220,7 +219,8 @@ export class Aura {
     if (this.blooms.length > MAX_BLOOMS) this.blooms.shift();
   }
 
-  frame(dtSec: number, quality: QualityLevel): void {
+  /** `quality` lowers the backing store live; a clip always draws at full. */
+  frame(dtSec: number, quality: QualityLevel = 'full'): void {
     const dt = Math.min(dtSec, 0.1);
     const t = this.target;
     const c = this.current;
@@ -255,6 +255,7 @@ export class Aura {
 
   private draw(quality: QualityLevel): void {
     const { gl, canvas, u, current: c } = this;
+    if (!u) return;
     const scale = quality === 'lite' ? LITE_RESOLUTION_SCALE : RESOLUTION_SCALE;
     const w = Math.max(1, Math.round(canvas.clientWidth * scale));
     const h = Math.max(1, Math.round(canvas.clientHeight * scale));
@@ -289,6 +290,35 @@ export class Aura {
     gl.uniform3fv(u.bloomColor, this.bloomColorBuf);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
+}
+
+/** Context restoration invalidates every program, buffer and uniform location. */
+function prepare(
+  gl: WebGLRenderingContext,
+): Record<UniformName, WebGLUniformLocation | null> | null {
+  const program = link(gl);
+  if (!program) return null;
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(program, 'aPos');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  gl.useProgram(program);
+  const loc = (name: string) => gl.getUniformLocation(program, name);
+  return {
+    res: loc('uRes'),
+    time: loc('uTime'),
+    drift: loc('uDrift'),
+    a: loc('uA'),
+    b: loc('uB'),
+    warp: loc('uWarp'),
+    glow: loc('uGlow'),
+    shift: loc('uShift'),
+    shock: loc('uShock'),
+    bloom: loc('uBloom'),
+    bloomColor: loc('uBloomColor'),
+  };
 }
 
 function link(gl: WebGLRenderingContext): WebGLProgram | null {

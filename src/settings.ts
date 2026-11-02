@@ -31,9 +31,9 @@ export interface Settings {
   baseVolumeDb: number;
   /** Tension layer (sub, percussion, riser) level, dB. */
   tensionVolumeDb: number;
-  /** Market-event voices and opt-in interaction accents, dB. */
+  /** Market-event voices and interaction accents, dB. */
   eventsVolumeDb: number;
-  /** Optional accents when touching scene particles while listening. */
+  /** Accents when touching scene particles while listening. */
   interactionSound: boolean;
   /** Liquidations at or above this quote notional sound, USD. */
   liqThresholdUsd: number;
@@ -65,9 +65,9 @@ export const DEFAULT_SETTINGS: Settings = {
   baseVolumeDb: -6,
   tensionVolumeDb: -6,
   eventsVolumeDb: -6,
-  interactionSound: false,
+  interactionSound: true,
   liqThresholdUsd: 20_000,
-  tradeThresholdUsd: 200_000,
+  tradeThresholdUsd: 100_000,
   periodMin: 15,
 };
 

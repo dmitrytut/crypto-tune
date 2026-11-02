@@ -58,6 +58,10 @@ looked at the chart.
   switch to the built-in simulator to hear a sell-off on demand.
 - **Favorite pairs first.** Star pairs directly in the picker: each market keeps its own favorites
   above the rest, with BTC, ETH and SOL pinned by default. Saved in this browser, no extra tab.
+- **Share.** The share icon gives the pair's link in one press (the system sheet on a phone, a copy
+  on a computer) and makes a vertical video (1080×1920, H.264 + AAC) of the last 15 or 30 seconds
+  with its sound, the pair, the price and a `crypto-tune.com/bitcoin` watermark, ready for Shorts,
+  TikTok or Reels: shared from a phone, downloaded elsewhere.
 
 | Live BTCUSDT, buyers in control                    | Simulator, liquidation cascade                                 |
 | -------------------------------------------------- | -------------------------------------------------------------- |
@@ -77,7 +81,9 @@ input. On a fitting phone screen the background accepts swipes in every directio
 pinch-zoom; on a short or zoomed page vertical swipes scroll instead (taps resolve on release).
 Native pull-to-refresh can start over controls or the chart, not over a background swipe surface.
 Effects follow the order in which the gesture crosses the particles, not their creation order.
-Enable **Settings → Sound → Interaction sounds** for quiet accents, off by default. They follow
+A thin neutral ring acknowledges each scene press, even a miss (280 ms); a held swipe leaves a
+short fading trail (180 ms). Both use the existing overlay, with fixed storage for 128 marks.
+**Settings → Sound → Interaction sounds** controls the accents, on by default. They follow
 the Events volume and current tonic, never start Listen, and stop when you switch them off or Stop.
 
 **Settings → Graphics** defaults to **Auto**. Choose **Full** to keep all effects or **Lite** for
@@ -158,16 +164,18 @@ Recomputed every 250 ms on the feed clock, never wall time:
 - **Events**:
   - a liquidation above the threshold (default $20K) is an FM gong: a LONG (forced sell, price
     falling) is a low dark gong on the tonic, a SHORT is a bright bell on the fifth an octave up;
-  - a market trade above the threshold (default $200K) is a short pluck, BUY high and right, SELL low
+  - a market trade above the threshold (default $100K) is a short pluck, BUY high and right, SELL low
     and left;
   - loudness grows with log size, from quiet at the threshold to full at 100× the threshold;
   - cascades collapse to at most one hit per kind per 250 ms tick; the side with more volume wins.
     The latest event is shown under the meter with its age (`LIQ LONG $766K (12s ago)`), even with
     sound off, and fades out after a minute;
   - thresholds are shared by all pairs, so lower them for small pairs.
-- **Interaction accents** (opt-in): one dedicated quiet voice for touching particles, on the Events
-  channel, at most 10 strikes per second. They are independent of market-event cues, chart dots and
-  thresholds; Stop or disabling them cancels even an accent already scheduled in audio lookahead.
+- **Interaction accents** (on by default, off in Settings): one dedicated voice for touching
+  particles, a short triangle tick on the Events channel, about as loud as the music's peaks, at most
+  10 strikes per second. Only a particle hit sounds: a press or swipe on empty background is silent.
+  They are independent of market-event cues, chart dots and thresholds; Stop or disabling them
+  cancels even an accent already scheduled in audio lookahead.
 - Every change is smooth: levels and filters ramp over 0.5 s, tempo moves in 1 BPM steps, double time
   lands on the beat and chord changes on bar lines. Tonic, the three layer volumes and both
   thresholds are configurable; a tonic change glides the drone and sub over 3 s.
@@ -262,8 +270,61 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
 - **Tab title**: `▲ 81,305.2 · BTCUSDT · tension 2.6`, so the state is visible without switching tabs.
 - **Immersive mode**: after 10 s without mouse or keyboard the UI fades out, leaving the aura, the
   price and the chart. A control that holds keyboard focus stays visible.
-- `prefers-reduced-motion`: the aura is nearly still, and there are no bubbles, rings, waves, shake
-  or flashes.
+- `prefers-reduced-motion`: the aura is nearly still, and there are no market particles, waves,
+  shake or flashes. Scene presses retain a stationary fading ring, without expansion or swipe trails.
+
+### Clips
+
+The share icon (top right, next to About) opens **Share**. First the clip: pick 15 or 30 s,
+**Make clip**, preview, then **Download** or, where the browser shares files (phones),
+**Share video**. Under a `── or ──` divider, **Share link** sends the pair's page
+(`?utm_source=share`) to the system share sheet on touch devices and copies it elsewhere
+(`Link copied`). The video goes alone: with a link beside
+it iOS hands most apps only the link. Nothing is recorded while you listen: the last 36 s of the live
+market (trades, liquidations, every tick's metrics and cues) stay in memory, and a clip replays
+them faster than real time. The music comes from the same layers built in an offline audio context,
+the picture from the same aura, particles and chart on a hidden phone-sized stage (432×768 at 2.5×),
+with the price, its change, the last event and the watermark drawn over it; mediabunny muxes the
+WebCodecs output into an mp4. A clip works before **Listen** and leaves live audio alone: the
+render hands the main thread back after every frame (in a hidden tab the browser throttles it, so
+a render left behind finishes slowly). The first 5 s of every render are a pre-roll and are
+cut off. Until enough has arrived the dialog counts down (`Preparing clip… 12 s`); a pair change or
+a feed gap starts it over. The simulator's clips say **Simulated market**. Browsers that cannot
+encode H.264 + AAC (Firefox, desktop Linux, Safari before 26) get **Share link** only; Umami counts
+them (`clip_support`), links shared (`link_shared`), and clips made, shared and failed.
+
+<img src="docs/media/clip-frame.jpg" alt="A frame of a clip made from the simulator: Simulated market, price, change, bubbles and drops, the chart and the crypto-tune.com watermark" width="270">
+
+### Stream mode
+
+For a broadcast (an OBS browser source on Twitch or YouTube) or a screen nobody touches, add `?obs`
+to the address: `https://crypto-tune.com/bitcoin/?obs`.
+- The music starts by itself where the browser allows it: OBS does (its browser autoplays). An
+  ordinary browser holds it until a press, so Listen stays on screen and one press starts it.
+- The pair (`BTCUSDT`, the top line a clip has, plus `· Reconnecting…` during an outage), the
+  tension meter and the volume and last-event line stay on screen; only the controls fade after
+  10 s, and the clip's watermark (`crypto-tune.com/bitcoin` on a pair page) takes their corner.
+  Readouts and the trade and liquidation labels are about half again as large, read in a small
+  player. No film grain: a video encoder turns it into blocks. No ⓘ beside Tension: a viewer
+  cannot hover a video (the tips in settings stay for Interact).
+- When OBS hides the source (its eye icon, a scene without it) the music stops and nothing is drawn;
+  showing it starts both again.
+- Settings work as usual through OBS's **Interact** window and are remembered.
+
+| Parameter              | Effect                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| `obs`                  | stream mode                                                                              |
+| `layout=audio`         | sound only: a transparent page, nothing drawn                                            |
+| `aura=on` / `aura=off` | draw the aura even on software WebGL (a GPU-less server streaming the picture), or never |
+| `fps=10…60`            | cap the scene's frame rate                                                               |
+| `pair=SYMBOL`          | open any pair, with or without `obs`; `market=coinm` for a COIN-M one (`BTCUSD_PERP`)    |
+
+**OBS:** Sources → **+** → **Browser**; URL `https://crypto-tune.com/bitcoin/?obs`, 1920 × 1080,
+**Control audio via OBS** checked (the sound goes to the OBS mixer); keep Settings → Advanced →
+Sources → _Enable Browser Source Hardware Acceleration_ on, or the aura is off. Stream at 30 fps.
+
+In stream mode the music sends `stream_start` and `stream_hour` instead of `listen`: a broadcast is
+not a daily listener.
 
 ### Accessibility
 
@@ -294,6 +355,21 @@ ARIA and motion. What that changed:
 Before committing: `pnpm check && pnpm test && pnpm build`. Code layout, module boundaries and
 conventions are in [`AGENTS.md`](AGENTS.md).
 
+**Repository review (2026-11-02).** History now refills a short cache left by an outage, while
+busy pairs still reuse a cache that reaches beyond the REST page budget. COIN-M contract
+loading times out instead of waiting forever. Clip replay preserves markers at its start.
+Visual freshness and flow use wall time with a fixed market-clock correction, including after
+system sleep; scrolling keeps particle impacts aligned with the chart. The aura rebuilds its
+GPU resources after context loss.
+Picker toggling, dialog drag selection, pair-page media artwork and clip readiness transitions
+are corrected. Stopped audio tracks tempo without appending transport automation.
+
+Verify with `pnpm test && pnpm build`, then `pnpm preview`: toggle the pair picker twice,
+drag About text past its edge, start Listen from `/bitcoin/`, scroll a short viewport, and
+render a clip while listening. Use `WEBGL_lose_context` to lose and restore the aura context.
+The [full review](docs/reviews/2026-11-02-repository-review.md) records reproductions, limitations
+and remaining improvement ideas.
+
 **Deploy.** Every push to `master` builds the site and publishes it to GitHub Pages
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): check, test, build, upload
 `dist/`) at the custom domain `crypto-tune.com`, set in Settings → Pages (an Actions deploy needs no
@@ -302,11 +378,18 @@ load the same `/assets/`; the old `dmitrytut.github.io/crypto-tune/` address red
 domain. To redeploy by hand: Actions → Deploy to GitHub Pages → Run workflow.
 
 **Link previews and search.** Open Graph and Twitter card tags in `index.html` point at
-`public/og.jpg` (1200×630). `index.html` also carries the canonical URL and `WebApplication`
-structured data (JSON-LD). Crawlers need absolute URLs, so all of these hard-code
-`https://crypto-tune.com/`; update them if the site moves. The description appears
-three times (meta, Open Graph, JSON-LD): keep them identical. The About dialog (the ? button next to
-the gear) is static HTML on purpose: AI crawlers that skip JavaScript read what the app does from it.
+`public/og.jpg` (1200×630): logo, name and tagline over the app's own scene (aura, particles and
+price chart, slightly out of focus), so a preview hints at the picture without showing a price
+that would read as current. The scene is the simulator in a calm stretch (blue-violet aura, buys
+and sells both in view), so the card leans to neither side; it was captured from the dev server
+with the readouts and controls hidden. The card text stays general ("hear and watch") so it outlives
+changes to the visuals. `max-image-preview:large` lets Google show it large.
+`index.html` also carries the canonical URL and `WebApplication` structured data (JSON-LD).
+Crawlers need absolute URLs, so all of these hard-code `https://crypto-tune.com/`; update them if
+the site moves. The title and description lead with "hear and watch": the sound is what sets the
+app apart, the picture is what a preview can show. The description appears three times (meta,
+Open Graph, JSON-LD): keep them identical. The About dialog (the ? button next to the gear) is
+static HTML on purpose: AI crawlers that skip JavaScript read what the app does from it.
 
 **Pair pages.** `src/pair-pages.ts` lists twelve popular USDⓈ-M pairs (slug and symbol: all the
 app needs); their words (name, ticker, intro) are in `src/pair-page-texts.ts`, which only the
@@ -326,12 +409,15 @@ visible content.
 
 **Analytics.** Umami Cloud (EU region, cookieless, no consent banner): the beacon at the end of
 `index.html`, counting only on `crypto-tune.com`. Visits, referrers and countries are in the Umami
-dashboard. `src/analytics.ts` sends two events:
+dashboard. `src/analytics.ts` sends these listening events (clip events are under Clips, stream
+events under Stream mode):
 
-| Event        | When                                                               | Data                                                                                            |
-| ------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `listen`     | audio starts (button, media key)                                   | `pair` (symbol or `simulator`), `days`: distinct days this browser has listened, today included |
-| `listen_10m` | 10 minutes without a stop since the last start, once per page load | `pair` as it was at that start                                                                  |
+| Event          | When                                                                                | Data                                                                                            |
+| -------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `listen`       | audio starts (button, media key)                                                    | `pair` (symbol or `simulator`), `days`: distinct days this browser has listened, today included |
+| `listen_10m`   | 10 minutes without a stop since the last start, once per page load                  | `pair` as it was at that start                                                                  |
+| `stream_start` | stream mode started its music: on load, on a press, or OBS showing the source again | `pair`, `layout` (`full` or `audio`)                                                            |
+| `stream_hour`  | every hour the stream's music keeps running                                         | `pair` as it was at that start                                                                  |
 
 Daily listeners are the unique visitors of `listen` per day; returning listeners are those with
 `days` ≥ 2. Nothing identifies a visitor: `days` is a counter in localStorage. A stop resets the
@@ -369,10 +455,19 @@ Search Console → Core Web Vitals and CrUX (PageSpeed Insights).
 - [x] **Trade legend**: About shows what each bubble and drop size means
 - [x] **Chart refresh**: smooth line and eased range, glowing event dots that pop in with sparks,
   edge to edge on phones
-- [x] **Particle interaction**: tap/drag/swipe, bounded local pops and mid-air sparks, opt-in quiet
+- [x] **Particle interaction**: tap/drag/swipe, bounded local pops and mid-air sparks, sound
   accents, scroll/pinch ownership, and no invisible immersive controls intercepting a gesture
+- [x] **Gesture feedback**: quiet press rings and short swipe trails, including misses; stationary
+  acknowledgment in reduced motion, cleared with cancelled gestures and scene changes
+- [x] **Audible interaction sounds**: the accent was ~12 dB under the music and inaudible; now a
+  louder, longer tick, on by default; large trade threshold default lowered to $100K
 - [x] **Particle collisions**: damped, area-weighted contacts within sell drops and within buy bubbles,
   without a physics dependency
+- [x] **Clips**: the last 15 or 30 s as a vertical mp4 with sound and a watermark, rendered offline
+  from the live data; share or download
+- [x] **Stream mode**: `?obs` for OBS and TVs: music without a press where allowed, readouts that
+  stay on screen at a stream size, a watermark, no grain, pause while OBS hides the source, a
+  sound-only layout, `?pair=` for any pair
 - [x] **Adaptive quality**: Auto / Full / Lite, sustained-load detection, bounded Lite effects,
   slower/lower-resolution aura and a persisted override independent of data and music
 
@@ -396,6 +491,9 @@ sound, and Binance covers the pairs that matter.
    controller's result. Full → Lite took about 3.05 s; after removing load it stayed Lite at 2 s and
    returned to Full after about 21.03 s. Explicit Full survived sustained load. The same audio graph
    kept running and the simulator did not reconnect. Reload retained Lite and the selected period.
+   With stream mode merged: `/?obs&fps=10` in Auto stays Full (FX canvas at the browser DPR) for
+   15 s idle, since frames count only beyond the cap; 150 ms of injected work per frame still drops
+   it to Lite within 3 s. Plain `/`: Lite after ~2 s of 50 ms frames, Full again ~21 s after.
 5. Synthetic mixed-side 1500-particle fixture, 390×844 desktop-hosted Chromium, CPU ×4: FX-call p95
    Full/Lite was about 18/1.2 ms at normal steps and 38.2/1.8 ms at 100 ms simulation steps. Lite
    retained 400 primaries. The timing probe used browser DPR 1.25; separate DPR-3 device emulation
@@ -405,11 +503,70 @@ sound, and Binance covers the pairs that matter.
    tab is foregrounded. No claim of a physical background-tab lifecycle test.
 7. Physical Safari/iOS/Android, battery/thermal behavior and field CWV still need real-device data.
 
+### Stream mode
+
+1. `pnpm test`: includes the address (stream defaults, unknown values, the frame cap's range, pair
+   and market, the address after a pick: pair page or `/`, `?pair=` dropped, the rest kept).
+2. `pnpm build && pnpm preview --host 127.0.0.1`, open `/bitcoin/?obs` in Chromium started with
+   `--autoplay-policy=no-user-gesture-required` (what OBS runs): the music plays with no press;
+   after 10 s the controls fade, the pair line, meter and volume line stay, `crypto-tune.com/bitcoin`
+   shows top right; no grain. Changing the tension window keeps the address.
+3. In the console: `dispatchEvent(new CustomEvent('obsSourceVisibleChanged', {detail: {visible:
+   false}}))`: Listen reads Listen again and the scene stops; `visible: true` starts both again.
+4. `/?obs&layout=audio&pair=ethusdt`: an empty transparent page, ETHUSDT playing (tab title).
+5. In an ordinary browser, `/?obs`: Listen stays; one press starts the music. Pick another pair:
+   `pair=` leaves the address, `obs` stays.
+6. OBS: a browser source on `/bitcoin/?obs`, then Start Streaming: picture and sound with no
+   Interact click; hide and show the source with the eye icon.
+
+### Clips
+
+1. `pnpm test`: includes the clip buffer (readiness per length, trimming with drifting ticks, reset,
+   the window), the history replay (nothing after the frame), the clip layout and share wording.
+2. `pnpm dev`, BTCUSDT: open the share icon — `Preparing clip… 34 s` counts down; under `or`,
+   **Share link** copies `…/bitcoin/?utm_source=share` (`Link copied` on the button).
+   Make a 15 s and a 30 s clip, with and without **Listen**: a few seconds each, preview plays with
+   sound, **Download** saves `crypto-tune-bitcoin-<date>-<time>.mp4`.
+3. `ffprobe` on the file: H.264 Main 1080×1920 30 fps, AAC 48 kHz stereo, 15.0 or 30.0 s, `moov`
+   before `mdat`. The frames show the pair, price, change, last event, chart and the watermark.
+4. With **Listen** on, DevTools 4× CPU slowdown: the music keeps time while a clip renders.
+5. Closing the dialog mid-render stops it (no hidden stage left in the page). Settings → Simulator:
+   the clip says `Simulated market`, watermark `crypto-tune.com`.
+6. DevTools device toolbar at 320, 360 and 375 px: three icons fit, the status keeps at least its
+   dot. With `delete window.AudioEncoder` before load, Share has only **Share link**.
+7. On a phone (HTTPS preview): **Share link** opens the system sheet with the link; **Share video**
+   with the video itself (Messages, Telegram get the file, not a link).
+
+### Audible interaction sounds
+
+1. `pnpm test`: a saved `interactionSound` boolean is kept, anything else falls back to on.
+2. `pnpm dev` in a fresh profile (or after clearing `crypto-tune.settings.v1`) → ⚙: Interaction
+   sounds is checked, Large trade threshold reads $100K. → Simulator → Listen, tap a bubble or drop:
+   a short tick sounds over the music, higher for a bubble, lower for a drop. Tapping empty
+   background stays silent. Untick Interaction sounds: taps are silent again.
+3. Measured in Chromium (simulator, default volumes): music peaks at about −12 dBFS on the master
+   bus; the accent's voice output peaked at −29 dBFS before and −12 dBFS after this change.
+
+### Gesture feedback
+
+1. `pnpm dev`: click empty background — a faint neutral ring appears immediately and fades in
+   280 ms. Hold and sweep around a corner — the thin trail follows the actual path, fades in
+   180 ms, and never joins separate gestures. Hover and right-click do not draw it.
+2. Repeat on a phone-sized viewport. Controls and chart markers retain native input; vertical
+   scrolling on short/zoomed pages does not leave a trail. A second finger or pointer cancellation
+   clears the feedback; switching pairs or leaving the tab clears it too.
+3. Emulate `prefers-reduced-motion: reduce`: a press still has a stationary fading ring, but no
+   expansion, swipe trail or market particles.
+4. Implementation smoke: Chromium mouse input at 1728×913 and touch at 390×844; real-canvas pixel
+   checks cover first-frame feedback when input follows the rAF timestamp, corners without
+   shortcuts, expiry, separate taps, cancellation, bounded input floods and the reduced-motion
+   stationary ring. Physical phone feel remains a device check.
+
 ### Particle interaction
 
 1. `pnpm check && pnpm test && pnpm build`: includes stroke geometry (fast crossings, tangent hits,
    corners without shortcuts, quick released taps, multiple taps before a frame, jitter, cancellation
-   and bounded event floods) and strict boolean sound opt-in when loading saved settings.
+   and bounded event floods) and strict boolean sound setting when loading saved settings.
 2. `pnpm dev` → Simulator: tap one of two overlapping bubbles (only the nearest pops), drag a
    corner-shaped path through bubbles/drops (only crossed ones pop), hover or right-click (no pop).
    A drop breaks at its current height, not at the chart; hand gestures never make market labels,
@@ -418,12 +575,13 @@ sound, and Binance covers the pairs that matter.
    Listen stays stopped. Chart taps, dialog backdrops, hints and visible controls do not pop particles.
    Repeat with a mobile device profile and reduced motion: a compatibility click generated after
    the chrome wakes must not start/stop Listen. A subsequent deliberate control tap still works.
+   The stationary press ring must still appear under reduced motion; only particle hits are disabled.
 4. On a fitting phone screen, swipe vertically through several particles. Pinch cancels the game
    gesture and zooms; on a short/zoomed page a vertical swipe scrolls without popping the particle
    under the first touch. A tap there pops on release; a horizontal swipe still works.
-5. Interaction sounds start off; enable them in Settings, then Listen. Dense hits make bounded quiet
-   accents; switching the option off or Stop suppresses new and scheduled accents. No sound before
-   Listen. Reduced motion clears the game effects and pending gesture.
+5. Interaction sounds start on; disable them in Settings to keep touches silent. With Listen on,
+   dense hits make bounded accents; switching the option off or Stop suppresses new and scheduled
+   accents. No sound before Listen. Reduced motion clears the game effects and pending gesture.
 6. Implementation proof: Chromium trusted mouse/touch input at 1440×900 and 390×844, a 390×400
    scrolling layout, native pinch and reduced-motion emulation; offline audio verified a cancelled
    scheduled strike is silent and the next permitted strike sounds. A synthetic dense 1500-particle
@@ -447,7 +605,7 @@ sound, and Binance covers the pairs that matter.
 1. `pnpm test`: includes the legend steps (`≤ $1K` … `≥ $1M`), the threshold column and the mark
    sizes matching the scene.
 2. `pnpm dev` → ?: under the text, a Buy row of bubbles and a Sell row of drops, captioned
-   `≤ $1K, $10K, $100K, $200K, ≥ $1M`; the last two glow. ⚙ → Large trade threshold $5M, reopen
+   `≤ $1K, $10K, $100K, ≥ $1M`; the last two glow. ⚙ → Large trade threshold $5M, reopen
    About: the columns end in `$1M, ≥ $5M` and only the last glows; the note names $5M.
 3. On a 360 px wide window the marks shrink alike and halos are not cut at the edges.
 
@@ -600,9 +758,9 @@ sound, and Binance covers the pairs that matter.
    loudness by size, voice placement (LONG below SHORT, BUY above and right of SELL).
 2. `pnpm dev` → SIMULATOR → **Start**. On a down impulse low gongs and left-side plucks sound, and the
    event line shows `LIQ LONG …` and `SELL …` in red; on an up impulse the opposite.
-3. LIVE BTCUSDT: trades above $200K happen several times a minute. Threshold sliders move on a log
+3. LIVE BTCUSDT: trades above $100K happen many times a minute. Threshold sliders move on a log
    scale ($1K–$1M and $10K–$10M).
-4. The Events slider changes gongs, plucks and any enabled interaction accents.
+4. The Events slider changes gongs, plucks and interaction accents.
 
 ### Stage 3
 

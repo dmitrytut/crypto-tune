@@ -33,9 +33,18 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`, and `events.ts`
   (`EventBuffer`: trades and liquidations above their thresholds collapse to at most one
-  `EventCue` per kind per tick, stale replays dropped; audio, readout and chart all use the cues).
-- `src/audio/` — Tone.js graph. `engine.ts` (`AudioEngine`: start/stop/update, built lazily on the
-  first user gesture over a few tasks, a layer or two each, so the press stays responsive),
+  `EventCue` per kind per tick, stale replays dropped; audio, readout and chart all use the cues),
+  `clip-buffer.ts` (`ClipBuffer`: the last 36 s of live trades, liquidations and ticks for a clip;
+  reset by a pipeline change or a feed gap; `replayHistory` grows a copy of the chart history
+  through the clip, `MarketHistory.before` + `addCues`).
+- `src/audio/` — Tone.js graph. `graph.ts` (`buildGraph`: the layers in Tone's current context,
+  a generator that yields between layers; `Conductor`: tick → mix, tempo, shock, event voices, on
+  the graph's own context clock and transport, so live and offline share it), `engine.ts`
+  (`AudioEngine`: start/stop/update, built lazily on the first user gesture over a few tasks, a
+  layer or two each, so the press stays responsive), `offline.ts` (`renderClipAudio`: a clip's
+  music in a `Tone.OfflineContext`; the global context is swapped only during the synchronous
+  build, so live audio never sees it. Never lower a running context's `lookAhead`: Tone's clock
+  then replays ticks it already ran, doubling notes),
   `mixer.ts` (layers → reverb → compressor → limiter → master),
   `base-layer.ts` (drone with chord drift + arpeggio), `ambience-layer.ts` (Eno bell loops + pulse,
   base channel), `tension-layer.ts` (sub, percussion, riser, shock swell), `events-layer.ts`
@@ -66,14 +75,24 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   settings modal, a hint per setting from its `HELP` texts; `about/` About modal, static text in
   `index.html` so crawlers without JS read it, plus the trade legend drawn on open from
   `scene/legend.ts` (marks, captions, threshold note); `chart-tip/` tooltip for chart event markers,
-  hit-tested by `Chart.markerAt`),
+  hit-tested by `Chart.markerAt`; `share-dialog/` Share modal: where clips can be encoded, the clip
+  part first (length, readiness countdown, render progress, preview, Download and, where files can
+  be shared, Share video), then an `or` divider; one Share link button last (system share sheet
+  on touch devices, a copy elsewhere). Share video needs its own press and gets the file alone —
+  iOS drops the file for the link when both are passed),
   `scene/` (`stage.ts` creates the layers and
   runs the animation loop, `aura.ts` WebGL background with drift/shock/bloom uniforms, off on
   software WebGL (`failIfMajorPerformanceCaveat`), `fx.ts` trade bubbles/drops and liquidation
   bursts, `sprites.ts` their sprites, drawn once, `legend.ts` the About trade legend (pure
   `tradeLegend` steps of the `spawn.ts` size scale + threshold; sizes from `bubbleRadius`, never
   restated), `chart.ts` price/volume strip (`lineY`: the price line drops land on; `draw` returns
-  true while it animates, so the view redraws next frame), `canvas.ts` DPR fit).
+  true while it animates, so the view redraws next frame; pixel ratio and clock can be fixed),
+  `canvas.ts` DPR fit (or a given ratio), `clip-layout.ts` the clip's phone-sized stage (432×768
+  at 2.5×) and where its texts and chart go, `clip-render.ts` a clip's picture: the scene classes on
+  a hidden stage stepped at 30 fps, composited with texts and encoded with mediabunny; loaded by
+  `import()` on the first clip, never in the first bundle).
+  `clip-format.ts`: the clip file (H.264 Main `avc1.4d0028` + AAC 48 kHz, 1080×1920) and
+  `clipSupport()` from WebCodecs alone; without it Share has the link button only.
   `media-session.ts`: media keys and OS media controls. Browsers grant them only to a playing
   `<audio>`/`<video>` (Web Audio does not count; Chrome ignores media under 5 s), so a looped
   10 s silent WAV plays while Listen runs; play/pause follow the Listen button state.
@@ -81,9 +100,11 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   flow → aura colours/motion; the one source of side and tension colours, CSS included),
   `scene/spawn.ts` (merging, bubble start state), `scene/pop.ts` (bubble pop height, droplets),
   `scene/sparks.ts` (sparks of a drop on the line, their cooling), `scene/surface.ts` (the smooth
-  price line, a polyline per pixel column). Visuals are wall-clock animation; anything older
-  than 2 s is not animated (a throttled tab's catch-up, filtered in the view). Every motion effect
-  respects `prefers-reduced-motion`.
+  price line, a polyline per pixel column). Animation uses frame time. Live event freshness
+  (2 s cutoff) and flow use `Date.now()` plus a fixed feed offset (`src/visual-clock.ts`),
+  calibrated on the first event; simulator events use wall time directly. Every motion effect
+  respects `prefers-reduced-motion`; a clip's video does not (it plays on other people's screens),
+  and its preview never autoplays.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.
 - `src/pair-pages.ts` — popular USDⓈ-M pairs with their own page (`/bitcoin/` …): slug and symbol
   only, what the app needs. Their words (name, ticker, intro) live in `pair-page-texts.ts`, keyed
@@ -92,9 +113,23 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   exact string replacement (a miss fails the build) plus `sitemap.xml` and `robots.txt`; `main.ts`
   opens the pair from the path without saving it, and `replaceState`s the path on a pair change.
   Page texts land in attributes and JSON-LD: no `&<>"\`.
-- `src/analytics.ts` — Umami events `listen` / `listen_10m` (beacon in `index.html`, counts only
-  on the production host). No identifiers: returning listeners come from a day counter in
-  localStorage. Wired in `main.ts` around audio start/stop.
+- `src/share.ts` — what sharing says: the link (pair page, or `/`, with `?utm_source=share`) and its
+  line, a clip's top line, watermark (`crypto-tune.com/<slug>` for pair pages) and file name.
+  Simulated markets say so.
+- `src/address.ts` — what the address asks for: `?obs` stream mode (`StreamOptions`, owned by
+  `ui/app.ts`: layout `full`/`audio`, aura mode, frame cap), `?pair=`/`market=` for any pair
+  (precedes a pair page's pair, never saved) and `addressAfterPick`: the address once the user
+  picks a pair (its page or `/`, `?pair=` dropped, the rest kept). `main.ts` applies it on a pair
+  pick only. In stream mode `main.ts` starts the music on load (OBS autoplays; elsewhere
+  `AudioEngine.blocked` turns Listen into the press `resume()` needs) and follows OBS's
+  `obsSourceVisibleChanged` (a start that completes while hidden stops at once); the view keeps
+  the readouts unfaded, names the pair and watermark with the clip's words (`pairTexts`, from
+  `share.ts`), scales labels (`Fx.labelScale`) and can pause the scene (`Stage.setPaused`).
+- `src/analytics.ts` — Umami events `listen` / `listen_10m`, `link_shared`, `clip_support` (once
+  per session), `clip_recorded`, `clip_shared`, `clip_failed`, and in stream mode `stream_start` /
+  `stream_hour` instead of the listen events (beacon in `index.html`, counts only on the production
+  host). No identifiers: returning listeners come from a day counter in localStorage. Wired in
+  `main.ts` around audio start/stop and the share handlers.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 
 ## Code organization

@@ -81,4 +81,35 @@ describe('MarketHistory', () => {
     expect(h.volumeUsdSince(T0 + 1)).toBeCloseTo(130);
     expect(h.volumeUsdSince(T0)).toBeCloseTo(131);
   });
+
+  it('adds a tick cue as a marker, the liquidation after the trade', () => {
+    const h = new MarketHistory();
+    h.addCues(T0, { trade: null, liquidation: null });
+    h.addCues(T0 + 250, {
+      trade: { side: 'buy', usd: 3e5, size: 1.5, count: 2 },
+      liquidation: { side: 'short', usd: 4e4, size: 2, count: 1 },
+    });
+    expect(h.markers).toEqual([
+      { ts: T0 + 250, kind: 'trade', side: 'buy', usd: 3e5 },
+      { ts: T0 + 250, kind: 'liquidation', side: 'short', usd: 4e4 },
+    ]);
+  });
+
+  it('copies only what was complete before a time, and the copy grows on its own', () => {
+    const h = new MarketHistory();
+    for (let i = 0; i < 30; i++) {
+      h.addSnapshot({ ts: T0 + i * 1_000, price: 100 + i, tension: 0 });
+      h.addTrade(trade(T0 + i * 1_000, 'buy', 1));
+    }
+    h.addMarker({ ts: T0 + 12_000, kind: 'trade', side: 'buy', usd: 1 });
+    h.addMarker({ ts: T0 + 25_000, kind: 'trade', side: 'buy', usd: 1 });
+    const at = T0 + 25_500;
+    const b = h.before(at);
+    // The second and the bucket that `at` falls in are not over yet: left out.
+    expect(b.prices.at(-1)?.ts).toBe(T0 + 24_000);
+    expect(b.volumes.map((v) => v.ts)).toEqual([T0, T0 + VOLUME_BUCKET_MS]);
+    expect(b.markers.map((m) => m.ts)).toEqual([T0 + 12_000, T0 + 25_000]);
+    b.addSnapshot({ ts: T0 + 24_200, price: -1, tension: 0 });
+    expect(h.priceAt(T0 + 24_000)).toBe(124);
+  });
 });

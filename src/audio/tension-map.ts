@@ -47,8 +47,6 @@ export const MIX_RAMP_SEC = 0.5;
 export interface TensionMix {
   /** 0 below TENSION_LEVELS.mid, 1 at TENSION_LEVELS.high. */
   intensity: number;
-  /** 0 up to TENSION_LEVELS.high, 1 at TENSION_LEVELS.peak. */
-  peak: number;
   bpm: number;
   /** Arpeggio in eighths instead of quarters. */
   doubleTime: boolean;
@@ -90,7 +88,6 @@ export function tensionMix(tension: number, direction: number, wasDoubleTime: bo
 
   return {
     intensity,
-    peak,
     bpm: CALM_BPM + (TENSE_BPM - CALM_BPM) * intensity,
     doubleTime: wasDoubleTime ? tension >= high - DOUBLE_TIME_HYSTERESIS : tension >= high,
     // Exponential sweep: equal steps of intensity sound like equal steps of brightness.

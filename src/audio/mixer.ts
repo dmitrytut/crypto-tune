@@ -21,12 +21,17 @@ export class Mixer {
   private readonly master = new Tone.Volume(Number.NEGATIVE_INFINITY);
 
   constructor() {
-    this.reverb.chain(this.compressor, this.limiter, this.master, Tone.getDestination());
+    this.reverb.chain(this.compressor, this.limiter, this.master.toDestination());
   }
 
   /** Resolves once the reverb impulse response is generated (it is silent before). */
   get ready(): Promise<void> {
     return this.reverb.ready;
+  }
+
+  /** The context the bus was built in: live, or offline for a clip. */
+  get context(): Tone.BaseContext {
+    return this.master.context;
   }
 
   /** New layer input at `volumeDb`, routed into the bus. */

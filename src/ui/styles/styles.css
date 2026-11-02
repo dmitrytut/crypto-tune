@@ -147,6 +147,15 @@
     @media (max-width: 480px) {
       gap: var(--space-sm);
     }
+    /* Three icons beside the pair: on a 320 px screen the status would lose even its dot. */
+    @media (max-width: 340px) {
+      gap: 4px;
+
+      & .icon-btn {
+        width: 36px;
+        height: 36px;
+      }
+    }
   }
   /* Takes the room the pair leaves. Dot and words are two flex items on one visible line: when
    * the words do not fit, they wrap to a clipped second line and only the dot stays. Width 0
@@ -196,6 +205,39 @@
     }
     &:hover {
       background: var(--surface-strong);
+    }
+  }
+
+  /* Radio group drawn as buttons (Settings, clip length); the radios are visually hidden, so
+   * the label shows focus. */
+  .segmented {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: var(--space-xs);
+
+    & label {
+      flex: 1;
+      text-align: center;
+      font-size: var(--font-size-md);
+      padding: var(--space-sm);
+      border: var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+
+      &:has(input:focus-visible) {
+        outline: var(--focus-ring);
+        outline-offset: var(--focus-offset);
+      }
+      &:has(input:checked) {
+        border-color: rgb(255 255 255 / 0.5);
+        background: var(--surface-strong);
+      }
+      &:has(input:disabled) {
+        opacity: 0.5;
+        cursor: default;
+      }
     }
   }
 
@@ -322,6 +364,69 @@
       /* A canvas does not stretch in a grid: widen it by the gutters it reaches into. */
       width: calc(100% + 2 * var(--gutter));
       margin-inline: calc(-1 * var(--gutter));
+    }
+  }
+
+  /* ── stream mode (?obs): a broadcast seen in a small player ── */
+  body.stream {
+    /* Grain is fine noise: the worst case for a video encoder, which turns it into blocks. */
+    &::after {
+      content: none;
+    }
+
+    /* Readouts about half again as large (17–24 px for 12–15 px): legible in a small player. */
+    & .hero {
+      width: min(760px, 100%);
+      --font-size-xs: 17px;
+      --font-size-sm: 19px;
+      --font-size-md: 21px;
+      --font-size-lg: 24px;
+
+      /* The ⓘ invites a hover nobody watching a video can make; the label stays. */
+      & .hint-btn .icon {
+        display: none;
+      }
+    }
+  }
+  .stream-pair {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-shadow: var(--text-shadow-legible);
+  }
+  /* In the corner the controls use: shown while they are faded out. */
+  .stream-mark {
+    position: fixed;
+    top: 20px;
+    right: var(--gutter);
+    z-index: var(--z-stage);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgb(255 255 255 / 0.55);
+    text-shadow: var(--text-shadow-legible);
+    pointer-events: none;
+    transition: opacity var(--duration-fade) ease;
+
+    body:not(.idle) & {
+      opacity: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+  /* Sound only: nothing drawn, a transparent page; Listen shows only when a press must start it. */
+  :root:has(body.stream-audio) {
+    background: transparent;
+  }
+  body.stream-audio {
+    background: transparent;
+
+    & :is(#aura, #fx, .top, .chart, .stream-mark),
+    & .hero > :not(.play),
+    & .play:not([data-state="blocked"]) {
+      display: none;
     }
   }
 }

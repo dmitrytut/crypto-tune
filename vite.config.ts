@@ -71,9 +71,9 @@ function pageTexts(p: (typeof PAIR_PAGES)[number]) {
   const { name, ticker, intro } = PAIR_PAGE_TEXTS[p.slug];
   const label = name === ticker ? name : `${name} (${ticker})`;
   const texts = {
-    title: `Listen to ${name} live: ${p.symbol} as music · Crypto Tune`,
-    description: `Hear ${label} perpetual futures as calm generative music: live trades and liquidations from Binance set the tempo, the melody and the gongs. Free, in the browser.`,
-    heading: `${label} futures, played as sound`,
+    title: `Listen to ${name} live: ${p.symbol} as music and motion`,
+    description: `Hear and watch ${label} futures live: Binance trades and liquidations as calm generative music, rising bubbles and falling drops. Free, in the browser.`,
+    heading: `${label} futures, live in sound and motion`,
     intro,
   };
   for (const text of Object.values(texts)) {

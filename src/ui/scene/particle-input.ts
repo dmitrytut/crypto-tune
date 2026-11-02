@@ -1,4 +1,5 @@
 import { el } from '../dom';
+import type { GestureFeedback } from './gesture-feedback';
 import { DRAG_SLOP_PX, type PointerStroke } from './interaction';
 
 const TOUCH_PADDING_PX = 12;
@@ -11,6 +12,7 @@ export function mountParticleInput(
   canvas: HTMLCanvasElement,
   stroke: PointerStroke,
   reducedMotion: MediaQueryList,
+  feedback: GestureFeedback,
 ): () => void {
   let active = -1;
   let blocked = -1;
@@ -37,11 +39,21 @@ export function mountParticleInput(
   window.addEventListener('resize', updatePan);
   viewport?.addEventListener('resize', updatePan);
 
+  const begin = (x: number, y: number, padding: number) => {
+    stroke.begin(x, y, padding);
+    feedback.begin(x, y);
+  };
+  const move = (x: number, y: number) => {
+    stroke.move(x, y);
+    feedback.move(x, y);
+  };
+
   const cancel = () => {
     active = -1;
     blocked = -1;
     pendingTap = false;
     stroke.cancel();
+    feedback.clear();
   };
   // Capture phase sees a second finger even if it lands on a button, chart or dialog.
   // One active pointer across input devices also prevents a mouse/pen from splicing a touch path.
@@ -85,16 +97,14 @@ export function mountParticleInput(
     ownsClick = true;
     // Prevent compatibility mouse focus without cancelling native touch-action pan or pinch.
     event.preventDefault();
-    // Chrome ownership still matters when particles are disabled by reduced motion.
-    if (active !== -1 || blocked !== -1 || reducedMotion.matches || document.hidden) return;
+    // Reduced motion keeps press feedback; the frame loop suppresses particle hits instead.
+    if (active !== -1 || blocked !== -1 || document.hidden) return;
     active = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
     // Let a scroll-eligible touch prove it is a tap or horizontal stroke before any pop.
     pendingTap = event.pointerType === 'touch' && panAllowed;
-    if (!pendingTap) {
-      stroke.begin(startX, startY, event.pointerType === 'touch' ? TOUCH_PADDING_PX : 3);
-    }
+    if (!pendingTap) begin(startX, startY, event.pointerType === 'touch' ? TOUCH_PADDING_PX : 3);
   });
 
   canvas.addEventListener('pointermove', (event) => {
@@ -104,22 +114,22 @@ export function mountParticleInput(
       const dy = Math.abs(event.clientY - startY);
       if (dx <= DRAG_SLOP_PX || dx <= dy) return;
       pendingTap = false;
-      stroke.begin(startX, startY, TOUCH_PADDING_PX);
+      begin(startX, startY, TOUCH_PADDING_PX);
     }
-    stroke.move(event.clientX, event.clientY);
+    move(event.clientX, event.clientY);
   });
   canvas.addEventListener('pointerup', (event) => {
     if (event.pointerId === blocked) blocked = -1;
     if (event.pointerId !== active) return;
     if (pendingTap) {
       const distanceSq = (event.clientX - startX) ** 2 + (event.clientY - startY) ** 2;
-      if (distanceSq <= DRAG_SLOP_PX ** 2)
-        stroke.begin(event.clientX, event.clientY, TOUCH_PADDING_PX);
+      if (distanceSq <= DRAG_SLOP_PX ** 2) begin(event.clientX, event.clientY, TOUCH_PADDING_PX);
       pendingTap = false;
     } else {
-      stroke.move(event.clientX, event.clientY);
+      move(event.clientX, event.clientY);
     }
     stroke.finish();
+    feedback.finish();
     active = -1;
     // Implicit lostpointercapture follows normal pointerup; keep the queued tap until rAF.
   });
@@ -135,8 +145,6 @@ export function mountParticleInput(
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) cancel();
   });
-  reducedMotion.addEventListener('change', () => {
-    if (reducedMotion.matches) cancel();
-  });
+  reducedMotion.addEventListener('change', cancel);
   return cancel;
 }
