@@ -15,6 +15,11 @@
  *   took, the speed on phones.
  * - `clip_shared` { pair, method }: the video sent to the share sheet or downloaded.
  * - `clip_failed` { stage, reason }: making or sharing a clip broke.
+ * - `stream_start` { pair, layout }: stream mode (`?obs`) started its music: on load in OBS, on a
+ *   press elsewhere, or when OBS shows the source again. Stream mode sends no `listen`: a
+ *   broadcast is not a daily listener.
+ * - `stream_hour` { pair }: every hour the stream's music keeps running, so the hours on air add
+ *   up; the pair is the one it started with.
  */
 declare global {
   interface Window {
@@ -24,6 +29,7 @@ declare global {
 }
 
 const ENGAGED_MS = 10 * 60_000;
+const STREAM_HOUR_MS = 60 * 60_000;
 const KEY = 'crypto-tune.listen-days.v1';
 
 /** The part of `Storage` the day counter needs; specs pass an in-memory one. */
@@ -87,6 +93,33 @@ export class ListenTracker {
   }
 }
 
+/**
+ * Runs `send` once the page has loaded. The Umami script is deferred after the app, so an event
+ * that fires while the page loads (a clip support check, music that starts on load in OBS) would
+ * find no `window.umami` yet.
+ */
+function afterLoad(send: () => void): void {
+  if (document.readyState === 'complete') send();
+  else window.addEventListener('load', send, { once: true });
+}
+
+export class StreamTracker {
+  private hourTimer = 0;
+
+  started(pair: string, layout: string): void {
+    afterLoad(() => window.umami?.track('stream_start', { pair, layout }));
+    window.clearInterval(this.hourTimer);
+    this.hourTimer = window.setInterval(
+      () => window.umami?.track('stream_hour', { pair }),
+      STREAM_HOUR_MS,
+    );
+  }
+
+  stopped(): void {
+    window.clearInterval(this.hourTimer);
+  }
+}
+
 const SUPPORT_KEY = 'crypto-tune.clip-support.v1';
 
 export class ShareTracker {
@@ -99,17 +132,19 @@ export class ShareTracker {
    * there to take it (not yet loaded, blocked, or a dev host), so a later load still counts.
    */
   clipSupport(result: { supported: boolean; reason?: string }): void {
-    const umami = window.umami;
-    if (!umami) return;
-    try {
-      if (sessionStorage.getItem(SUPPORT_KEY)) return;
-      sessionStorage.setItem(SUPPORT_KEY, '1');
-    } catch {
-      // No session storage: counted on every load, a small overcount.
-    }
-    umami.track('clip_support', {
-      supported: result.supported ? 'yes' : 'no',
-      reason: result.reason ?? 'none',
+    afterLoad(() => {
+      const umami = window.umami;
+      if (!umami) return;
+      try {
+        if (sessionStorage.getItem(SUPPORT_KEY)) return;
+        sessionStorage.setItem(SUPPORT_KEY, '1');
+      } catch {
+        // No session storage: counted on every load, a small overcount.
+      }
+      umami.track('clip_support', {
+        supported: result.supported ? 'yes' : 'no',
+        reason: result.reason ?? 'none',
+      });
     });
   }
 

@@ -115,10 +115,20 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 - `src/share.ts` — what sharing says: the link (pair page, or `/`, with `?utm_source=share`) and its
   line, a clip's top line, watermark (`crypto-tune.com/<slug>` for pair pages) and file name.
   Simulated markets say so.
+- `src/address.ts` — what the address asks for: `?obs` stream mode (`StreamOptions`, owned by
+  `ui/app.ts`: layout `full`/`audio`, aura mode, frame cap), `?pair=`/`market=` for any pair
+  (precedes a pair page's pair, never saved) and `addressAfterPick`: the address once the user
+  picks a pair (its page or `/`, `?pair=` dropped, the rest kept). `main.ts` applies it on a pair
+  pick only. In stream mode `main.ts` starts the music on load (OBS autoplays; elsewhere
+  `AudioEngine.blocked` turns Listen into the press `resume()` needs) and follows OBS's
+  `obsSourceVisibleChanged` (a start that completes while hidden stops at once); the view keeps
+  the readouts unfaded, names the pair and watermark with the clip's words (`pairTexts`, from
+  `share.ts`), scales labels (`Fx.labelScale`) and can pause the scene (`Stage.setPaused`).
 - `src/analytics.ts` — Umami events `listen` / `listen_10m`, `link_shared`, `clip_support` (once
-  per session), `clip_recorded`, `clip_shared`, `clip_failed` (beacon in `index.html`, counts only
-  on the production host). No identifiers: returning listeners come from a day counter in
-  localStorage. Wired in `main.ts` around audio start/stop and the share handlers.
+  per session), `clip_recorded`, `clip_shared`, `clip_failed`, and in stream mode `stream_start` /
+  `stream_hour` instead of the listen events (beacon in `index.html`, counts only on the production
+  host). No identifiers: returning listeners come from a day counter in localStorage. Wired in
+  `main.ts` around audio start/stop and the share handlers.
 - `src/main.ts` — wiring: settings → feed → metrics → UI/audio.
 
 ## Code organization

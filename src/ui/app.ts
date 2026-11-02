@@ -32,7 +32,7 @@ import {
   LIQUIDATION_PULSE,
   UP_COLOR,
 } from './palette';
-import { mountStage } from './scene/stage';
+import { type AuraMode, mountStage } from './scene/stage';
 
 /** Smoothed direction beyond ±this gets an arrow in the tab title; inside it reads as flat. */
 const DIRECTION_ARROW_MIN = 0.2;
@@ -44,6 +44,8 @@ const VISUAL_MAX_AGE_MS = 2_000;
 const fresh = (ts: number) => ts >= Date.now() - VISUAL_MAX_AGE_MS;
 /** The last big trade or liquidation stays readable this long, then fades out. */
 const EVENT_SHOW_MS = 60_000;
+/** Trade and liquidation labels on a stream: read in a small player, not at arm's length. */
+const STREAM_LABEL_SCALE = 1.6;
 
 export interface AppHandlers {
   /** Called with the full updated settings after any control change. */
@@ -54,10 +56,24 @@ export interface AppHandlers {
   onParticleTouch(side: TradeSide, strength: number): void;
   /** The link, clip data and rendering behind the Share dialog. */
   share: ShareHandlers;
+  /**
+   * How a clip names the pair being played: its top line and watermark (`crypto-tune.com/bitcoin`
+   * on a pair page). Stream mode shows the same words, so a stream and a clip say the same thing.
+   */
+  pairTexts(): { pair: string; watermark: string };
 }
 
-/** What the Start/Stop button shows. */
-export type PlaybackView = 'stopped' | 'starting' | 'running';
+/** Stream mode (`?obs`, parsed by `address.ts`): what changes for a broadcast. */
+export interface StreamOptions {
+  /** `full`: the scene with readouts that never fade; `audio`: nothing drawn, sound only. */
+  layout: 'full' | 'audio';
+  aura: AuraMode;
+  /** Frame-rate cap for the scene; null: the display's rate. */
+  maxFps: number | null;
+}
+
+/** What the Start/Stop button shows; `blocked`: a start waits for a press (autoplay policy). */
+export type PlaybackView = 'stopped' | 'starting' | 'blocked' | 'running';
 
 export type EventReadout =
   | ({ kind: 'liquidation' } & EventCue<LiquidationSide>)
@@ -81,6 +97,8 @@ export interface AppView {
   liquidation(l: Liquidation): void;
   /** The browser can make clips: the Share dialog shows its clip part. */
   enableClips(): void;
+  /** Stream mode: OBS showed or hid the source; a hidden one draws nothing. */
+  setSourceVisible(visible: boolean): void;
 }
 
 function statusText(s: FeedStatus, source: Settings['source']): string {
@@ -106,8 +124,18 @@ const arrowOf = (d: number) =>
 /** Tabs of the pair list, one per Binance futures market. */
 const MARKET_LABELS: Record<Settings['market'], string> = { usdm: 'USDⓈ-M', coinm: 'COIN-M' };
 
-export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
+export function mountApp(
+  initial: Settings,
+  handlers: AppHandlers,
+  stream: StreamOptions | null = null,
+): AppView {
   let settings = initial;
+  const soundOnly = stream?.layout === 'audio';
+  if (stream) {
+    document.body.classList.add('stream', `stream-${stream.layout}`);
+    // On air the readouts are the content: only the controls fade.
+    for (const node of document.querySelectorAll('.meter, .info')) node.classList.remove('fades');
+  }
   /** Markets whose pair list has loaded; the others let the search take any symbol as typed. */
   const listed = new Set<string>();
   const update = (patch: Partial<Settings>) => {
@@ -157,6 +185,18 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     if (lastEvent.classList.contains('faded')) clearEvent();
   });
   const audioToggle = el<HTMLButtonElement>('audio-toggle');
+  const streamPair = el('stream-pair');
+  const streamMark = el('stream-mark');
+  streamPair.hidden = streamMark.hidden = !stream;
+  /** Stream mode: what the line under the pair says while the feed is down; null while it is up. */
+  let outage: string | null = null;
+  /** Stream mode names the pair on screen (the picker fades with the controls), or the outage. */
+  const paintStream = () => {
+    if (!stream) return;
+    const { pair, watermark } = handlers.pairTexts();
+    streamPair.textContent = outage ? `${pair} · ${outage}` : pair;
+    streamMark.textContent = watermark;
+  };
   const pair = mountPicker(el('pair'), {
     label: 'Pair',
     scopes: {
@@ -198,6 +238,7 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     if (live) pair.set(settings.symbol, settings.market);
     else pair.disable('Simulator');
     mediaKeys.setTitle(live ? settings.symbol : 'Simulator');
+    paintStream();
   };
   syncPair();
 
@@ -208,11 +249,14 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
   let chartDirty = false;
   /** Between reset() and historyReady(): the meter shows the wait, not a warm-up countdown. */
   let loadingHistory = true;
+  /** Stream mode: the scene stops drawing while OBS hides the source, and never draws for audio. */
+  let scenePaused = soundOnly;
   const {
     aura,
     fx,
     chart,
     clear: clearStage,
+    setPaused: setScenePaused,
   } = mountStage({
     origin: priceNode,
     reducedMotion,
@@ -224,7 +268,11 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
         chartDirty = chart.draw(history, last.ts, settings.periodMin * 60_000);
       }
     },
+    aura: soundOnly ? 'off' : (stream?.aura ?? 'auto'),
+    maxFps: stream?.maxFps ?? null,
+    labelScale: stream ? STREAM_LABEL_SCALE : 1,
   });
+  if (scenePaused) setScenePaused(true);
   mountChartTip(el<HTMLCanvasElement>('chart'), el('chart-tip'), (x, y) => chart.markerAt(x, y));
 
   // ── immersive mode ──
@@ -308,6 +356,14 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     setStatus(s) {
       status.dataset.state = s.state;
       status.textContent = statusText(s, settings.source);
+      // Always on screen in stream mode, so no countdown that only moves on the next status.
+      outage =
+        s.state === 'open'
+          ? null
+          : s.state === 'reconnecting'
+            ? 'Reconnecting…'
+            : status.textContent;
+      paintStream();
       // No snapshot yet: say what the empty readout is waiting for.
       if (!last && s.state === 'connecting') vol.textContent = 'Connecting to the market…';
       // Connected but no snapshot yet: waiting for the first live trade.
@@ -331,11 +387,14 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     trade(t) {
       if (!fresh(t.ts)) return;
       flow.add(t.side, t.price * t.qty, t.ts);
-      if (!document.hidden && !reducedMotion.matches) fx.trade(t.side, t.price * t.qty);
+      if (!document.hidden && !reducedMotion.matches && !scenePaused) {
+        fx.trade(t.side, t.price * t.qty);
+      }
     },
     liquidation(l) {
       // Hidden tab: nothing to see. Reduced motion: no waves, shocks or shake at all.
-      if (!fresh(l.ts) || document.hidden || reducedMotion.matches) return;
+      // A paused scene (stream mode) would only queue particles it never draws.
+      if (!fresh(l.ts) || document.hidden || reducedMotion.matches || scenePaused) return;
       fx.liquidation(l.side, l.usd, settings.liqThresholdUsd);
       if (l.usd >= settings.liqThresholdUsd) aura?.pulseBy(LIQUIDATION_PULSE);
     },
@@ -345,6 +404,10 @@ export function mountApp(initial: Settings, handlers: AppHandlers): AppView {
     },
     enableClips() {
       share.enableClips();
+    },
+    setSourceVisible(visible) {
+      scenePaused = !visible || soundOnly;
+      setScenePaused(scenePaused);
     },
   };
 }
