@@ -100,8 +100,9 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   flow → aura colours/motion; the one source of side and tension colours, CSS included),
   `scene/spawn.ts` (merging, bubble start state), `scene/pop.ts` (bubble pop height, droplets),
   `scene/sparks.ts` (sparks of a drop on the line, their cooling), `scene/surface.ts` (the smooth
-  price line, a polyline per pixel column). Visuals are wall-clock animation; anything older
-  than 2 s is not animated (a throttled tab's catch-up, filtered in the view). Every motion effect
+  price line, a polyline per pixel column). Animation uses frame time. Live event freshness
+  (2 s cutoff) and flow use `Date.now()` plus a fixed feed offset (`src/visual-clock.ts`),
+  calibrated on the first event; simulator events use wall time directly. Every motion effect
   respects `prefers-reduced-motion`; a clip's video does not (it plays on other people's screens),
   and its preview never autoplays.
 - `src/settings.ts` — persisted settings (localStorage), validated field by field on load.

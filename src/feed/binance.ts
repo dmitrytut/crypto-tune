@@ -93,7 +93,7 @@ export interface BinanceFeedOptions {
 /** `aggTrades` weighs 20 on both markets; 20 pages = 400 of the 2400/min per-IP budget. */
 const HISTORY_MAX_PAGES = 20;
 const HISTORY_PAGE_SIZE = 1000;
-/** Whole history load gives up after this and reports no history: metrics warm up live, ms. */
+/** Deadline (ms) for history warm-up and COIN-M contract specs; neither may wait forever. */
 const HISTORY_TIMEOUT_MS = 15_000;
 /** Longest wait for the trade cache; a stuck store must never hold the live stream back. */
 const CACHE_TIMEOUT_MS = 1_500;

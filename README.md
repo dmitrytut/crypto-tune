@@ -329,9 +329,9 @@ conventions are in [`AGENTS.md`](AGENTS.md).
 **Repository review (2026-11-02).** History now refills a short cache left by an outage, while
 busy pairs still reuse a cache that reaches beyond the REST page budget. COIN-M contract
 loading times out instead of waiting forever. Clip replay preserves markers at its start.
-Visual freshness and flow use the market's clock, not an unsynchronised device clock;
-scrolling keeps particle impacts aligned with the chart. The aura rebuilds its GPU resources
-after context loss and uses high-precision fragment floats where supported.
+Visual freshness and flow use wall time with a fixed market-clock correction, including after
+system sleep; scrolling keeps particle impacts aligned with the chart. The aura rebuilds its
+GPU resources after context loss.
 Picker toggling, dialog drag selection, pair-page media artwork and clip readiness transitions
 are corrected. Stopped audio tracks tempo without appending transport automation.
 
@@ -340,7 +340,6 @@ drag About text past its edge, start Listen from `/bitcoin/`, scroll a short vie
 render a clip while listening. Use `WEBGL_lose_context` to lose and restore the aura context.
 The [full review](docs/reviews/2026-11-02-repository-review.md) records reproductions, limitations
 and remaining improvement ideas.
-
 
 **Deploy.** Every push to `master` builds the site and publishes it to GitHub Pages
 ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): check, test, build, upload

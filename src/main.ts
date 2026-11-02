@@ -22,6 +22,7 @@ import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { shareTexts } from './share';
 import { mountApp } from './ui/app';
 import { CLIP_FORMAT, clipSupport } from './ui/clip-format';
+import { calibratedClock } from './visual-clock';
 
 const params = new URLSearchParams(location.search);
 /** Stream mode (`?obs`): OBS, a TV; null on the ordinary page. */
@@ -249,16 +250,7 @@ function startPipeline(): void {
   events = new EventBuffer(eventThresholds(settings));
   clips.reset();
   feedOpen = false;
-  // Calibrate on the first event, then advance monotonically: a queued socket backlog must
-  // not drag visual time backwards with the feed's smoothed clock offset.
-  visualNow = Date.now;
-  if (settings.source === 'live') {
-    visualNow = () => {
-      const epoch = f.now() - performance.now();
-      visualNow = () => epoch + performance.now();
-      return visualNow();
-    };
-  }
+  visualNow = settings.source === 'live' ? calibratedClock(f) : Date.now;
   /** Live trades since connect, replayed after history into the rebuilt metrics; null after. */
   let seen: Trade[] | null = [];
   unsubs = [

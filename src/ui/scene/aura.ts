@@ -26,11 +26,7 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
  * field and glow (liquidations), and point blooms (large trades).
  */
 const FRAGMENT = `
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
 precision mediump float;
-#endif
 uniform vec2 uRes;
 uniform float uTime;
 uniform vec2 uDrift;

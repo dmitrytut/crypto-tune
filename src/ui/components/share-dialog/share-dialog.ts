@@ -103,10 +103,11 @@ export function mountShareDialog(h: ShareHandlers): ShareDialog {
     if (rendering) return;
     const r = h.readiness(seconds);
     make.disabled = !r.ready;
-    if (file || (failed && r.ready)) return;
-    failed = false;
-    if (r.ready) say(`Ready: the last ${seconds} s.`);
-    else say('Preparing clip…', `${Math.ceil(r.leftMs / 1000)} s`);
+    if (file) return;
+    const countdown = r.ready ? '' : `${Math.ceil(r.leftMs / 1000)} s`;
+    if (failed) say('Could not make the clip.', r.ready ? '' : `Preparing clip… ${countdown}`);
+    else if (r.ready) say(`Ready: the last ${seconds} s.`);
+    else say('Preparing clip…', countdown);
   };
   const watchReadiness = () => {
     window.clearInterval(timer);
