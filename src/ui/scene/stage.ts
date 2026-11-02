@@ -31,8 +31,6 @@ export interface StageOptions {
   maxFps: number | null;
   /** Text size multiplier for trade and liquidation labels. */
   labelScale: number;
-  /** Start without drawing (stream mode, sound only). */
-  paused: boolean;
 }
 
 /** The visual layers: WebGL aura (null without hardware WebGL), event overlay and history chart. */
@@ -127,8 +125,8 @@ export function mountStage(o: StageOptions): Stage {
     feedback.draw(t);
     o.onFrame();
   };
-  let paused = o.paused;
-  if (!paused) raf = requestAnimationFrame(frame);
+  let paused = false;
+  raf = requestAnimationFrame(frame);
   const setPaused = (next: boolean) => {
     if (next === paused) return;
     paused = next;

@@ -56,14 +56,17 @@ export interface AppHandlers {
   onParticleTouch(side: TradeSide, strength: number): void;
   /** The link, clip data and rendering behind the Share dialog. */
   share: ShareHandlers;
+  /**
+   * How a clip names the pair being played: its top line and watermark (`crypto-tune.com/bitcoin`
+   * on a pair page). Stream mode shows the same words, so a stream and a clip say the same thing.
+   */
+  pairTexts(): { pair: string; watermark: string };
 }
 
-export type StreamLayout = 'full' | 'audio';
-
-/** Stream mode (`?obs`, parsed by `stream.ts`): what changes for a broadcast. */
+/** Stream mode (`?obs`, parsed by `address.ts`): what changes for a broadcast. */
 export interface StreamOptions {
   /** `full`: the scene with readouts that never fade; `audio`: nothing drawn, sound only. */
-  layout: StreamLayout;
+  layout: 'full' | 'audio';
   aura: AuraMode;
   /** Frame-rate cap for the scene; null: the display's rate. */
   maxFps: number | null;
@@ -127,6 +130,7 @@ export function mountApp(
   stream: StreamOptions | null = null,
 ): AppView {
   let settings = initial;
+  const soundOnly = stream?.layout === 'audio';
   if (stream) {
     document.body.classList.add('stream', `stream-${stream.layout}`);
     // On air the readouts are the content: only the controls fade.
@@ -182,14 +186,16 @@ export function mountApp(
   });
   const audioToggle = el<HTMLButtonElement>('audio-toggle');
   const streamPair = el('stream-pair');
-  streamPair.hidden = !stream;
-  el('stream-mark').hidden = !stream;
-  let feedStatus = { state: 'idle' } as FeedStatus;
+  const streamMark = el('stream-mark');
+  streamPair.hidden = streamMark.hidden = !stream;
+  /** Stream mode: what the line under the pair says while the feed is down; null while it is up. */
+  let outage: string | null = null;
   /** Stream mode names the pair on screen (the picker fades with the controls), or the outage. */
-  const paintStreamPair = () => {
-    const name = settings.source === 'live' ? `${settings.symbol} · Binance Futures` : 'Simulated';
-    const ok = feedStatus.state === 'open';
-    streamPair.textContent = ok ? name : `${name} · ${statusText(feedStatus, settings.source)}`;
+  const paintStream = () => {
+    if (!stream) return;
+    const { pair, watermark } = handlers.pairTexts();
+    streamPair.textContent = outage ? `${pair} · ${outage}` : pair;
+    streamMark.textContent = watermark;
   };
   const pair = mountPicker(el('pair'), {
     label: 'Pair',
@@ -232,7 +238,7 @@ export function mountApp(
     if (live) pair.set(settings.symbol, settings.market);
     else pair.disable('Simulator');
     mediaKeys.setTitle(live ? settings.symbol : 'Simulator');
-    paintStreamPair();
+    paintStream();
   };
   syncPair();
 
@@ -244,7 +250,7 @@ export function mountApp(
   /** Between reset() and historyReady(): the meter shows the wait, not a warm-up countdown. */
   let loadingHistory = true;
   /** Stream mode: the scene stops drawing while OBS hides the source, and never draws for audio. */
-  let scenePaused = stream?.layout === 'audio';
+  let scenePaused = soundOnly;
   const {
     aura,
     fx,
@@ -262,11 +268,11 @@ export function mountApp(
         chartDirty = chart.draw(history, last.ts, settings.periodMin * 60_000);
       }
     },
-    aura: stream?.layout === 'audio' ? 'off' : (stream?.aura ?? 'auto'),
+    aura: soundOnly ? 'off' : (stream?.aura ?? 'auto'),
     maxFps: stream?.maxFps ?? null,
     labelScale: stream ? STREAM_LABEL_SCALE : 1,
-    paused: scenePaused,
   });
+  if (scenePaused) setScenePaused(true);
   mountChartTip(el<HTMLCanvasElement>('chart'), el('chart-tip'), (x, y) => chart.markerAt(x, y));
 
   // ── immersive mode ──
@@ -350,8 +356,14 @@ export function mountApp(
     setStatus(s) {
       status.dataset.state = s.state;
       status.textContent = statusText(s, settings.source);
-      feedStatus = s;
-      paintStreamPair();
+      // Always on screen in stream mode, so no countdown that only moves on the next status.
+      outage =
+        s.state === 'open'
+          ? null
+          : s.state === 'reconnecting'
+            ? 'Reconnecting…'
+            : status.textContent;
+      paintStream();
       // No snapshot yet: say what the empty readout is waiting for.
       if (!last && s.state === 'connecting') vol.textContent = 'Connecting to the market…';
       // Connected but no snapshot yet: waiting for the first live trade.
@@ -394,7 +406,7 @@ export function mountApp(
       share.enableClips();
     },
     setSourceVisible(visible) {
-      scenePaused = !visible || stream?.layout === 'audio';
+      scenePaused = !visible || soundOnly;
       setScenePaused(scenePaused);
     },
   };

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { dropPairParams, pairParamOf, streamOptionsOf } from '../stream';
+import { addressAfterPick, pairParamOf, streamOptionsOf } from '../address';
 
 const q = (search: string) => new URLSearchParams(search);
+const live = (symbol: string, market: 'usdm' | 'coinm' = 'usdm') =>
+  ({ source: 'live', market, symbol }) as const;
 
 describe('streamOptionsOf', () => {
   it('is off without ?obs, whatever else the address carries', () => {
@@ -53,15 +55,27 @@ describe('pairParamOf', () => {
   });
 });
 
-describe('dropPairParams', () => {
-  it('removes the pair and its market, keeping the rest of the address', () => {
-    expect(dropPairParams('?obs&pair=ETHUSDT&market=usdm&utm_source=youtube')).toBe(
-      '?obs=&utm_source=youtube',
+describe('addressAfterPick', () => {
+  it('moves to the pair page and drops the pair the old one came by, keeping the rest', () => {
+    const at = { pathname: '/', search: '?obs&pair=SOLUSDT&utm_source=youtube' };
+    expect(addressAfterPick(live('ETHUSDT'), at)).toBe('/ethereum/?obs=&utm_source=youtube');
+  });
+
+  it('goes home for a pair without a page, a COIN-M pair or the simulator', () => {
+    const at = { pathname: '/bitcoin/', search: '?obs' };
+    expect(addressAfterPick(live('TRXUSDT'), at)).toBe('/?obs');
+    expect(addressAfterPick(live('BTCUSD_PERP', 'coinm'), at)).toBe('/?obs');
+    expect(addressAfterPick({ source: 'simulator', market: 'usdm', symbol: 'BTCUSDT' }, at)).toBe(
+      '/?obs',
     );
   });
 
-  it('leaves no bare question mark behind', () => {
-    expect(dropPairParams('?pair=ETHUSDT')).toBe('');
-    expect(dropPairParams('')).toBe('');
+  it('leaves an address that already fits untouched, its query spelled as it was', () => {
+    expect(addressAfterPick(live('BTCUSDT'), { pathname: '/bitcoin/', search: '?obs' })).toBeNull();
+    expect(addressAfterPick(live('TRXUSDT'), { pathname: '/', search: '' })).toBeNull();
+  });
+
+  it('drops a lone pair parameter without leaving a bare question mark', () => {
+    expect(addressAfterPick(live('TRXUSDT'), { pathname: '/', search: '?pair=TRXUSDT' })).toBe('/');
   });
 });

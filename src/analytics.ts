@@ -93,14 +93,21 @@ export class ListenTracker {
   }
 }
 
+/**
+ * Runs `send` once the page has loaded. The Umami script is deferred after the app, so an event
+ * that fires while the page loads (a clip support check, music that starts on load in OBS) would
+ * find no `window.umami` yet.
+ */
+function afterLoad(send: () => void): void {
+  if (document.readyState === 'complete') send();
+  else window.addEventListener('load', send, { once: true });
+}
+
 export class StreamTracker {
   private hourTimer = 0;
 
   started(pair: string, layout: string): void {
-    // In OBS the music starts on load, possibly before the deferred Umami script has run.
-    const send = () => window.umami?.track('stream_start', { pair, layout });
-    if (window.umami || document.readyState === 'complete') send();
-    else window.addEventListener('load', send, { once: true });
+    afterLoad(() => window.umami?.track('stream_start', { pair, layout }));
     window.clearInterval(this.hourTimer);
     this.hourTimer = window.setInterval(
       () => window.umami?.track('stream_hour', { pair }),
@@ -125,17 +132,19 @@ export class ShareTracker {
    * there to take it (not yet loaded, blocked, or a dev host), so a later load still counts.
    */
   clipSupport(result: { supported: boolean; reason?: string }): void {
-    const umami = window.umami;
-    if (!umami) return;
-    try {
-      if (sessionStorage.getItem(SUPPORT_KEY)) return;
-      sessionStorage.setItem(SUPPORT_KEY, '1');
-    } catch {
-      // No session storage: counted on every load, a small overcount.
-    }
-    umami.track('clip_support', {
-      supported: result.supported ? 'yes' : 'no',
-      reason: result.reason ?? 'none',
+    afterLoad(() => {
+      const umami = window.umami;
+      if (!umami) return;
+      try {
+        if (sessionStorage.getItem(SUPPORT_KEY)) return;
+        sessionStorage.setItem(SUPPORT_KEY, '1');
+      } catch {
+        // No session storage: counted on every load, a small overcount.
+      }
+      umami.track('clip_support', {
+        supported: result.supported ? 'yes' : 'no',
+        reason: result.reason ?? 'none',
+      });
     });
   }
 

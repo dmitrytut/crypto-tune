@@ -1,3 +1,4 @@
+import { addressAfterPick, pairParamOf, streamOptionsOf } from './address';
 import { ListenTracker, ShareTracker, StreamTracker } from './analytics';
 import { AudioEngine } from './audio/engine';
 import type { AudioParams } from './audio/graph';
@@ -16,16 +17,17 @@ import { ClipBuffer, type ClipSeconds, replayHistory } from './metrics/clip-buff
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
 import { EventBuffer, type EventThresholds } from './metrics/events';
 import { MarketHistory } from './metrics/history';
-import { pagePath, pairPageAt, pairPageOf } from './pair-pages';
+import { pairPageAt } from './pair-pages';
 import { loadSettings, type Settings, saveSettings, TONICS } from './settings';
 import { shareTexts } from './share';
-import { dropPairParams, pairParamOf, streamOptionsOf } from './stream';
 import { mountApp } from './ui/app';
 import { CLIP_FORMAT, clipSupport } from './ui/clip-format';
 
 const params = new URLSearchParams(location.search);
 /** Stream mode (`?obs`): OBS, a TV; null on the ordinary page. */
 const stream = streamOptionsOf(params);
+/** Stream mode: OBS shows the source. A hidden one plays nothing, even a start already under way. */
+let sourceVisible = true;
 const stored = loadSettings();
 /** A pair the address names (`?pair=`, or a pair page like /bitcoin/) plays over the stored one. */
 const landing = pairPageAt(location.pathname);
@@ -73,18 +75,11 @@ const metricsEngine = (s: Settings) =>
     tension: tensionParams(s),
   });
 
-/**
- * Puts the address on the page of the pair being played (`/` for one without a page), so a reload
- * or a copied link opens it. Replaces the entry: switching pairs must not fill the back button.
- */
-function syncPath(s: Settings): void {
-  const page = s.source === 'live' && s.market === 'usdm' ? pairPageOf(s.symbol) : undefined;
-  const path = pagePath(page);
-  if (path !== location.pathname || dropPairParams(location.search) !== location.search) {
-    // `window.`: the module's `history` is the chart's MarketHistory.
-    const search = dropPairParams(location.search);
-    window.history.replaceState(window.history.state, '', path + search + location.hash);
-  }
+/** Puts the pair just picked into the address. Replaces the entry: picks must not fill Back. */
+function syncAddress(s: Settings): void {
+  const next = addressAfterPick(s, location);
+  // `window.`: the module's `history` is the chart's MarketHistory.
+  if (next) window.history.replaceState(window.history.state, '', next + location.hash);
 }
 
 const audio = new AudioEngine(audioParams(settings));
@@ -108,6 +103,11 @@ function startAudio(): void {
   view.setPlayback('starting');
   audio.start().then(
     () => {
+      // OBS hid the source while the graph was still starting: it must not play hidden.
+      if (!sourceVisible) {
+        stopAudio();
+        return;
+      }
       view.setPlayback('running');
       if (stream) streams.started(analyticsPair(settings), stream.layout);
       else listens.started(analyticsPair(settings));
@@ -186,10 +186,12 @@ const view = mountApp(
       settings = next;
       const pairChanged =
         next.source !== prev.source || next.market !== prev.market || next.symbol !== prev.symbol;
-      if (pairChanged) savedPair = null;
+      if (pairChanged) {
+        savedPair = null;
+        syncAddress(next);
+      }
       if (pairChanged || next.windowSec !== prev.windowSec) {
         startPipeline();
-        syncPath(next);
       } else if (next.sensitivity !== prev.sensitivity) {
         engine?.setTensionParams(tensionParams(next));
       }
@@ -200,6 +202,7 @@ const view = mountApp(
     onParticleTouch(side, strength) {
       audio.touch(side, strength);
     },
+    pairTexts: () => shareTexts(site, settings, new Date()),
     share: {
       link: () => shareTexts(site, settings, new Date()).link,
       onLinkShared: (method) => shares.linkShared(analyticsPair(settings), method),
@@ -210,9 +213,12 @@ const view = mountApp(
     },
     onToggleAudio() {
       if (audio.current === 'running') stopAudio();
-      // A start the autoplay policy holds: this press is the gesture it waits for.
-      else if (audio.current === 'starting') audio.resume();
-      else startAudio();
+      // A start the autoplay policy holds: this press is the gesture it waits for, and the one the
+      // media keys' silent track may start in.
+      else if (audio.current === 'starting') {
+        view.setPlayback('starting');
+        audio.resume();
+      } else startAudio();
     },
   },
   stream,
@@ -328,10 +334,8 @@ startPipeline();
 for (const market of BINANCE_MARKETS) void loadSymbols(market);
 void clipSupport().then((support) => {
   if (support.supported) view.enableClips();
-  // The Umami script is deferred after this module: report once the page has loaded.
-  const report = () => shares.clipSupport(support);
-  if (document.readyState === 'complete') report();
-  else window.addEventListener('load', report, { once: true });
+  // The Umami script is deferred after this module: the tracker waits for the page to load.
+  shares.clipSupport(support);
 });
 
 if (stream) {
@@ -339,6 +343,7 @@ if (stream) {
   // OBS hides a source with its eye icon or a scene switch: no drawing, no music until it is back.
   window.addEventListener('obsSourceVisibleChanged', (e) => {
     const { visible } = (e as CustomEvent<{ visible: boolean }>).detail;
+    sourceVisible = visible;
     view.setSourceVisible(visible);
     if (!visible) stopAudio();
     else if (audio.current === 'stopped') startAudio();

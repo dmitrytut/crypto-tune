@@ -273,10 +273,11 @@ For a broadcast (an OBS browser source on Twitch or YouTube) or a screen nobody 
 to the address: `https://crypto-tune.com/bitcoin/?obs`.
 - The music starts by itself where the browser allows it: OBS does (its browser autoplays). An
   ordinary browser holds it until a press, so Listen stays on screen and one press starts it.
-- The pair (`BTCUSDT · Binance Futures`, or the outage, `· Reconnecting…`), the tension meter and
-  the volume and last-event line stay on screen; only the controls fade after 10 s, and
-  `crypto-tune.com` takes their corner. Readouts and the trade and liquidation labels are a size
-  larger, read in a small player. No film grain: a video encoder turns it into blocks.
+- The pair (`BTCUSDT`, the top line a clip has, plus `· Reconnecting…` during an outage), the
+  tension meter and the volume and last-event line stay on screen; only the controls fade after
+  10 s, and the clip's watermark (`crypto-tune.com/bitcoin` on a pair page) takes their corner.
+  Readouts and the trade and liquidation labels are about half again as large, read in a small
+  player. No film grain: a video encoder turns it into blocks.
 - When OBS hides the source (its eye icon, a scene without it) the music stops and nothing is drawn;
   showing it starts both again.
 - Settings work as usual through OBS's **Interact** window and are remembered.
@@ -432,12 +433,12 @@ sound, and Binance covers the pairs that matter.
 
 ### Stream mode
 
-1. `pnpm test`: includes the address parameters (defaults, unknown values, the frame cap's range,
-   pair and market, dropping the pair on a pick).
+1. `pnpm test`: includes the address (stream defaults, unknown values, the frame cap's range, pair
+   and market, the address after a pick: pair page or `/`, `?pair=` dropped, the rest kept).
 2. `pnpm build && pnpm preview --host 127.0.0.1`, open `/bitcoin/?obs` in Chromium started with
    `--autoplay-policy=no-user-gesture-required` (what OBS runs): the music plays with no press;
-   after 10 s the controls fade, the pair line, meter and volume line stay, `crypto-tune.com` shows
-   top right; no grain.
+   after 10 s the controls fade, the pair line, meter and volume line stay, `crypto-tune.com/bitcoin`
+   shows top right; no grain. Changing the tension window keeps the address.
 3. In the console: `dispatchEvent(new CustomEvent('obsSourceVisibleChanged', {detail: {visible:
    false}}))`: Listen reads Listen again and the scene stops; `visible: true` starts both again.
 4. `/?obs&layout=audio&pair=ethusdt`: an empty transparent page, ETHUSDT playing (tab title).

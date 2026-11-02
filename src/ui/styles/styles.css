@@ -374,7 +374,7 @@
       content: none;
     }
 
-    /* The text scale one size up the whole hero: the readouts stay legible after scaling down. */
+    /* Readouts about half again as large (17–24 px for 12–15 px): legible in a small player. */
     & .hero {
       width: min(760px, 100%);
       --font-size-xs: 17px;
@@ -412,11 +412,12 @@
     }
   }
   /* Sound only: nothing drawn, a transparent page; Listen shows only when a press must start it. */
-  :root:has(body.stream-audio),
-  body.stream-audio {
+  :root:has(body.stream-audio) {
     background: transparent;
   }
   body.stream-audio {
+    background: transparent;
+
     & :is(#aura, #fx, .top, .chart, .stream-mark),
     & .hero > :not(.play),
     & .play:not([data-state="blocked"]) {
