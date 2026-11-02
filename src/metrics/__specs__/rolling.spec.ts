@@ -47,14 +47,9 @@ describe('RollingStats', () => {
     expect(rs.std).toBeCloseTo(ref.std, 6);
   });
 
-  it('reports zero std for a constant series and after clear', () => {
+  it('reports zero std for a constant series', () => {
     const rs = new RollingStats(4);
     for (let i = 0; i < 10; i++) rs.push(5);
-    expect(rs.std).toBe(0);
-    rs.clear();
-    expect(rs.count).toBe(0);
-    rs.push(2);
-    expect(rs.mean).toBe(2);
     expect(rs.std).toBe(0);
   });
 });

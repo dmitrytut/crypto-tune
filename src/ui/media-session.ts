@@ -6,8 +6,8 @@
 const SILENCE_SEC = 10;
 const SILENCE_RATE_HZ = 8000;
 const ARTIST = 'Crypto Tune';
-/** public/apple-touch-icon.png, resolved against the page: the build is served from two paths. */
-const ARTWORK = { src: 'apple-touch-icon.png', sizes: '180x180', type: 'image/png' };
+/** Public assets live at the site root, including from a pair page. */
+const ARTWORK = { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' };
 
 /** What a media key or the OS controls asked for. */
 export interface MediaActions {

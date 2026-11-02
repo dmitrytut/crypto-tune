@@ -75,6 +75,25 @@ describe('ClipBuffer', () => {
 });
 
 describe('replayHistory', () => {
+  it('keeps a chart marker exactly at the replay start without duplicating it', () => {
+    const live = new MarketHistory();
+    const b = new ClipBuffer();
+    for (let ts = T0; ts <= T0 + 40_000; ts += 250) {
+      const cues: EventCues =
+        ts === T0 + 20_000
+          ? { trade: { side: 'buy', usd: 2e5, size: 2, count: 1 }, liquidation: null }
+          : NO_CUES;
+      live.addSnapshot(snap(ts, 100));
+      live.addCues(ts, cues);
+      b.addTick({ ts, snap: snap(ts, 100), cues });
+    }
+    const w = b.window(15);
+    if (!w) throw new Error('not ready');
+    const replay = replayHistory(live, w);
+    replay.advanceTo(w.end);
+    expect(replay.series.markers).toEqual([{ ts: w.start, kind: 'trade', side: 'buy', usd: 2e5 }]);
+  });
+
   it('reveals the window only up to the frame, markers included', () => {
     const live = new MarketHistory();
     const b = new ClipBuffer();

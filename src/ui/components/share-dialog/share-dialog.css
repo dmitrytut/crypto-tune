@@ -34,10 +34,6 @@
     font-size: var(--font-size-md);
     color: var(--muted);
   }
-  .clip-status:has(#clip-status:empty) {
-    display: none;
-  }
-
   .clip-progress {
     display: block;
     width: 100%;

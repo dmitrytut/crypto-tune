@@ -100,6 +100,10 @@ const CACHE_TIMEOUT_MS = 1_500;
 /** How often the trailing history window of trades is written to the store. */
 const SAVE_EVERY_MS = 30_000;
 
+/** The oldest reachable id is bounded by both the request budget and the symbol's first trade. */
+const olderPageCap = (firstId: number): number =>
+  Math.min(HISTORY_MAX_PAGES - 1, Math.ceil(firstId / HISTORY_PAGE_SIZE));
+
 /**
  * How many pages older than `newest` to fetch in one parallel wave: exactly up to the cache
  * when the capped wave reaches it, else enough to reach `sinceMs` at the newest page's pace.
@@ -113,7 +117,7 @@ export function olderPages(
   const first = newest[0];
   const last = newest.at(-1);
   if (!first || !last) return 0;
-  const cap = Math.min(HISTORY_MAX_PAGES - 1, Math.ceil(first.a / HISTORY_PAGE_SIZE));
+  const cap = olderPageCap(first.a);
   const gap = first.a - cachedLastId - 1;
   if (cachedLastId >= 0 && gap <= cap * HISTORY_PAGE_SIZE) {
     return Math.max(0, Math.ceil(gap / HISTORY_PAGE_SIZE));
@@ -199,7 +203,8 @@ export class BinanceFuturesFeed implements MarketFeed {
   private async startContracts(): Promise<void> {
     this.status.emit({ state: 'connecting', attempt: 1 });
     try {
-      this.contractUsd = await fetchContractUsd(this.symbol, this.abort.signal);
+      const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(HISTORY_TIMEOUT_MS)]);
+      this.contractUsd = await fetchContractUsd(this.symbol, signal);
     } catch (err) {
       if (this.abort.signal.aborted) return;
       // shortcut: no retry; picking the pair again starts over. The specs come from the same host
@@ -280,9 +285,16 @@ export class BinanceFuturesFeed implements MarketFeed {
     let past: CachedTrade[] = [];
     try {
       const newest = await fetchPage(this.market, this.symbol, null, signal);
-      const cached = (await cache).filter((t) => t.ts > sinceMs && t.ts < liveTs);
-      const cachedLastId = cached.at(-1)?.id ?? -1;
+      const saved = await cache;
       const firstId = newest[0]?.a ?? 0;
+      // A short run saved after an outage must not prevent REST from warming the market.
+      // Keep partial busy-pair caches when even the full request budget cannot reach earlier.
+      const coversWindow = (saved[0]?.ts ?? Infinity) <= sinceMs;
+      const beyondWave =
+        (saved[0]?.id ?? Infinity) <= firstId - olderPageCap(firstId) * HISTORY_PAGE_SIZE;
+      const cached =
+        coversWindow || beyondWave ? saved.filter((t) => t.ts > sinceMs && t.ts < liveTs) : [];
+      const cachedLastId = cached.at(-1)?.id ?? -1;
       const n = olderPages(newest, sinceMs, cachedLastId);
       const older = await Promise.all(
         Array.from({ length: n }, (_, i) =>

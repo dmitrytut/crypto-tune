@@ -96,7 +96,7 @@ export function startGraph(g: Graph, bpm: number, time: number): void {
 export class Conductor {
   /** Hysteresis state for double time, carried between ticks. */
   private doubleTime = false;
-  /** Last tempo written to the transport, whole BPM; tracks the market without a graph too. */
+  /** Current market tempo, whole BPM; written while playing and applied at each start. */
   bpm = CALM_BPM;
   private shock: ShockState = INITIAL_SHOCK;
 
@@ -120,7 +120,7 @@ export class Conductor {
     this.shock = shock.state;
     if (shock.fired && sounding) g.tension.shock(s.ret >= 0, ctx.now());
     g.tension.applyMix(mix);
-    if (bpmChanged) ctx.transport.bpm.setValueAtTime(bpm, ctx.now());
+    if (bpmChanged && sounding) ctx.transport.bpm.setValueAtTime(bpm, ctx.now());
   }
 
   /** The tick's event cues, now. */

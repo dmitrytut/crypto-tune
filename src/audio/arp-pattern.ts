@@ -28,13 +28,13 @@ export const MAX_REGISTER_SHIFT = 3;
 const HYSTERESIS = 0.25;
 
 /**
- * Scale degree for arpeggio step `step` of `contour`, with the register moved by `shift` degrees.
+ * Scale degree for arpeggio step `step` of `contour`; the layer owns register transposition.
  * @package
  */
-export function arpDegree(step: number, shift: number, contour: Contour = 'calm'): number {
+export function arpDegree(step: number, contour: Contour = 'calm'): number {
   const pattern = PATTERNS[contour];
   const i = ((step % PHRASE_STEPS) + PHRASE_STEPS) % PHRASE_STEPS;
-  return (pattern[i] as number) + shift;
+  return pattern[i] as number;
 }
 
 /**

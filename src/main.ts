@@ -48,6 +48,8 @@ let events: EventBuffer | null = null;
 let unsubs: Unsubscribe[] = [];
 /** The feed is connected: ticks are market time, not an outage. */
 let feedOpen = false;
+/** Visual age advances independently of the feed's catch-up progress. */
+let visualNow = Date.now;
 
 const tensionParams = (s: Settings) => ({
   ...DEFAULT_METRICS_CONFIG.tension,
@@ -181,6 +183,7 @@ async function makeClip(
 const view = mountApp(
   settings,
   {
+    marketNow: () => visualNow(),
     onSettings(next) {
       const prev = settings;
       settings = next;
@@ -246,6 +249,16 @@ function startPipeline(): void {
   events = new EventBuffer(eventThresholds(settings));
   clips.reset();
   feedOpen = false;
+  // Calibrate on the first event, then advance monotonically: a queued socket backlog must
+  // not drag visual time backwards with the feed's smoothed clock offset.
+  visualNow = Date.now;
+  if (settings.source === 'live') {
+    visualNow = () => {
+      const epoch = f.now() - performance.now();
+      visualNow = () => epoch + performance.now();
+      return visualNow();
+    };
+  }
   /** Live trades since connect, replayed after history into the rebuilt metrics; null after. */
   let seen: Trade[] | null = [];
   unsubs = [

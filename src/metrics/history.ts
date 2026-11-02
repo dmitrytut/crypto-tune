@@ -100,13 +100,13 @@ export class MarketHistory implements HistorySeries {
 
   /**
    * A copy of what was complete before `ts`: whole seconds and volume buckets that ended by then
-   * and earlier markers. Replaying data from `ts` on into it rebuilds the history as it grew.
+   * and markers through `ts`. Replay ticks start strictly after `ts`, so its marker belongs here.
    */
   before(ts: number): MarketHistory {
     const h = new MarketHistory();
     for (const p of this.prices) if (p.ts + PRICE_STEP_MS <= ts) h.prices.push({ ...p });
     for (const b of this.volumes) if (b.ts + VOLUME_BUCKET_MS <= ts) h.volumes.push({ ...b });
-    for (const m of this.markers) if (m.ts < ts) h.markers.push(m);
+    for (const m of this.markers) if (m.ts <= ts) h.markers.push(m);
     return h;
   }
 

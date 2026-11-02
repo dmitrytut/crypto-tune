@@ -26,7 +26,11 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
  * field and glow (liquidations), and point blooms (large trades).
  */
 const FRAGMENT = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 uniform vec2 uRes;
 uniform float uTime;
 uniform vec2 uDrift;
@@ -136,8 +140,6 @@ type UniformName =
  * @package
  */
 export class Aura {
-  private readonly gl: WebGLRenderingContext;
-  private readonly u: Record<UniformName, WebGLUniformLocation | null>;
   private current: AuraTarget;
   private target: AuraTarget;
   /** Noise-space time and drift; integrating them keeps speed changes from jumping the picture. */
@@ -153,28 +155,25 @@ export class Aura {
 
   private constructor(
     private readonly canvas: HTMLCanvasElement,
-    gl: WebGLRenderingContext,
-    program: WebGLProgram,
+    private readonly gl: WebGLRenderingContext,
+    private u: Record<UniformName, WebGLUniformLocation | null> | null,
     initial: AuraTarget,
   ) {
-    this.gl = gl;
     this.current = initial;
     this.target = initial;
-    const loc = (n: string) => gl.getUniformLocation(program, n);
-    this.u = {
-      res: loc('uRes'),
-      time: loc('uTime'),
-      drift: loc('uDrift'),
-      a: loc('uA'),
-      b: loc('uB'),
-      warp: loc('uWarp'),
-      glow: loc('uGlow'),
-      shift: loc('uShift'),
-      shock: loc('uShock'),
-      bloom: loc('uBloom'),
-      bloomColor: loc('uBloomColor'),
-    };
+    canvas.addEventListener('webglcontextlost', this.contextLost);
+    canvas.addEventListener('webglcontextrestored', this.contextRestored);
   }
+
+  private readonly contextLost = (event: Event) => {
+    event.preventDefault();
+    this.u = null;
+  };
+
+  private readonly contextRestored = () => {
+    this.u = prepare(this.gl);
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+  };
 
   /** `allowSoftware`: draw on a software renderer too, for a machine that has the CPU to spare. */
   static create(
@@ -190,16 +189,8 @@ export class Aura {
       failIfMajorPerformanceCaveat: !allowSoftware,
     });
     if (!gl) return null;
-    const program = link(gl);
-    if (!program) return null;
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const pos = gl.getAttribLocation(program, 'aPos');
-    gl.enableVertexAttribArray(pos);
-    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-    gl.useProgram(program);
-    return new Aura(canvas, gl, program, initial);
+    const uniforms = prepare(gl);
+    return uniforms ? new Aura(canvas, gl, uniforms, initial) : null;
   }
 
   setTarget(t: AuraTarget): void {
@@ -208,6 +199,8 @@ export class Aura {
 
   /** Frees the GPU context now (a clip's aura), instead of whenever it is collected. */
   dispose(): void {
+    this.canvas.removeEventListener('webglcontextlost', this.contextLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.contextRestored);
     this.gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 
@@ -263,6 +256,7 @@ export class Aura {
 
   private draw(): void {
     const { gl, canvas, u, current: c } = this;
+    if (!u) return;
     const w = Math.max(1, Math.round(canvas.clientWidth * RESOLUTION_SCALE));
     const h = Math.max(1, Math.round(canvas.clientHeight * RESOLUTION_SCALE));
     if (canvas.width !== w || canvas.height !== h) {
@@ -296,6 +290,35 @@ export class Aura {
     gl.uniform3fv(u.bloomColor, this.bloomColorBuf);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
+}
+
+/** Context restoration invalidates every program, buffer and uniform location. */
+function prepare(
+  gl: WebGLRenderingContext,
+): Record<UniformName, WebGLUniformLocation | null> | null {
+  const program = link(gl);
+  if (!program) return null;
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(program, 'aPos');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  gl.useProgram(program);
+  const loc = (name: string) => gl.getUniformLocation(program, name);
+  return {
+    res: loc('uRes'),
+    time: loc('uTime'),
+    drift: loc('uDrift'),
+    a: loc('uA'),
+    b: loc('uB'),
+    warp: loc('uWarp'),
+    glow: loc('uGlow'),
+    shift: loc('uShift'),
+    shock: loc('uShock'),
+    bloom: loc('uBloom'),
+    bloomColor: loc('uBloomColor'),
+  };
 }
 
 function link(gl: WebGLRenderingContext): WebGLProgram | null {

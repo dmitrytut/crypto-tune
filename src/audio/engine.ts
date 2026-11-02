@@ -82,7 +82,7 @@ export class AudioEngine {
     this.stopAt = end;
     g.base.stop(end);
     g.tension.stop(end);
-    Tone.getTransport().stop(end);
+    g.mixer.context.transport.stop(end);
     this.lastTouchAt = Number.NEGATIVE_INFINITY;
     this.state = 'stopped';
   }

@@ -109,7 +109,7 @@ export class BaseLayer {
         this.step = entryStep(this.contour, this.lastDegree);
       }
       const step = this.step++;
-      this.lastDegree = arpDegree(step, 0, this.contour);
+      this.lastDegree = arpDegree(step, this.contour);
       // Weak beats from the transport, not the pattern step (a contour entry can set it
       // to either parity): odd quarters, or off-beat eighths in double time. Resting there
       // thins a calm line without losing the pulse.
