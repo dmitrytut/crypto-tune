@@ -499,8 +499,9 @@ sound, and Binance covers the pairs that matter.
    returned to Full after about 21.03 s. Explicit Full survived sustained load. The same audio graph
    kept running and the simulator did not reconnect. Reload retained Lite and the selected period.
    With stream mode merged: `/?obs&fps=10` in Auto stays Full (FX canvas at the browser DPR) for
-   15 s idle, since frames count only beyond the cap; 150 ms of injected work per frame still drops
-   it to Lite within 3 s. Plain `/`: Lite after ~2 s of 50 ms frames, Full again ~21 s after.
+   15 s idle, since only the cap's time beyond a display frame is excused; 150 ms of injected work
+   per frame still drops it to Lite within 3 s. Plain `/`: Lite after ~2 s of 50 ms frames, Full
+   again ~21 s after.
    A resize event every frame (`dispatchEvent(new Event('resize'))` in a rAF loop) keeps particles
    moving: no particle sprite is drawn at the previous frame's position (all were before the fix).
 5. Synthetic mixed-side 1500-particle fixture, 390×844 desktop-hosted Chromium, CPU ×4: FX-call p95

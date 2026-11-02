@@ -56,7 +56,7 @@ export function mountStage(o: StageOptions): Stage {
   const { reducedMotion } = o;
   // The 1 ms slack keeps a 60 Hz display at 30 fps under a 30 cap instead of rounding to 20.
   const minFrameMs = o.maxFps ? 1000 / o.maxFps - 1 : 0;
-  // The cap's interval is not overload: Auto judges frames by their time beyond it.
+  // The cap's interval is not overload: Auto excuses its time beyond a display frame.
   const quality = new QualityController(o.graphics(), cappedQualityParams(minFrameMs));
   let prevFrame: number | null = null;
   let auraElapsed = 0;

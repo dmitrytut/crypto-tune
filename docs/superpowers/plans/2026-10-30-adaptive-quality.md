@@ -68,7 +68,7 @@
 
 ## After merging master (stream mode, clips)
 
-- `cappedQualityParams(minFrameMs)`: a `?fps=` cap's interval is not overload. Below 30 fps without `fps=`, Auto reads the cadence as overload (README stream table).
+- `cappedQualityParams(minFrameMs)`: a `?fps=` cap's interval beyond one 60 Hz frame is not overload (the base thresholds already budget that frame, so `fps=60` judges like no cap). Below 30 fps without `fps=`, Auto reads the cadence as overload (README stream table).
 - Relapse backoff: if Full fails within fewer windows than the last return needed, the next return needs twice as many; a longer stretch in Full (a real market burst on a healthy host) restores 20. `setMode` restores 20.
 - Lite aura threshold has 1 ms slack so frame-time rounding keeps 15 Hz (4 frames at 60 Hz, 2 at a 30 cap).
 

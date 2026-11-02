@@ -65,6 +65,14 @@ describe('QualityController', () => {
     expect(capped.level).toBe('full');
   });
 
+  it('judges a cap at the display rate like no cap', () => {
+    const capped = new QualityController('auto', cappedQualityParams(1000 / 60 - 1, params));
+    capped.sample(params.warmupMs, 0);
+    // A GPU-bound 20 fps cadence with cheap JS: overload with or without a 60 fps cap.
+    advance(capped, 4, 1, 50);
+    expect(capped.level).toBe('lite');
+  });
+
   it('uses the share of bad frames rather than the worst sample', () => {
     const c = ready();
     for (let window = 0; window < 3; window++) {

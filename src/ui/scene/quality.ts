@@ -30,18 +30,23 @@ const DEFAULT_QUALITY_PARAMS: QualityParams = {
   recoverWindows: 20,
 };
 
+/** The base frame thresholds already budget one 60 Hz display frame. */
+const DISPLAY_FRAME_MS = 1000 / 60;
+
 /**
- * Thresholds for a scene capped to frames of at least `minFrameMs`: frame times count only
- * beyond the cap, so a 10 fps stream is not taken for overload. @package
+ * Thresholds for a scene capped to frames of at least `minFrameMs`: only the cap's time beyond a
+ * display frame is not overload, so a 10 fps stream is not taken for overload and a 60 fps cap
+ * judges like no cap. @package
  */
 export function cappedQualityParams(
   minFrameMs: number,
   base: QualityParams = DEFAULT_QUALITY_PARAMS,
 ): QualityParams {
+  const shift = Math.max(0, minFrameMs - DISPLAY_FRAME_MS);
   return {
     ...base,
-    slowFrameMs: base.slowFrameMs + minFrameMs,
-    headroomFrameMs: base.headroomFrameMs + minFrameMs,
+    slowFrameMs: base.slowFrameMs + shift,
+    headroomFrameMs: base.headroomFrameMs + shift,
   };
 }
 
