@@ -229,9 +229,12 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   cascade build.
 - **Adaptive quality** measures visible-frame cadence and the scene's own JS work, not device
   identity. After a 1 s warm-up, Auto checks 1 s windows. Two consecutive overloaded windows
-  select Lite; 20 consecutive headroom windows allow a return to Full. One stall is insufficient.
-  Visibility changes, resizing/zoom and reduced-motion changes reset the measurement, not the
-  selected level. Full/Lite overrides never switch automatically. No memory/core hints, startup
+  select Lite; 20 consecutive headroom windows allow a return to Full, and each return doubles that
+  wait (40, 80 … windows), so a host that only copes in Lite settles there instead of flipping every
+  ~20 s; picking a mode again starts over. One stall is insufficient. Visibility changes reset the
+  measurement and the clock; resizing/zoom and reduced-motion changes reset only the measurement,
+  so the scene keeps moving during a resize. Neither touches the selected level. Full/Lite
+  overrides never switch automatically. No memory/core hints, startup
   benchmark or browser-specific timing API is required.
 
   | Budget                                     | Full               | Lite                |
@@ -316,7 +319,7 @@ to the address: `https://crypto-tune.com/bitcoin/?obs`.
 | `obs`                  | stream mode                                                                              |
 | `layout=audio`         | sound only: a transparent page, nothing drawn                                            |
 | `aura=on` / `aura=off` | draw the aura even on software WebGL (a GPU-less server streaming the picture), or never |
-| `fps=10…60`            | cap the scene's frame rate                                                               |
+| `fps=10…60`            | cap the scene's frame rate; under 30, match OBS's rate (else Auto sees overload)         |
 | `pair=SYMBOL`          | open any pair, with or without `obs`; `market=coinm` for a COIN-M one (`BTCUSD_PERP`)    |
 
 **OBS:** Sources → **+** → **Browser**; URL `https://crypto-tune.com/bitcoin/?obs`, 1920 × 1080,
@@ -480,7 +483,8 @@ sound, and Binance covers the pairs that matter.
 ### Adaptive graphics
 
 1. `pnpm check && pnpm test && pnpm build`: policy specs cover isolated stalls, sustained overload,
-   broken streaks, recovery, interruptions, 30/60/120 Hz cadence, overrides and settings migration.
+   broken streaks, recovery and its backoff after relapses, interruptions, 30/60/120 Hz cadence, the
+   frame cap, overrides and settings migration.
 2. While Listen runs, switch Full → Lite → Auto in Settings. Bubbles stop colliding in Lite but
    still move, pop, splash and respond to gestures. Music continues; changing graphics does not
    reconnect the feed or restart its history. Arrow keys select radios; reload preserves the choice.
@@ -494,6 +498,8 @@ sound, and Binance covers the pairs that matter.
    With stream mode merged: `/?obs&fps=10` in Auto stays Full (FX canvas at the browser DPR) for
    15 s idle, since frames count only beyond the cap; 150 ms of injected work per frame still drops
    it to Lite within 3 s. Plain `/`: Lite after ~2 s of 50 ms frames, Full again ~21 s after.
+   A resize event every frame (`dispatchEvent(new Event('resize'))` in a rAF loop) keeps particles
+   moving: no particle sprite is drawn at the previous frame's position (all were before the fix).
 5. Synthetic mixed-side 1500-particle fixture, 390×844 desktop-hosted Chromium, CPU ×4: FX-call p95
    Full/Lite was about 18/1.2 ms at normal steps and 38.2/1.8 ms at 100 ms simulation steps. Lite
    retained 400 primaries. The timing probe used browser DPR 1.25; separate DPR-3 device emulation

@@ -46,9 +46,9 @@
 
 **Files:** modify `src/ui/scene/{stage,fx,aura,canvas}.ts` and `src/ui/app.ts`.
 
-**Interfaces:** `StageOptions.graphics(): GraphicsMode`; `Fx.setQuality(level: QualityLevel): void`; `Aura.frame(dtSec: number, quality: QualityLevel): void`; `fitCanvas(canvas, maxDpr = 2): number` with unchanged default for chart/legend. The scene reads graphics from the same settings closure as trade threshold.
+**Interfaces:** `StageOptions.graphics(): GraphicsMode`; `Fx.setQuality(level: QualityLevel): void`; `Aura.frame(dtSec: number, quality: QualityLevel = 'full'): void` (clips use the default); `fitCanvas` unchanged, Fx passes `pixelRatio ?? min(limits.dpr, devicePixelRatio)` and `MAX_DPR` is exported `@package`. The scene reads graphics from the same settings closure as trade threshold.
 - [x] Read LSP references for changed exported contracts and migrate every caller.
-- [x] Feed actual visible-frame interval plus measured scene JS duration to the controller after rendering. Apply its level on the next frame; skip rendering/sampling while hidden. Reset on visibility/resize/visualViewport resize/reduced-motion change; first resumed frame has dt 0.
+- [x] Feed actual visible-frame interval plus measured scene JS duration to the controller after rendering. Apply its level on the next frame; skip rendering/sampling while hidden. Visibility and pause reset sampling and the clock (first resumed frame has dt 0); resize/visualViewport resize/reduced-motion change reset sampling only, so a resize never stalls motion.
 - [x] Keep hit-testing before motion and culling. Apply profile limits to current arrays every frame, preserving newest primary age order with in-place truncation, not allocating removed arrays. Shared local limits replace obsolete budget constants.
 - [x] In Lite, skip collision list building/solving while retaining the existing movement loop; bound both automatic and manual secondary creation. Lower only FX backing resolution.
 - [x] Throttle only the aura in Lite and integrate accumulated elapsed time; use the Lite shader resolution. Keep chart updates and input on each rAF.
@@ -65,6 +65,12 @@
 - [x] Visually inspect desktop/mobile settings and scene, repeat interaction/native pan/reduced-motion checks, and observe browser errors. Verify production cold start and native interaction after build. Remove throwaway browser instrumentation by closing owned pages.
 - [x] Update README with behavior, exact limits, checks and honest physical-device/CWV limits. Run `pnpm check && pnpm test && pnpm build`.
 - [x] Obtain fresh independent policy/rendering and settings/requirements reviews; trace and fix confirmed important findings. Commit complete adaptation separately; do not merge or push it without a user request.
+
+## After merging master (stream mode, clips)
+
+- `cappedQualityParams(minFrameMs)`: a `?fps=` cap's interval is not overload. Below 30 fps without `fps=`, Auto reads the cadence as overload (README stream table).
+- Each Lite → Full recovery doubles the headroom windows the next one needs; `setMode` restores the default.
+- Lite aura threshold has 1 ms slack so frame-time rounding keeps 15 Hz (4 frames at 60 Hz, 2 at a 30 cap).
 
 ## Execution ledger
 

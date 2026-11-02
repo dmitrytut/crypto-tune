@@ -99,6 +99,30 @@ describe('QualityController', () => {
     expect(c.level).toBe('full');
   });
 
+  it('doubles the headroom it needs after each relapse, until the mode is picked again', () => {
+    const c = ready();
+    const relapse = () => {
+      advance(c, 20, 20);
+      expect(c.level).toBe('lite');
+      c.sample(params.warmupMs, 0);
+    };
+    relapse();
+    advance(c, 30, 1);
+    expect(c.level).toBe('full');
+    c.sample(params.warmupMs, 0);
+    relapse();
+    advance(c, 50, 1);
+    expect(c.level).toBe('lite');
+    advance(c, 10, 1);
+    expect(c.level).toBe('full');
+    c.setMode('full');
+    c.setMode('auto');
+    c.sample(params.warmupMs, 0);
+    relapse();
+    advance(c, 30, 1);
+    expect(c.level).toBe('full');
+  });
+
   it('resets an overload streak and warm-up after an interruption while keeping its level', () => {
     const c = ready();
     advance(c, 10, 20);

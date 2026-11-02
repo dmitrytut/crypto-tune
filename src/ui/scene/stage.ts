@@ -120,9 +120,11 @@ export function mountStage(o: StageOptions): Stage {
     resetTiming();
   });
 
-  window.addEventListener('resize', resetTiming);
-  window.visualViewport?.addEventListener('resize', resetTiming);
-  reducedMotion.addEventListener('change', resetTiming);
+  // Layout and motion changes skew a sample, not the clock: resetting time would stall a resize.
+  const resetSampling = () => quality.reset();
+  window.addEventListener('resize', resetSampling);
+  window.visualViewport?.addEventListener('resize', resetSampling);
+  reducedMotion.addEventListener('change', resetSampling);
   let raf = 0;
   const frame = (t: number) => {
     raf = requestAnimationFrame(frame);
@@ -135,7 +137,8 @@ export function mountStage(o: StageOptions): Stage {
     quality.setMode(o.graphics());
     fx.setQuality(quality.level);
     auraElapsed += dt;
-    if (quality.level === 'full' || auraElapsed >= LITE_AURA_INTERVAL_SEC) {
+    // The 1 ms slack keeps frame-time rounding from stretching Lite's 15 Hz to every 5th frame.
+    if (quality.level === 'full' || auraElapsed >= LITE_AURA_INTERVAL_SEC - 0.001) {
       // Reduced motion: the aura barely drifts, regardless of graphics mode.
       aura?.frame(reducedMotion.matches ? auraElapsed * 0.1 : auraElapsed, quality.level);
       auraElapsed = 0;

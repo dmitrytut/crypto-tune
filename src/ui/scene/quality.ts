@@ -17,8 +17,7 @@ export interface QualityParams {
   recoverWindows: number;
 }
 
-/** @package */
-export const DEFAULT_QUALITY_PARAMS: QualityParams = {
+const DEFAULT_QUALITY_PARAMS: QualityParams = {
   warmupMs: 1000,
   windowMs: 1000,
   workBudgetMs: 12,
@@ -56,12 +55,15 @@ export class QualityController {
   private headroom = 0;
   private badWindows = 0;
   private goodWindows = 0;
+  /** Doubles on every recovery: a host that relapses in Full stops flipping every ~20 s. */
+  private recoverWindows: number;
 
   constructor(
     private mode: GraphicsMode,
     private readonly params: QualityParams = DEFAULT_QUALITY_PARAMS,
   ) {
     this.current = mode === 'lite' ? 'lite' : 'full';
+    this.recoverWindows = params.recoverWindows;
     this.reset();
   }
 
@@ -73,6 +75,7 @@ export class QualityController {
     if (mode === this.mode) return;
     this.mode = mode;
     if (mode !== 'auto') this.current = mode;
+    this.recoverWindows = this.params.recoverWindows;
     this.reset();
   }
 
@@ -84,29 +87,29 @@ export class QualityController {
     this.clearWindow();
   }
 
-  sample(frameMs: number, workMs: number): QualityLevel {
-    if (this.mode !== 'auto') return this.current;
+  sample(frameMs: number, workMs: number): void {
+    if (this.mode !== 'auto') return;
     if (this.warmupMs > 0) {
       this.warmupMs -= frameMs;
-      return this.current;
+      return;
     }
     const p = this.params;
     this.elapsedMs += frameMs;
     this.frames++;
     if (workMs > p.workBudgetMs || frameMs > p.slowFrameMs) this.overloaded++;
     if (workMs <= p.headroomWorkMs && frameMs <= p.headroomFrameMs) this.headroom++;
-    if (this.elapsedMs < p.windowMs) return this.current;
+    if (this.elapsedMs < p.windowMs) return;
     this.badWindows = this.overloaded / this.frames >= p.overloadRatio ? this.badWindows + 1 : 0;
     this.goodWindows = this.headroom / this.frames >= p.headroomRatio ? this.goodWindows + 1 : 0;
     const change =
       this.current === 'full'
         ? this.badWindows >= p.degradeWindows
-        : this.goodWindows >= p.recoverWindows;
+        : this.goodWindows >= this.recoverWindows;
     if (change) {
+      if (this.current === 'lite') this.recoverWindows *= 2;
       this.current = this.current === 'full' ? 'lite' : 'full';
       this.reset();
     } else this.clearWindow();
-    return this.current;
   }
 
   private clearWindow(): void {
