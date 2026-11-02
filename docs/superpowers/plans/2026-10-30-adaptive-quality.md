@@ -34,9 +34,9 @@
 
 **Files:** create `src/ui/scene/quality.ts`, `src/ui/scene/__specs__/quality.spec.ts`; modify `src/settings.ts`, `src/__specs__/settings.spec.ts`.
 
-**Interfaces:** `GraphicsMode = 'auto' | 'full' | 'lite'` owned by settings, `Settings.graphics` defaults to `auto`. `QualityLevel` is `Exclude<GraphicsMode, 'auto'>`, owned by quality. `QualityController(mode, params = DEFAULT_QUALITY_PARAMS)` exposes `level`, `setMode(mode)`, `reset()` and `sample(frameMs, workMs): QualityLevel`.
+**Interfaces:** `GraphicsMode = 'auto' | 'full' | 'lite'` owned by settings, `Settings.graphics` defaults to `auto`. `QualityLevel` is `Exclude<GraphicsMode, 'auto'>`, owned by quality. `QualityController(mode, params = DEFAULT_QUALITY_PARAMS)` (params module-private) exposes `level`, `setMode(mode)`, `reset()` and `sample(frameMs, workMs): void`; `cappedQualityParams(minFrameMs)` for a frame cap.
 
-**Policy:** 1000 ms warm-up and 1000 ms sampling windows. Overload: at least 20% of frames have own work >12 ms or interval >40 ms. Headroom: at least 95% have work <=4 ms and interval <=36 ms. Downgrade after 2 consecutive overloaded windows; restore after 20 consecutive headroom windows. Reset counters/warm-up after transitions/interruption, retaining chosen level. Manual modes bypass sampling; entering Auto retains current level. Parameters are typed and injectable for specs.
+**Policy:** 1000 ms warm-up and 1000 ms sampling windows. Overload: at least 20% of frames have own work >12 ms or interval >40 ms. Headroom: at least 95% have work <=4 ms and interval <=36 ms. Downgrade after 2 consecutive overloaded windows; restore after 20 consecutive headroom windows, doubled after a relapse (see "After merging master"). Reset counters/warm-up after transitions/interruption, retaining chosen level. Manual modes bypass sampling; entering Auto retains current level. Parameters are typed and injectable for specs.
 - [x] Write policy regressions for sustained overload, single stall, sustained recovery, broken streaks, warm-up, reset/visibility-sized gap, 30/60/120 Hz cadence, manual override and return to Auto; observe RED.
 - [x] Write settings regression: preserve each explicit valid mode; old/malformed/non-string settings use Auto; observe RED.
 - [x] Implement the scalar-only controller and validated settings field; no per-frame sample arrays or sorting.
@@ -69,7 +69,7 @@
 ## After merging master (stream mode, clips)
 
 - `cappedQualityParams(minFrameMs)`: a `?fps=` cap's interval is not overload. Below 30 fps without `fps=`, Auto reads the cadence as overload (README stream table).
-- Each Lite → Full recovery doubles the headroom windows the next one needs; `setMode` restores the default.
+- Relapse backoff: if Full fails within fewer windows than the last return needed, the next return needs twice as many; a longer stretch in Full (a real market burst on a healthy host) restores 20. `setMode` restores 20.
 - Lite aura threshold has 1 ms slack so frame-time rounding keeps 15 Hz (4 frames at 60 Hz, 2 at a 30 cap).
 
 ## Execution ledger

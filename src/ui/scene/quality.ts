@@ -55,8 +55,13 @@ export class QualityController {
   private headroom = 0;
   private badWindows = 0;
   private goodWindows = 0;
-  /** Doubles on every recovery: a host that relapses in Full stops flipping every ~20 s. */
+  /**
+   * Headroom windows a return to Full needs. Doubles when Full fails sooner than that after a
+   * return (a host that only copes in Lite stops flipping); a longer stretch in Full restores it.
+   */
   private recoverWindows: number;
+  /** Windows sampled in Full since the last return; Infinity before any return. */
+  private fullWindows = Infinity;
 
   constructor(
     private mode: GraphicsMode,
@@ -76,6 +81,7 @@ export class QualityController {
     this.mode = mode;
     if (mode !== 'auto') this.current = mode;
     this.recoverWindows = this.params.recoverWindows;
+    this.fullWindows = Infinity;
     this.reset();
   }
 
@@ -101,15 +107,24 @@ export class QualityController {
     if (this.elapsedMs < p.windowMs) return;
     this.badWindows = this.overloaded / this.frames >= p.overloadRatio ? this.badWindows + 1 : 0;
     this.goodWindows = this.headroom / this.frames >= p.headroomRatio ? this.goodWindows + 1 : 0;
+    if (this.current === 'full') this.fullWindows++;
     const change =
       this.current === 'full'
         ? this.badWindows >= p.degradeWindows
         : this.goodWindows >= this.recoverWindows;
-    if (change) {
-      if (this.current === 'lite') this.recoverWindows *= 2;
-      this.current = this.current === 'full' ? 'lite' : 'full';
-      this.reset();
-    } else this.clearWindow();
+    if (!change) {
+      this.clearWindow();
+      return;
+    }
+    if (this.current === 'full') {
+      const relapse = this.fullWindows < this.recoverWindows;
+      this.recoverWindows = relapse ? this.recoverWindows * 2 : p.recoverWindows;
+      this.current = 'lite';
+    } else {
+      this.fullWindows = 0;
+      this.current = 'full';
+    }
+    this.reset();
   }
 
   private clearWindow(): void {

@@ -229,9 +229,11 @@ shadows, motion, stacking) in `src/ui/styles/tokens.css`, cascade layers
   cascade build.
 - **Adaptive quality** measures visible-frame cadence and the scene's own JS work, not device
   identity. After a 1 s warm-up, Auto checks 1 s windows. Two consecutive overloaded windows
-  select Lite; 20 consecutive headroom windows allow a return to Full, and each return doubles that
-  wait (40, 80 … windows), so a host that only copes in Lite settles there instead of flipping every
-  ~20 s; picking a mode again starts over. One stall is insufficient. Visibility changes reset the
+  select Lite; 20 consecutive headroom windows allow a return to Full. If Full fails again sooner
+  than that return took, the next one needs twice as long (40, 80 … windows), so a host that only
+  copes in Lite settles there instead of flipping every ~20 s; a longer stretch in Full (a passing
+  market burst on a healthy host, a clip render) restores 20, and so does picking a mode. One stall
+  is insufficient. Visibility changes reset the
   measurement and the clock; resizing/zoom and reduced-motion changes reset only the measurement,
   so the scene keeps moving during a resize. Neither touches the selected level. Full/Lite
   overrides never switch automatically. No memory/core hints, startup
@@ -483,8 +485,9 @@ sound, and Binance covers the pairs that matter.
 ### Adaptive graphics
 
 1. `pnpm check && pnpm test && pnpm build`: policy specs cover isolated stalls, sustained overload,
-   broken streaks, recovery and its backoff after relapses, interruptions, 30/60/120 Hz cadence, the
-   frame cap, overrides and settings migration.
+   broken streaks, recovery, its backoff after quick relapses and its reset after a healthy stretch,
+   interruptions, 30/60/120 Hz cadence, the frame cap (down and back up), overrides and settings
+   migration.
 2. While Listen runs, switch Full → Lite → Auto in Settings. Bubbles stop colliding in Lite but
    still move, pop, splash and respond to gestures. Music continues; changing graphics does not
    reconnect the feed or restart its history. Arrow keys select radios; reload preserves the choice.

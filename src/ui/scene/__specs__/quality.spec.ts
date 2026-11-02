@@ -60,6 +60,9 @@ describe('QualityController', () => {
     expect(capped.level).toBe('full');
     advance(capped, 4, 2, capMs + 50);
     expect(capped.level).toBe('lite');
+    capped.sample(params.warmupMs, 0);
+    advance(capped, params.recoverWindows, 2, 100);
+    expect(capped.level).toBe('full');
   });
 
   it('uses the share of bad frames rather than the worst sample', () => {
@@ -121,6 +124,20 @@ describe('QualityController', () => {
     relapse();
     advance(c, 30, 1);
     expect(c.level).toBe('full');
+  });
+
+  it('forgets the backoff once Full has held longer than the wait it needed', () => {
+    const c = ready();
+    for (let burst = 0; burst < 3; burst++) {
+      advance(c, 20, 20);
+      expect(c.level).toBe('lite');
+      c.sample(params.warmupMs, 0);
+      advance(c, 30, 1);
+      expect(c.level).toBe('full');
+      c.sample(params.warmupMs, 0);
+      // A healthy stretch in Full: the next burst is not a relapse.
+      advance(c, 100, 1);
+    }
   });
 
   it('resets an overload streak and warm-up after an interruption while keeping its level', () => {
