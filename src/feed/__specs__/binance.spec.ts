@@ -288,6 +288,27 @@ describe('BinanceFuturesFeed history', () => {
     feed.disconnect();
   });
 
+  it('takes history from the fallback host when the API refuses, asking the API once', async () => {
+    const serve = stubRest(5000);
+    // The US: a 451 without CORS headers reaches the page as a failed fetch.
+    const rest = vi.fn(async (url: string) => {
+      if (new URL(url).hostname !== 'www.binance.com') throw new TypeError('Failed to fetch');
+      return serve(url);
+    });
+    vi.stubGlobal('fetch', rest);
+    const { feed, histories, history, ws } = connect();
+    ws.live(5001);
+    await vi.waitFor(() => expect(histories).toHaveLength(1));
+
+    expect(history()[0]).toBeLessThanOrEqual(5001 - 1800);
+    expect(history().at(-1)).toBe(5000);
+    contiguous(history());
+    const hosts = rest.mock.calls.map(([url]) => new URL(url).hostname);
+    expect(hosts[0]).toBe('fapi.binance.com');
+    expect(hosts.slice(1).every((h) => h === 'www.binance.com')).toBe(true);
+    feed.disconnect();
+  });
+
   it('caps the REST pages on a busy pair', async () => {
     const busy = stubBusyRest();
     const { feed, histories, ws } = connect();

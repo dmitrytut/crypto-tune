@@ -24,7 +24,8 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
   and COIN-M (`dapi`/`dstream`); COIN-M quantities are USD-face contracts ($100 BTC, $10 the rest,
   a rule in the constructor), so the adapter emits base quantity like USDⓈ-M.
   Binance REST answers 451 in the US while the streams work: nothing but the optional history may
-  depend on REST.
+  depend on REST. History asks `fapi`/`dapi` first and, if that fails, `www.binance.com` (same API,
+  answers in the US); the host of the newest page serves the rest.
   `reconnecting-socket.ts` owns backoff and the silence/connect watchdog.
   `trade-cache.ts` is the injected `TradeStore`: recent trades with ids per pair in IndexedDB, so a
   reload fetches only the gap after the cache. Live trades are emitted from the first one; history
@@ -202,7 +203,9 @@ Enforced by Biome (`biome.json`): violations fail `pnpm check`.
 - Feed adapters normalize to `Trade`/`Liquidation`: `side` is the aggressor; a forced SELL is a
   `long` liquidation.
 - Exchange endpoints come from current official docs, never guessed. Binance USDⓈ-M uses the
-  routed `/market` base (legacy `/ws` was decommissioned 2026-04-23).
+  routed `/market` base (legacy `/ws` was decommissioned 2026-04-23). One exception: the history
+  fallback `www.binance.com/{fapi,dapi}/v1`, undocumented but checked, since nothing else answers
+  REST in the US.
 - Biome formats (2 spaces, single quotes, width 100). Do not hand-format against it.
 
 ## Git
