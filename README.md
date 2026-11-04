@@ -114,7 +114,8 @@ computation runs in the browser, which talks to Binance directly.
   market's list of trading perpetuals, a snapshot in `src/feed/binance-pairs.ts` (any other pair
   opens by `?pair=`). Binance REST answers 451 in the US while the streams work, so only the
   optional history uses it. Live trades show at once; meanwhile the last 30 min of trades come
-  from REST (`/fapi/v1/aggTrades` or `/dapi/v1/aggTrades`: the newest page,
+  from REST (`/fapi/v1/aggTrades` or `/dapi/v1/aggTrades`; if that host refuses, as it does in the
+  US, the same API on `www.binance.com`, which answers there: the newest page,
   then the older ones in one parallel wave, up to 20 requests) and end right before the first live
   trade by id. The last 30 min per pair live in IndexedDB (written every 30 s, when the tab is
   hidden and when the page is left), read while the newest page loads, so a reload usually fetches

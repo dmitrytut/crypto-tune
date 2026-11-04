@@ -7,12 +7,25 @@ import { type CachedTrade, NO_STORE, type TradeStore } from './trade-cache';
 export const BINANCE_MARKETS = ['usdm', 'coinm'] as const;
 export type BinanceMarket = (typeof BINANCE_MARKETS)[number];
 
-const ENDPOINTS: Record<BinanceMarket, { ws: string; rest: string }> = {
+/**
+ * `restFallback`: the same API under binance.com, used for history when `rest` fails. Not in the
+ * official docs (an exception to that rule): `fapi`/`dapi` answer 451 in the US, where this host
+ * answers 200 with CORS `*`, the same rows and the same per-IP weight (checked 2026-11-04).
+ */
+const ENDPOINTS: Record<BinanceMarket, { ws: string; rest: string; restFallback: string }> = {
   // Routed endpoint: legacy `wss://fstream.binance.com/ws/...` was decommissioned on 2026-04-23;
   // aggTrade/forceOrder/markPrice live under /market.
-  usdm: { ws: 'wss://fstream.binance.com/market/stream', rest: 'https://fapi.binance.com/fapi/v1' },
+  usdm: {
+    ws: 'wss://fstream.binance.com/market/stream',
+    rest: 'https://fapi.binance.com/fapi/v1',
+    restFallback: 'https://www.binance.com/fapi/v1',
+  },
   // COIN-M was not split: combined streams stay at /stream.
-  coinm: { ws: 'wss://dstream.binance.com/stream', rest: 'https://dapi.binance.com/dapi/v1' },
+  coinm: {
+    ws: 'wss://dstream.binance.com/stream',
+    rest: 'https://dapi.binance.com/dapi/v1',
+    restFallback: 'https://www.binance.com/dapi/v1',
+  },
 };
 
 /** A row of `GET /{fapi,dapi}/v1/aggTrades`; the stream message carries the same fields. */
@@ -130,14 +143,14 @@ export function olderPages(
   return Math.min(cap, Math.ceil((first.T - sinceMs) / spanMs));
 }
 
-/** One page of aggregate trades, oldest first: the newest page, or 1000 ids from `fromId`. */
+/** One page of aggregate trades from `rest`, oldest first: the newest, or 1000 from `fromId`. */
 async function fetchPage(
-  market: BinanceMarket,
+  rest: string,
   symbol: string,
   fromId: number | null,
   signal: AbortSignal,
 ): Promise<AggTradeRow[]> {
-  const base = `${ENDPOINTS[market].rest}/aggTrades?symbol=${encodeURIComponent(symbol)}&limit=${HISTORY_PAGE_SIZE}`;
+  const base = `${rest}/aggTrades?symbol=${encodeURIComponent(symbol)}&limit=${HISTORY_PAGE_SIZE}`;
   const res = await fetch(fromId === null ? base : `${base}&fromId=${fromId}`, { signal });
   if (!res.ok) throw new Error(`aggTrades HTTP ${res.status}`);
   return (await res.json()) as AggTradeRow[];
@@ -269,7 +282,17 @@ export class BinanceFuturesFeed implements MarketFeed {
     const cache = this.loadCache();
     let past: CachedTrade[] = [];
     try {
-      const newest = await fetchPage(this.market, this.symbol, null, signal);
+      // The newest page picks the host: a refused API (451 in the US, seen as a CORS failure)
+      // is asked once per feed, then every page goes to the fallback.
+      let rest = ENDPOINTS[this.market].rest;
+      let newest: AggTradeRow[];
+      try {
+        newest = await fetchPage(rest, this.symbol, null, signal);
+      } catch (err) {
+        if (signal.aborted) throw err;
+        rest = ENDPOINTS[this.market].restFallback;
+        newest = await fetchPage(rest, this.symbol, null, signal);
+      }
       const saved = await cache;
       const firstId = newest[0]?.a ?? 0;
       // A short run saved after an outage must not prevent REST from warming the market.
@@ -283,12 +306,7 @@ export class BinanceFuturesFeed implements MarketFeed {
       const n = olderPages(newest, sinceMs, cachedLastId);
       const older = await Promise.all(
         Array.from({ length: n }, (_, i) =>
-          fetchPage(
-            this.market,
-            this.symbol,
-            Math.max(0, firstId - (n - i) * HISTORY_PAGE_SIZE),
-            signal,
-          ),
+          fetchPage(rest, this.symbol, Math.max(0, firstId - (n - i) * HISTORY_PAGE_SIZE), signal),
         ),
       );
       const rows: CachedTrade[] = [];
