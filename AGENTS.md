@@ -21,15 +21,17 @@ Before committing: `pnpm check && pnpm test && pnpm build`.
 - `src/feed/` — `MarketFeed` contract (`market-feed.ts`) and its implementations: the Binance adapter
   (`binance.ts`, which also loads 30 min of REST `aggTrades` in the background so metrics start
   warm) and `simulator.ts`. The adapter serves both `BINANCE_MARKETS`: USDⓈ-M (`fapi`/`fstream`)
-  and COIN-M (`dapi`/`dstream`); COIN-M quantities are USD-face contracts, so the adapter reads
-  `contractSize` from `exchangeInfo` before opening the stream and emits base quantity like USDⓈ-M.
+  and COIN-M (`dapi`/`dstream`); COIN-M quantities are USD-face contracts ($100 BTC, $10 the rest,
+  a rule in the constructor), so the adapter emits base quantity like USDⓈ-M.
+  Binance REST answers 451 in the US while the streams work: nothing but the optional history may
+  depend on REST.
   `reconnecting-socket.ts` owns backoff and the silence/connect watchdog.
   `trade-cache.ts` is the injected `TradeStore`: recent trades with ids per pair in IndexedDB, so a
   reload fetches only the gap after the cache. Live trades are emitted from the first one; history
   arrives once via `onHistory`, all older than the first live trade, and `main.ts` rebuilds metrics
   from history + live seen so far. Any history or storage failure degrades to a plain live start,
   never blocks the stream.
-  `symbol-cache.ts` caches each market's pair list in localStorage.
+  `binance-pairs.ts` is each market's pair list, a committed snapshot refreshed by hand.
 - `src/metrics/` — pure math (`rolling.ts`, `stats.ts`, `tension.ts`) plus `engine.ts`, which buckets
   trades into 250 ms ticks on the feed clock and emits `MetricsSnapshot`, and `events.ts`
   (`EventBuffer`: trades and liquidations above their thresholds collapse to at most one

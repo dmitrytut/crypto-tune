@@ -93,7 +93,7 @@ export interface BinanceFeedOptions {
 /** `aggTrades` weighs 20 on both markets; 20 pages = 400 of the 2400/min per-IP budget. */
 const HISTORY_MAX_PAGES = 20;
 const HISTORY_PAGE_SIZE = 1000;
-/** Deadline (ms) for history warm-up and COIN-M contract specs; neither may wait forever. */
+/** Deadline (ms) for history warm-up: it may never keep the meter waiting. */
 const HISTORY_TIMEOUT_MS = 15_000;
 /** Longest wait for the trade cache; a stuck store must never hold the live stream back. */
 const CACHE_TIMEOUT_MS = 1_500;
@@ -148,7 +148,7 @@ export class BinanceFuturesFeed implements MarketFeed {
   private readonly market: BinanceMarket;
   private readonly symbol: string;
   /** COIN-M contract face value, USD; null on USDⓈ-M, whose quantities are base already. */
-  private contractUsd: number | null = null;
+  private readonly contractUsd: number | null;
   private readonly trades = new Emitter<Trade>();
   private readonly histories = new Emitter<readonly Trade[]>();
   private readonly liquidations = new Emitter<Liquidation>();
@@ -183,6 +183,9 @@ export class BinanceFuturesFeed implements MarketFeed {
     this.store = opts.store ?? NO_STORE;
     this.market = market;
     this.symbol = symbol.toUpperCase();
+    // One COIN-M contract is worth $100 for BTC and $10 for every other coin (all contracts as of
+    // 2026-11). A fixed rule: `exchangeInfo` answers 451 in the US, where the stream still works.
+    this.contractUsd = market === 'coinm' ? (this.symbol.startsWith('BTCUSD_') ? 100 : 10) : null;
     this.label = `Binance ${this.symbol}`;
     this.socket = new ReconnectingSocket(
       binanceStreamUrl(market, this.symbol),
@@ -192,28 +195,10 @@ export class BinanceFuturesFeed implements MarketFeed {
   }
 
   connect(): void {
-    if (this.market === 'coinm') void this.startContracts();
-    else this.socket.start();
+    this.socket.start();
     this.saveTimer = setInterval(() => void this.persist(), SAVE_EVERY_MS);
     globalThis.document?.addEventListener('visibilitychange', this.saveWhenHidden);
     globalThis.window?.addEventListener('pagehide', this.saveOnLeave);
-  }
-
-  /** COIN-M counts contracts: their face value must be known before the first trade parses. */
-  private async startContracts(): Promise<void> {
-    this.status.emit({ state: 'connecting', attempt: 1 });
-    try {
-      const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(HISTORY_TIMEOUT_MS)]);
-      this.contractUsd = await fetchContractUsd(this.symbol, signal);
-    } catch (err) {
-      if (this.abort.signal.aborted) return;
-      // shortcut: no retry; picking the pair again starts over. The specs come from the same host
-      // as history, so an outage here is rare; retry with the socket's backoff if it ever shows.
-      console.warn('COIN-M contract specs unavailable', err);
-      this.status.emit({ state: 'error', message: 'contract specs unavailable' });
-      return;
-    }
-    if (!this.abort.signal.aborted) this.socket.start();
   }
 
   /** Final: a feed is single-use (`main.ts` builds a new one per pipeline), so the abort is not reset. */
@@ -358,51 +343,4 @@ export class BinanceFuturesFeed implements MarketFeed {
       this.clockOffset += CLOCK_ALPHA * (sample - this.clockOffset);
     }
   }
-}
-
-interface ExchangeInfo {
-  symbols: {
-    symbol: string;
-    contractType: string;
-    /** USDⓈ-M listing state. */
-    status?: string;
-    /** COIN-M listing state. */
-    contractStatus?: string;
-    /** COIN-M contract face value, USD. */
-    contractSize?: number;
-  }[];
-}
-
-async function fetchExchangeInfo(
-  market: BinanceMarket,
-  signal?: AbortSignal,
-): Promise<ExchangeInfo['symbols']> {
-  const res = await fetch(`${ENDPOINTS[market].rest}/exchangeInfo`, { signal });
-  if (!res.ok) throw new Error(`exchangeInfo HTTP ${res.status}`);
-  return ((await res.json()) as ExchangeInfo).symbols;
-}
-
-/** USD face value of one `symbol` contract on COIN-M (100 for BTC, 10 for the rest as of 2026). */
-async function fetchContractUsd(symbol: string, signal: AbortSignal): Promise<number> {
-  const spec = (await fetchExchangeInfo('coinm', signal)).find((s) => s.symbol === symbol);
-  if (!spec?.contractSize) throw new Error(`${symbol} is not a COIN-M contract`);
-  return spec.contractSize;
-}
-
-/**
- * Tradable perpetual symbols of `market`, sorted. USDⓈ-M answers ~1 MB, so callers should cache.
- */
-export async function fetchBinanceSymbols(
-  market: BinanceMarket,
-  signal?: AbortSignal,
-): Promise<string[]> {
-  const symbols = await fetchExchangeInfo(market, signal);
-  return symbols
-    .filter(
-      (s) =>
-        s.contractType === 'PERPETUAL' &&
-        (market === 'usdm' ? s.status : s.contractStatus) === 'TRADING',
-    )
-    .map((s) => s.symbol)
-    .sort();
 }

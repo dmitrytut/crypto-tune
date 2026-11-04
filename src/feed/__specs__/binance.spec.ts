@@ -466,77 +466,24 @@ describe('BinanceFuturesFeed history', () => {
   });
 
   describe('on COIN-M', () => {
-    const exchangeInfo = {
-      symbols: [{ symbol: 'BTCUSD_PERP', contractType: 'PERPETUAL', contractSize: 100 }],
-    };
-
-    function coinM(symbol: string) {
+    // No contract specs are fetched (`exchangeInfo` answers 451 in the US): the stream opens at
+    // once and every contract is valued from its symbol. row(): price 100, 1 contract.
+    it.each([
+      ['BTCUSD_PERP', 1],
+      ['ethusd_perp', 0.1],
+    ])('opens the stream at once and values %s contracts in coins', (symbol, qty) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.withResolvers<never>().promise),
+      );
       FakeWebSocket.last = null;
       const feed = new BinanceFuturesFeed('coinm', symbol, { historyMs: 30 * 60_000 });
       const trades: Trade[] = [];
-      const statuses: string[] = [];
       feed.onTrade((t) => trades.push(t));
-      feed.onStatus((s) => statuses.push(s.state));
       feed.connect();
-      return { feed, trades, statuses };
-    }
-
-    it('reports an error when contract specs stall instead of connecting forever', async () => {
-      vi.useFakeTimers();
-      vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), ms);
-        return controller.signal;
-      });
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
-      vi.stubGlobal('fetch', (_url: string, { signal }: { signal: AbortSignal }) => {
-        const { promise, reject } = Promise.withResolvers<Response>();
-        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-        return promise;
-      });
-      const { feed, statuses } = coinM('BTCUSD_PERP');
-      try {
-        await vi.advanceTimersByTimeAsync(15_000);
-        expect(statuses.at(-1)).toBe('error');
-        expect(FakeWebSocket.last).toBeNull();
-      } finally {
-        feed.disconnect();
-        vi.restoreAllMocks();
-        vi.useRealTimers();
-      }
-    });
-
-    it('opens the stream once contract specs arrive, and reports base quantity', async () => {
-      const specs = Promise.withResolvers<unknown>();
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async (url: string) =>
-          url.includes('/exchangeInfo')
-            ? { ok: true, status: 200, json: () => specs.promise }
-            : Promise.withResolvers<never>().promise,
-        ),
-      );
-      const { feed, trades } = coinM('BTCUSD_PERP');
-      // No socket before the contract size is known: a trade could not be valued.
-      expect(FakeWebSocket.last).toBeNull();
-      specs.resolve(exchangeInfo);
-      await vi.waitFor(() => expect(FakeWebSocket.last).not.toBeNull());
-      (FakeWebSocket.last as FakeWebSocket).live(5001);
-      // row(): price 100, 1 contract of $100 → 1 coin.
+      (FakeWebSocket.last as FakeWebSocket | null)?.live(5001);
       expect(trades[0]?.price).toBe(100);
-      expect(trades[0]?.qty).toBe(1);
-      feed.disconnect();
-    });
-
-    it('reports an error and opens no stream for an unlisted symbol', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => ({ ok: true, status: 200, json: async () => exchangeInfo })),
-      );
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const { feed, statuses } = coinM('BTCUSDT');
-      await vi.waitFor(() => expect(statuses.at(-1)).toBe('error'));
-      expect(FakeWebSocket.last).toBeNull();
+      expect(trades[0]?.qty).toBeCloseTo(qty, 12);
       feed.disconnect();
     });
   });
