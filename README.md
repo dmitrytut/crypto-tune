@@ -109,11 +109,12 @@ computation runs in the browser, which talks to Binance directly.
 - **LIVE**: Binance Futures public WebSocket (`aggTrade` + `forceOrder`): USDⓈ-M at
   `wss://fstream.binance.com/market/stream`, COIN-M at `wss://dstream.binance.com/stream`. The pair
   list has a tab per market; a tab only browses, picking a pair switches the stream.
-  COIN-M quantities count USD-face contracts ($100 for BTC, $10 for the rest, read from
-  `/dapi/v1/exchangeInfo` before the stream opens), so the feed converts them to coins and volume,
-  thresholds and events stay in USD. The pair can be picked from the market's list of trading
-  perpetuals. Live trades show at once; meanwhile the last 30 min of trades come from REST
-  (`/fapi/v1/aggTrades` or `/dapi/v1/aggTrades`: the newest page,
+  COIN-M quantities count USD-face contracts ($100 for BTC, $10 for the rest), so the feed converts
+  them to coins and volume, thresholds and events stay in USD. The pair can be picked from the
+  market's list of trading perpetuals, a snapshot in `src/feed/binance-pairs.ts` (any other pair
+  opens by `?pair=`). Binance REST answers 451 in the US while the streams work, so only the
+  optional history uses it. Live trades show at once; meanwhile the last 30 min of trades come
+  from REST (`/fapi/v1/aggTrades` or `/dapi/v1/aggTrades`: the newest page,
   then the older ones in one parallel wave, up to 20 requests) and end right before the first live
   trade by id. The last 30 min per pair live in IndexedDB (written every 30 s, when the tab is
   hidden and when the page is left), read while the newest page loads, so a reload usually fetches

@@ -3,15 +3,10 @@ import { ListenTracker, ShareTracker, StreamTracker } from './analytics';
 import { AudioEngine } from './audio/engine';
 import type { AudioParams } from './audio/graph';
 import { renderClipAudio } from './audio/offline';
-import {
-  BINANCE_MARKETS,
-  BinanceFuturesFeed,
-  type BinanceMarket,
-  fetchBinanceSymbols,
-} from './feed/binance';
+import { BINANCE_MARKETS, BinanceFuturesFeed } from './feed/binance';
+import { BINANCE_PAIRS } from './feed/binance-pairs';
 import type { MarketFeed, Trade, Unsubscribe } from './feed/market-feed';
 import { SimulatorFeed } from './feed/simulator';
-import { cachedSymbols } from './feed/symbol-cache';
 import { indexedDbTradeStore } from './feed/trade-cache';
 import { ClipBuffer, type ClipSeconds, replayHistory } from './metrics/clip-buffer';
 import { DEFAULT_METRICS_CONFIG, MetricsEngine, TICK_MS } from './metrics/engine';
@@ -326,17 +321,8 @@ window.setInterval(() => {
   if (cues.liquidation) view.showEvent({ kind: 'liquidation', ...cues.liquidation });
 }, TICK_MS);
 
-async function loadSymbols(market: BinanceMarket): Promise<void> {
-  try {
-    view.setSymbols(market, await cachedSymbols(market, () => fetchBinanceSymbols(market)));
-  } catch (err) {
-    // Symbol input still accepts any well-formed ticker without the list.
-    console.warn(`Binance ${market} symbol list unavailable`, err);
-  }
-}
-
 startPipeline();
-for (const market of BINANCE_MARKETS) void loadSymbols(market);
+for (const market of BINANCE_MARKETS) view.setSymbols(market, BINANCE_PAIRS[market]);
 void clipSupport().then((support) => {
   if (support.supported) view.enableClips();
   // The Umami script is deferred after this module: the tracker waits for the page to load.

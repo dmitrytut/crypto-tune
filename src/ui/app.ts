@@ -88,7 +88,7 @@ export interface AppView {
   historyReady(history: HistorySeries): void;
   setStatus(s: FeedStatus): void;
   /** The tradable pairs of one market, for the pair picker. */
-  setSymbols(market: Settings['market'], symbols: string[]): void;
+  setSymbols(market: Settings['market'], symbols: readonly string[]): void;
   setPlayback(state: PlaybackView): void;
   /** Last event that crossed its threshold (shown even while audio is stopped). */
   showEvent(e: EventReadout): void;
